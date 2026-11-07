@@ -7,7 +7,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # WeasyPrint (PDF) native deps + fonts with Cyrillic glyphs
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b libharfbuzz-subset0 \
-    libcairo2 libgdk-pixbuf-2.0-0 libffi8 shared-mime-info \
+    libcairo2 libgdk-pixbuf-2.0-0 libffi8 shared-mime-info libglib2.0-0 \
     fonts-dejavu-core fonts-liberation2 \
     && rm -rf /var/lib/apt/lists/*
 
