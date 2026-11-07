@@ -332,3 +332,80 @@ class AuditLog(Base):
     entity_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     details: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+# ---------------------------------------------------------------------------
+# Procurement: purchase orders, goods receipt, project documents
+# ---------------------------------------------------------------------------
+class PurchaseOrder(Base):
+    """One order to one supplier for one project (generated from an accepted quote, editable afterwards)."""
+
+    __tablename__ = "purchase_orders"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    number: Mapped[str] = mapped_column(String(32), unique=True, index=True)  # PO-2026-0001
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), index=True)
+    quote_id: Mapped[int | None] = mapped_column(ForeignKey("quotes.id"), nullable=True)
+    supplier: Mapped[str] = mapped_column(String(128), index=True)
+    # draft -> sent -> confirmed -> partial -> received ; cancelled
+    status: Mapped[str] = mapped_column(String(16), default="draft", index=True)
+    ordered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    expected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    supplier_ref: Mapped[str | None] = mapped_column(String(64), nullable=True)  # supplier's order / invoice number
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    currency: Mapped[str] = mapped_column(String(3), default="EUR")
+    total: Mapped[float] = mapped_column(Float, default=0.0)  # purchase value, net
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    project: Mapped[Project] = relationship()
+    quote: Mapped[Quote | None] = relationship()
+    lines: Mapped[list[PurchaseOrderLine]] = relationship(back_populates="order", cascade="all, delete-orphan", order_by="PurchaseOrderLine.position")
+
+
+class PurchaseOrderLine(Base):
+    __tablename__ = "purchase_order_lines"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("purchase_orders.id"), index=True)
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    catalog_item_id: Mapped[int | None] = mapped_column(ForeignKey("catalog_items.id"), nullable=True)
+    quote_line_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    sku: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    name: Mapped[str] = mapped_column(String(255))
+    unit: Mapped[str] = mapped_column(String(16), default="бр.")
+    qty_ordered: Mapped[float] = mapped_column(Float, default=0.0)
+    qty_received: Mapped[float] = mapped_column(Float, default=0.0)
+    unit_price: Mapped[float] = mapped_column(Float, default=0.0)  # purchase price, net
+    expected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # last receipt
+    status: Mapped[str] = mapped_column(String(16), default="open")  # open | partial | received | cancelled
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    receipts: Mapped[list[Any]] = mapped_column(JSON, default=list)  # [{date, qty, note, user}]
+    meta: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+
+    order: Mapped[PurchaseOrder] = relationship(back_populates="lines")
+    catalog_item: Mapped[CatalogItem | None] = relationship(lazy="joined")
+
+
+class ProjectDocument(Base):
+    """Everything that belongs to a project and must live on our own server: generated PDFs/XLSX, photos from the
+    site survey, contracts, datasheets snapshot, commissioning protocols …"""
+
+    __tablename__ = "project_documents"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), index=True)
+    quote_id: Mapped[int | None] = mapped_column(ForeignKey("quotes.id"), nullable=True)
+    kind: Mapped[str] = mapped_column(String(32), index=True)  # quote|calc|techfile|bom|rfq|order|photo|survey|contract|datasheet|protocol|other
+    title: Mapped[str] = mapped_column(String(255))
+    filename: Mapped[str] = mapped_column(String(255))
+    path: Mapped[str] = mapped_column(String(255))  # relative to DATA_DIR
+    size: Mapped[int] = mapped_column(Integer, default=0)
+    mime: Mapped[str | None] = mapped_column(String(96), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    project: Mapped[Project] = relationship()

@@ -24,6 +24,7 @@ DEFAULT_SETTINGS: dict[str, dict[str, Any]] = {
         "currency": "EUR",
         "vat_pct": 20.0,
         "default_markup_pct": 10.0,
+        "min_margin_pct": 10.0,
         "advance_options": [60, 70, 80],
         "default_advance_pct": 70,
         "quote_validity_days": 10,
@@ -57,6 +58,7 @@ DEFAULT_SETTINGS: dict[str, dict[str, Any]] = {
         "payment": "1. Аванс при подписване на договор.\n2. Остатък след монтаж и пуск на централата.",
         "intro": "Благодарим Ви за интереса към GM SUN SYSTEM SOLAR. Въз основа на данните за обекта и потреблението Ви подготвихме следното предложение за доставка и монтаж на фотоволтаична централа. Всички позиции са описани в приложената спецификация и могат да бъдат уточнени според Вашите предпочитания.",
         "closing": "Оставаме на разположение за въпроси и безплатен оглед на място.",
+        "order_note": "Моля, потвърдете поръчката с номер и срок на доставка. Доставката да е придружена от приемо-предавателен протокол и сертификати/декларации за съответствие на продуктите.",
         "rfq_note": "Моля, потвърдете наличност, цена и срок на доставка за посочените позиции. При липса на точен артикул предложете еквивалент със същите технически параметри.",
     },
     # Procurement: who we order from and how long it takes (working days). Item-level lead time overrides the
@@ -76,6 +78,7 @@ DEFAULT_SETTINGS: dict[str, dict[str, Any]] = {
     # Set by datafill.fill_missing() once the demo dataset has been completed (prevents re-running on every start).
     "datafill": {"done": False, "at": None, "stats": {}},
     "procurement": {
+        "price_max_age_days": 120,
         "brand_tiers": {
             "premium": ["Huawei", "SMA", "Fronius", "Sungrow", "LONGi", "AIKO", "Jinko", "JA Solar", "BYD", "Aerocompact", "Victron", "Tesla"],
             "economy": ["Deye", "Solis", "Luxpower", "Felicity", "Dyness", "Tongwei", "Canadian", "Risen", "Pylontech", "Must", "Growatt"],

@@ -11,8 +11,10 @@ import { EquipmentStep } from './steps/Equipment'
 import { LaborStep, MaterialsStep } from './steps/Materials'
 import { LayoutStep } from './steps/LayoutStep'
 import { QuoteStep } from './steps/QuoteStep'
+import { OrdersStep } from './steps/OrdersStep'
+import { DocumentsStep } from './steps/DocumentsStep'
 
-export const STEPS = ['client', 'params', 'layout', 'equipment', 'materials', 'labor', 'quote'] as const
+export const STEPS = ['client', 'params', 'layout', 'equipment', 'materials', 'labor', 'quote', 'orders', 'documents'] as const
 export type Step = (typeof STEPS)[number]
 
 export interface StepCtx {
@@ -121,7 +123,7 @@ export default function ProjectPage() {
         <div className="flex items-center gap-2 text-sm text-ink-2">
           {ctx.kwp > 0 && <Badge tone="sun">{fmtNum(ctx.kwp, 2)} kWp</Badge>}
           <Select value={p.status} onChange={(e) => update({ status: e.target.value })} className="input-sm w-auto" aria-label={t('status')}>
-            {['draft', 'quoted', 'sent', 'accepted', 'rejected', 'done'].map((s) => (
+            {['draft', 'quoted', 'sent', 'accepted', 'ordered', 'installing', 'done', 'rejected'].map((s) => (
               <option key={s} value={s}>
                 {t(`status_${s}` as Key)}
               </option>
@@ -160,6 +162,8 @@ export default function ProjectPage() {
         {step === 'materials' && <MaterialsStep ctx={ctx} />}
         {step === 'labor' && <LaborStep ctx={ctx} />}
         {step === 'quote' && <QuoteStep ctx={ctx} />}
+        {step === 'orders' && <OrdersStep ctx={ctx} />}
+        {step === 'documents' && <DocumentsStep ctx={ctx} />}
       </section>
 
       <div className="mt-8 flex items-center justify-between">

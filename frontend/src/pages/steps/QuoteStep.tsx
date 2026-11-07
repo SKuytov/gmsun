@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Download, DraftingCompass, Eye, EyeOff, FileSpreadsheet, FileText, Lock, Plus, RefreshCw, Trash2, Unlock } from 'lucide-react'
+import { Download, DraftingCompass, Eye, EyeOff, FileSpreadsheet, FileText, Lock, Package, Plus, RefreshCw, Trash2, Unlock } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { CompletenessPanel } from '@/components/Completeness'
 import { Badge, Empty, Field, Input, Loading, Modal, NumInput, Select, Spinner, Stat, Textarea, Warn, cx, useToast } from '@/components/ui'
 import { del, downloadFile, errMsg, get, patch, post } from '@/lib/api'
 import { fmtDate, fmtMoney, fmtNum, useT, type Key } from '@/lib/i18n'
@@ -109,7 +110,7 @@ function QuoteEditor({ quote: q0, ctx, lang }: { quote: Quote; ctx: StepCtx; lan
 
   const rfqQ = useQuery({ queryKey: ['rfq', q.id, q.updated_at], queryFn: () => get<RfqSupplier[]>(`/api/quotes/${q.id}/rfq`) })
 
-  const doc = async (kind: 'pdf' | 'pdf_internal' | 'xlsx' | 'xlsx_internal' | 'techfile' | 'rfq' | 'rfq_zip' | `rfq:${string}`) => {
+  const doc = async (kind: 'pdf' | 'pdf_internal' | 'xlsx' | 'xlsx_internal' | 'techfile' | 'rfq' | 'rfq_zip' | 'package' | `rfq:${string}`) => {
     setBusyDoc(kind)
     try {
       const base = `${q.number}-v${q.version}`
@@ -122,6 +123,7 @@ function QuoteEditor({ quote: q0, ctx, lang }: { quote: Quote; ctx: StepCtx; lan
         await downloadFile(`/api/quotes/${q.id}/rfq.xlsx?supplier=${encodeURIComponent(sup)}`, `Zapitvane_${sup.replace(/[^\w.-]+/g, '_')}_${q.number}.xlsx`)
       }
       else if (kind === 'techfile') await downloadFile(`/api/quotes/${q.id}/techfile.pdf`, `${base}-techfile.pdf`)
+      else if (kind === 'package') await downloadFile(`/api/quotes/${q.id}/client-package.zip`, `Paket_klient_${base}.zip`)
       else await downloadFile(`/api/quotes/${q.id}/pdf?mode=${kind === 'pdf' ? 'client' : 'internal'}`, `${base}${kind === 'pdf_internal' ? '-internal' : ''}.pdf`)
     } catch (e) {
       toast.push(errMsg(e), 'bad')
@@ -169,6 +171,8 @@ function QuoteEditor({ quote: q0, ctx, lang }: { quote: Quote; ctx: StepCtx; lan
             </button>
           </div>
         </div>
+
+        <CompletenessPanel quote={q} projectId={ctx.project.id} />
 
         {q.warnings.length > 0 && (
           <Warn>
@@ -292,6 +296,9 @@ function QuoteEditor({ quote: q0, ctx, lang }: { quote: Quote; ctx: StepCtx; lan
           </button>
           <button type="button" className="btn-ghost w-full" onClick={() => doc('techfile')} disabled={!!busyDoc} data-testid="button-techfile">
             {busyDoc === 'techfile' ? <Spinner /> : <DraftingCompass className="h-4 w-4" />} {t('techfile_pdf')}
+          </button>
+          <button type="button" className="btn-accent w-full" onClick={() => doc('package')} disabled={!!busyDoc} title={t('client_package_hint')} data-testid="button-package">
+            {busyDoc === 'package' ? <Spinner /> : <Package className="h-4 w-4" />} {t('client_package')}
           </button>
           <p className="text-center text-xs text-ink-3">
             {q.number} · v{q.version} · {fmtDate(q.created_at)} <Badge tone="neutral">{t(`status_${q.status}` as Key)}</Badge>

@@ -11,7 +11,7 @@ from ..models import Project, Quote, QuoteLine, User
 from ..schemas import QuoteCreate, QuoteLineIn, QuoteLineUpdate, QuoteOut, QuoteUpdate
 from ..services import pricing
 from ..services.pdf import render_quote_html, render_quote_pdf
-from ..services import procurement, workbooks
+from ..services import documents, procurement, workbooks
 from ..services.settings import get_setting
 
 router = APIRouter(tags=["quotes"])
@@ -206,6 +206,8 @@ def quote_pdf(qid: int, mode: str = Query("client"), db: Session = Depends(get_d
     q = _quote(db, qid)
     path = render_quote_pdf(db, q, mode)
     fname = f"Oferta_{q.number}_v{q.version}{'_internal' if mode == 'internal' else ''}.pdf"
+    documents.archive_file(db, q.project, "calc" if mode == "internal" else "quote", path, fname, quote=q, title=f"{'Вътрешна калкулация' if mode == 'internal' else 'Оферта'} {q.number} v{q.version}")
+    db.commit()
     return FileResponse(str(path), media_type="application/pdf", filename=fname)
 
 
@@ -216,7 +218,10 @@ def quote_techfile(qid: int, db: Session = Depends(get_db), _: User = Depends(ge
 
     q = _quote(db, qid)
     path = render_techfile_pdf(db, q)
-    return FileResponse(str(path), media_type="application/pdf", filename=f"Tehnichesko_dosie_{q.number}_v{q.version}.pdf")
+    fname = f"Tehnichesko_dosie_{q.number}_v{q.version}.pdf"
+    documents.archive_file(db, q.project, "techfile", path, fname, quote=q, title=f"Техническо досие {q.number} v{q.version}")
+    db.commit()
+    return FileResponse(str(path), media_type="application/pdf", filename=fname)
 
 
 @router.get("/quotes/{qid}/techfile.html", response_class=HTMLResponse)
@@ -235,6 +240,8 @@ def quote_xlsx(qid: int, internal: bool = False, db: Session = Depends(get_db), 
     q = _quote(db, qid)
     data = workbooks.quote_workbook(db, q, internal=internal)
     name = f"{'KSS_vatreshna' if internal else 'KSS'}_{q.number}_v{q.version}.xlsx"
+    documents.archive(db, q.project, "bom", name, data, quote=q, title=f"КСС {q.number} v{q.version}{' (вътрешна)' if internal else ''}")
+    db.commit()
     return Response(data, media_type=XLSX_MIME, headers={"Content-Disposition": f"attachment; filename={name}"})
 
 
@@ -260,12 +267,18 @@ def quote_rfq_xlsx(qid: int, supplier: str | None = None, db: Session = Depends(
     """Request-for-quotation workbook: summary sheet + one sheet per supplier (or a single supplier)."""
     q = _quote(db, qid)
     data = workbooks.rfq_workbook(db, q, supplier)
-    suffix = f"_{workbooks._safe(supplier)}" if supplier else ""
-    return Response(data, media_type=XLSX_MIME, headers={"Content-Disposition": f"attachment; filename=Zapitvane_{q.number}{suffix}.xlsx"})
+    suffix = f"_{workbooks.ascii_name(supplier)}" if supplier else ""
+    name = f"Zapitvane_{q.number}{suffix}.xlsx"
+    documents.archive(db, q.project, "rfq", name, data, quote=q, title=f"Запитване {q.number}" + (f" — {supplier}" if supplier else ""))
+    db.commit()
+    return Response(data, media_type=XLSX_MIME, headers={"Content-Disposition": f"attachment; filename={name}"})
 
 
 @router.get("/quotes/{qid}/rfq.zip")
 def quote_rfq_zip(qid: int, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     """One RFQ workbook per supplier, zipped – ready to attach to separate e-mails."""
     q = _quote(db, qid)
-    return Response(workbooks.rfq_zip(db, q), media_type="application/zip", headers={"Content-Disposition": f"attachment; filename=Zapitvania_{q.number}.zip"})
+    data = workbooks.rfq_zip(db, q)
+    documents.archive(db, q.project, "rfq", f"Zapitvania_{q.number}.zip", data, quote=q, title=f"Запитвания {q.number} (всички доставчици)")
+    db.commit()
+    return Response(data, media_type="application/zip", headers={"Content-Disposition": f"attachment; filename=Zapitvania_{q.number}.zip"})

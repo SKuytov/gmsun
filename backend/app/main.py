@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from . import models  # noqa: F401  (register tables)
 from .config import get_settings
 from .db import Base, SessionLocal, engine, ensure_columns
-from .routers import auth, catalog, projects, quotes, settings, sizing
+from .routers import auth, catalog, documents, orders, projects, quotes, settings, sizing
 from .seed import seed
 
 
@@ -33,7 +33,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    for r in (auth.router, catalog.router, settings.router, projects.router, quotes.router, sizing.router):
+    for r in (auth.router, catalog.router, settings.router, projects.router, quotes.router, sizing.router, orders.router, documents.router):
         app.include_router(r, prefix="/api")
 
     @app.get("/api/health")

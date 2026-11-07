@@ -1,4 +1,4 @@
-import { BookOpen, FolderKanban, LogOut, Settings2, Sun } from 'lucide-react'
+import { BookOpen, FolderKanban, LayoutDashboard, LogOut, Settings2, Sun, Truck } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
@@ -9,7 +9,9 @@ export function Shell({ children }: { children: ReactNode }) {
   const { t, lang, setLang } = useT()
   const { user, logout } = useAuth()
   const items = [
+    { to: '/dashboard', label: t('nav_dashboard'), icon: LayoutDashboard },
     { to: '/', label: t('nav_projects'), icon: FolderKanban, end: true },
+    { to: '/deliveries', label: t('nav_deliveries'), icon: Truck },
     { to: '/catalog', label: t('nav_catalog'), icon: BookOpen },
     { to: '/settings', label: t('nav_settings'), icon: Settings2 },
   ]

@@ -8,8 +8,9 @@ import { fmtMoney, fmtNum, useT, type Key } from '@/lib/i18n'
 import type { CatalogItem, LaborOption, MountingRule, RoofType, Tier } from '@/lib/types'
 import { useAuth } from '@/lib/auth'
 import { DocLinks, useMountingSystems } from '@/components/MountingSystem'
+import { DocsTab } from './CatalogDocs'
 
-const TABS = ['items', 'labor', 'roofs', 'rules'] as const
+const TABS = ['items', 'labor', 'roofs', 'rules', 'docs'] as const
 type Tab = (typeof TABS)[number]
 
 interface Meta {
@@ -83,7 +84,7 @@ export default function CatalogPage() {
         <div className="inline-flex gap-1 rounded-md bg-surface-2 p-1">
           {TABS.map((x) => (
             <button key={x} type="button" onClick={() => nav(`/catalog/${x}`)} className={cx('h-9 rounded px-3 text-sm font-medium', tab === x ? 'bg-surface shadow-card' : 'text-ink-2')} data-testid={`tab-catalog-${x}`}>
-              {{ items: t('nav_catalog'), labor: t('labor'), roofs: t('roof_types_title'), rules: t('mounting_rules_title') }[x]}
+              {{ items: t('nav_catalog'), labor: t('labor'), roofs: t('roof_types_title'), rules: t('mounting_rules_title'), docs: t('local_docs') }[x]}
             </button>
           ))}
         </div>
@@ -92,6 +93,7 @@ export default function CatalogPage() {
       {tab === 'labor' && <LaborTab />}
       {tab === 'roofs' && <RoofsTab lang={lang} />}
       {tab === 'rules' && <RulesTab lang={lang} />}
+      {tab === 'docs' && <DocsTab lang={lang} />}
     </div>
   )
 }

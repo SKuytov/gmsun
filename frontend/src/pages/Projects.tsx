@@ -7,7 +7,7 @@ import { del, errMsg, get, post } from '@/lib/api'
 import { fmtDate, fmtMoney, fmtNum, useT } from '@/lib/i18n'
 import type { Project, ProjectListItem, RoofType } from '@/lib/types'
 
-const statusTone: Record<string, 'neutral' | 'ok' | 'warn' | 'bad' | 'sun'> = { draft: 'neutral', quoted: 'sun', sent: 'sun', accepted: 'ok', rejected: 'bad', done: 'ok' }
+const statusTone: Record<string, 'neutral' | 'ok' | 'warn' | 'bad' | 'sun'> = { draft: 'neutral', quoted: 'sun', sent: 'sun', accepted: 'ok', ordered: 'ok', installing: 'ok', rejected: 'bad', done: 'ok' }
 
 export default function ProjectsPage() {
   const { t, lang } = useT()

@@ -169,6 +169,40 @@ AEROTOOL report, as the technical file states.
   applies only non‑empty cells, `-` clears, creates keyless rows, validates enumerations and returns
   `{tables: {…: {rows, created, updated, skipped, errors[]}}, created, updated, skipped, errors}`.
 
+## Completeness audit (`services/completeness.py`)
+
+`check(db, quote)` returns a score (0–100, weighted by severity) and grouped findings (`equipment`, `grid`, `site`,
+`labor`, `pricing`), each with a machine‑applicable fix: `add_item` (catalog item + qty into
+`selections.extra_items`/`electrical_items`), `step` (go to a wizard step), `nav`, `rfq`. Rules draw on the
+engineering result (inverter AC vs connected power → export limiter, DC run → combiner, module count → spares),
+the site survey (`project.params.survey`: height > 6 m → scaffold/lift, `internet == none` → 4G router,
+`main_breaker_a` < required AC breaker → upgrade, `cable_route_m` > 30 → conduit, `roof_condition == poor` → repair,
+no LPS on tall building → LPS survey, `roof_access`), the quote (no labour, no transport, no commissioning
+protocols, no grid paperwork, no waste removal, CAR insurance above 30 kWp), and the catalog (indicative prices,
+unverified specs, stale prices, margin below `pricing.min_margin_pct`). Service items are matched by name regexes
+(`SERVICE_ITEMS`) so renamed catalog entries still work.
+
+## Purchase orders and receiving (`services/orders.py`)
+
+`generate_orders` groups the material lines of a quote by `procurement.supplier_of` (labour/transport excluded,
+hidden lines skipped) into one `PurchaseOrder` per supplier, numbered `PO‑YYYY‑NNNN`; `expected_at` = today +
+max lead time of the lines. Existing drafts for the quote are replaced, sent/confirmed orders are kept. `receive`
+appends to the line's receipt log, recomputes `qty_received`, line status (`open|partial|received`) and order status
+(`partial|received`), and `readiness` aggregates per project (lines received / total, value received, earliest
+install start = latest expected date of open lines). `awaiting` powers the Deliveries page and dashboard (overdue =
+expected < today and not received). `order_workbook` renders the supplier‑facing Excel (one sheet, SKU, qty, unit,
+price, expected date, notes) which is also archived as a project document.
+
+## Project documents and local datasheet mirror (`services/documents.py`)
+
+Generated files are archived via `archive()` under `DATA_DIR/projects/<pid>/<kind>/` with a `ProjectDocument` row
+(kinds: quote, calc, techfile, bom, rfq, order, photo, survey, contract, datasheet, protocol, other). Uploaded
+photos are re‑encoded to JPEG ≤ 1920 px. `mirror_datasheets` runs in a background thread and downloads every
+catalog datasheet URL and every Aerocompact DOCS PDF into `DATA_DIR/datasheets/<hash>.pdf` (progress in `_MIRROR`,
+exposed by `GET /api/catalog/datasheets/status`). `item_datasheet_path(ci, download=False)` lets PDF/techfile/package
+generation use local files only. `client_package` builds the ZIP and merges quote + technical file + unique
+datasheets into one PDF with pypdf.
+
 ## Data sources
 
 - LONGi Hi‑MO X10 LR8‑66HVD‑650M datasheet — https://eu.longi.com/longi-solar-panels-datasheets/lr8-66hvd-640-670m

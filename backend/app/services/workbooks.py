@@ -47,6 +47,18 @@ FILL_SECTION = PatternFill("solid", fgColor=LIGHT)
 FILL_TOTAL = PatternFill("solid", fgColor=GREY)
 
 
+_CYR = dict(zip("абвгдежзийклмнопрстуфхцчшщъьюяАБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЬЮЯ",
+                ["a", "b", "v", "g", "d", "e", "zh", "z", "i", "y", "k", "l", "m", "n", "o", "p", "r", "s", "t", "u", "f", "h", "ts", "ch", "sh", "sht", "a", "y", "yu", "ya",
+                 "A", "B", "V", "G", "D", "E", "Zh", "Z", "I", "Y", "K", "L", "M", "N", "O", "P", "R", "S", "T", "U", "F", "H", "Ts", "Ch", "Sh", "Sht", "A", "Y", "Yu", "Ya"]))
+
+
+def ascii_name(s: str) -> str:
+    """Latin-only file name part (HTTP headers are latin-1): transliterate Cyrillic, drop the rest."""
+    out = "".join(_CYR.get(ch, ch) for ch in s)
+    out = "".join(ch if ch.isascii() and (ch.isalnum() or ch in "-_. ") else "_" for ch in out)
+    return (out.strip("_ ").replace(" ", "_") or "x")[:40]
+
+
 def _safe(s: str) -> str:
     s = re.sub(r"[^\w\-. ]+", "_", s, flags=re.U).strip("_ ")
     return (s or "x")[:40]

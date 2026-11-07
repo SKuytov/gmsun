@@ -252,6 +252,18 @@ CATALOG: list[dict] = [
     {"category": "transport", "name": "Транспорт до обекта", "unit": "бр.", "purchase_price": 0.0, "sell_price": 120.0},
     {"category": "service", "name": "Проектиране и документация за присъединяване", "unit": "бр.", "purchase_price": 0.0, "sell_price": 350.0},
     {"category": "service", "name": "Монтаж и настройка на мониторинг (Wi-Fi/4G)", "unit": "бр.", "purchase_price": 0.0, "sell_price": 60.0},
+    # ----- services the completeness check can add with one click (often forgotten → unpaid work) -----
+    {"category": "service", "name": "Скеле / подемна техника — наем", "unit": "ден", "purchase_price": 110.0, "specs": {"service": True, "price_source": "indicative", "note_bg": "Фасадно скеле или ножична/коленчата вишка. Цената е на ден с транспорт."}},
+    {"category": "service", "name": "Пускови изпитвания и протоколи по IEC 62446-1, обучение на клиента", "unit": "компл.", "purchase_price": 90.0, "sell_price": 180.0, "specs": {"service": True, "note_bg": "Изолационно съпротивление, Voc/Isc по стринг, полярност, заземяване, протокол за ЕРП и за гаранцията."}},
+    {"category": "service", "name": "Застраховка СМР (строително-монтажни рискове)", "unit": "компл.", "purchase_price": 150.0, "specs": {"service": True, "price_source": "indicative"}},
+    {"category": "service", "name": "Извозване на опаковки и строителни отпадъци", "unit": "компл.", "purchase_price": 40.0, "sell_price": 80.0, "specs": {"service": True, "price_source": "indicative"}},
+    {"category": "service", "name": "Изкопни работи за кабелна траншея (вкл. пясък, сигнална лента, засипване)", "unit": "м", "purchase_price": 9.0, "sell_price": 14.0, "specs": {"service": True, "price_source": "indicative"}},
+    {"category": "service", "name": "Оглед и становище за мълниезащита (LPS) и свързване към съществуваща заземителна уредба", "unit": "компл.", "purchase_price": 60.0, "sell_price": 120.0, "specs": {"service": True}},
+    {"category": "service", "name": "Ремонт / хидроизолация на покрива около проходите (резерв)", "unit": "компл.", "purchase_price": 120.0, "sell_price": 180.0, "specs": {"service": True, "price_source": "indicative"}},
+    {"category": "electrical", "name": "Кабелен канал PVC 60×40 mm с капак (м)", "unit": "м", "purchase_price": 3.2, "specs": {"price_source": "indicative"}},
+    {"category": "monitoring", "name": "4G/LTE рутер със SIM карта за мониторинг (без интернет на обекта)", "unit": "бр.", "purchase_price": 55.0, "specs": {"price_source": "indicative", "note_bg": "SIM картата и абонаментът са за сметка на клиента."}},
+    {"category": "monitoring", "name": "Wi-Fi/LAN комуникационен модул (логер) за инвертор", "unit": "бр.", "purchase_price": 38.0, "specs": {"price_source": "indicative", "note_bg": "Универсална позиция; при избор на инвертор заменете с оригиналния stick (Solis S3-WiFi-ST, Deye WiFi Plug, Huawei SDongle, Sungrow WiNet-S)."}},
+    {"category": "electrical", "name": "Комплект предупредителни табели за ПБ и ЕРП (фасада, ГРТ, инвертор)", "unit": "компл.", "purchase_price": 12.0, "specs": {"price_source": "indicative"}},
 ]
 
 # Roof / terrain types and the per-type component rules come from the Aerocompact catalogue module.

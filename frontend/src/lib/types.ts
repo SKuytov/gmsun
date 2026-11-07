@@ -483,3 +483,176 @@ export interface ProcurementSettings {
   candidate_inverters: number
   candidate_batteries: number
 }
+
+// ---------------------------------------------------------------- ERP: orders, deliveries, documents, completeness
+export interface PoLine {
+  id: number
+  order_id: number
+  catalog_item_id: number | null
+  sku: string | null
+  name: string
+  unit: string
+  qty_ordered: number
+  qty_received: number
+  qty_open: number
+  unit_price: number
+  expected_at: string | null
+  received_at: string | null
+  status: 'open' | 'partial' | 'received' | 'cancelled'
+  overdue: boolean
+  notes: string | null
+  receipts: { date: string; qty: number; note: string; user: string }[]
+  meta: Record<string, unknown>
+  // present in cross-project lists
+  order_number?: string
+  supplier?: string
+  project_id?: number
+  project_number?: string
+  project_name?: string
+  order_status?: string
+}
+
+export type PoStatus = 'draft' | 'sent' | 'confirmed' | 'partial' | 'received' | 'cancelled'
+
+export interface PurchaseOrder {
+  id: number
+  number: string
+  project_id: number
+  project_number: string | null
+  project_name: string | null
+  quote_id: number | null
+  quote_number: string | null
+  supplier: string
+  status: PoStatus
+  supplier_ref: string | null
+  ordered_at: string | null
+  expected_at: string | null
+  notes: string | null
+  currency: string
+  total: number
+  created_at: string | null
+  lines: PoLine[]
+  lines_total: number
+  lines_received: number
+  lines_overdue: number
+  overdue: boolean
+}
+
+export interface Readiness {
+  project_id: number
+  quote_id: number | null
+  quote_number: string | null
+  quote_status: string | null
+  items_total: number
+  items_ordered: number
+  items_received: number
+  pct_ordered: number
+  pct_received: number
+  value_total: number
+  value_received: number
+  orders: PurchaseOrder[]
+  waiting: PoLine[]
+  overdue: PoLine[]
+  not_ordered: { name: string; unit: string; qty: number; supplier: string; section: string; item_id: number | null }[]
+  earliest_start: string | null
+  ready: boolean
+}
+
+export interface Awaiting {
+  today: string
+  orders: PurchaseOrder[]
+  open_lines: PoLine[]
+  overdue_lines: PoLine[]
+  suppliers: { supplier: string; orders: number; open_lines: number; overdue_lines: number; value: number }[]
+}
+
+export interface CompletenessFix {
+  type: 'add_item' | 'step' | 'nav' | 'rfq'
+  catalog_item_id?: number
+  qty?: number
+  target?: 'extra' | 'electrical'
+  name?: string
+  price?: number
+  step?: string
+  to?: string
+}
+
+export interface CompletenessItem {
+  code: string
+  level: 'ok' | 'info' | 'warn' | 'bad'
+  title: string
+  detail: string
+  fix: CompletenessFix | null
+  group: string
+}
+
+export interface Completeness {
+  quote_id: number
+  score: number
+  counts: Record<'ok' | 'info' | 'warn' | 'bad', number>
+  ready: boolean
+  items: CompletenessItem[]
+  groups: [string, string][]
+}
+
+export interface ProjectDoc {
+  id: number
+  project_id: number
+  quote_id: number | null
+  kind: string
+  kind_label: string
+  title: string
+  filename: string
+  path: string
+  url: string
+  size: number
+  mime: string | null
+  notes: string | null
+  created_at: string | null
+  created_by: number | null
+}
+
+export interface Survey {
+  surveyed_at?: string
+  surveyed_by?: string
+  building_height_m?: number | null
+  floors?: number | null
+  roof_access?: 'ladder' | 'scaffold' | 'lift' | 'crane' | 'internal' | ''
+  roof_condition?: 'good' | 'fair' | 'poor' | ''
+  structure?: 'concrete' | 'steel' | 'wood' | ''
+  roof_age_years?: number | null
+  shading?: 'none' | 'partial' | 'strong' | ''
+  grid_operator?: string
+  meter_no?: string
+  main_breaker_a?: number | null
+  meter_location?: string
+  cable_route_m?: number | null
+  cable_route_notes?: string
+  internet?: 'wifi' | 'lan' | 'none' | ''
+  has_lightning_protection?: boolean
+  earth_existing?: boolean
+  notes?: string
+}
+
+export interface Dashboard {
+  today: string
+  pipeline: Record<string, number>
+  projects_total: number
+  recent_projects: { id: number; number: string; name: string; client_name: string; status: string; updated_at: string | null; kwp: number | null }[]
+  quotes: { sent: number; accepted: number; value_open: number; value_won: number; expiring: { id: number; number: string; version: number; project_id: number; project_name: string; client_name: string; total: number; valid_until: string; expired: boolean }[] }
+  deliveries: { open_orders: number; open_lines: number; overdue_lines: number; overdue: PoLine[]; next: PoLine[]; suppliers: Awaiting['suppliers'] }
+  catalog: { items: number; no_price: number; indicative: number; unverified: number; stale: number; max_age_days: number; no_price_items: { id: number; name: string }[]; unverified_items: { id: number; name: string }[] }
+  datasheets: { items_with_url: number; items_local: number; library_total: number; library_local: number; files: number; size_mb: number; running: boolean }
+}
+
+export interface DatasheetStatus {
+  items_with_url: number
+  items_local: number
+  items_uploaded_only: number
+  library_total: number
+  library_local: number
+  files: number
+  size_mb: number
+  running: boolean
+  progress: { running: boolean; total: number; done: number; ok: number; failed: number; started_at: string | null; finished_at: string | null; current: string | null; errors: string[] }
+}
