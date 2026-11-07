@@ -14,3 +14,4 @@ frontend/android/.idea/
 *.apk
 *.aab
 .DS_Store
+backups/

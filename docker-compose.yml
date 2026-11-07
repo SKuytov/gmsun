@@ -1,0 +1,52 @@
+# gmsun — production stack (Ubuntu 24.04/26.04 server, Docker Compose v2)
+#   cp .env.example .env   # edit SECRET_KEY, ADMIN_PASSWORD, POSTGRES_PASSWORD
+#   docker compose up -d --build
+# Web UI + API: http://<server-ip>:${HTTP_PORT:-80}
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-gmsun}
+      POSTGRES_USER: ${POSTGRES_USER:-gmsun}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gmsun} -d ${POSTGRES_DB:-gmsun}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-gmsun}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-gmsun}
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env}
+      ACCESS_TOKEN_MINUTES: ${ACCESS_TOKEN_MINUTES:-720}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@gmsun.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin1234}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      SEED_DEMO: ${SEED_DEMO:-true}
+      DATA_DIR: /data
+    volumes:
+      - appdata:/data
+    expose:
+      - "8000"
+
+  web:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${HTTP_PORT:-80}:80"
+
+volumes:
+  pgdata:
+  appdata:

@@ -1,0 +1,2 @@
+# /etc/cron.d/gmsun-backup — nightly backup at 02:30
+30 2 * * * root /opt/gmsun/deploy/backup.sh >> /var/log/gmsun-backup.log 2>&1

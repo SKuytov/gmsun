@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">gmsun</string>
+    <string name="title_activity_main">gmsun</string>
+    <string name="package_name">bg.gmsun.app</string>
+    <string name="custom_url_scheme">bg.gmsun.app</string>
+</resources>
