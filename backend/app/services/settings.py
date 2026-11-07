@@ -72,6 +72,8 @@ DEFAULT_SETTINGS: dict[str, dict[str, Any]] = {
         "delivery_address": "",  # empty → company address is used in RFQ documents
     },
     # Automatic tier classification (economy / standard / premium) and proposal engine weights.
+    # Set by datafill.fill_missing() once the demo dataset has been completed (prevents re-running on every start).
+    "datafill": {"done": False, "at": None, "stats": {}},
     "procurement": {
         "brand_tiers": {
             "premium": ["Huawei", "SMA", "Fronius", "Sungrow", "LONGi", "AIKO", "Jinko", "JA Solar", "BYD", "Aerocompact", "Victron", "Tesla"],

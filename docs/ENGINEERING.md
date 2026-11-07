@@ -134,6 +134,30 @@ AEROTOOL report, as the technical file states.
 - **Schema migration**: `db.ensure_columns()` adds new nullable columns to existing SQLite/PostgreSQL tables at
   startup, so upgrades need no manual migration.
 
+## Complete dataset (`services/datafill.py`) and Excel round trip (`services/dataset_io.py`)
+
+- `fill_missing()` runs once at first start (flag in setting `datafill.done`) and on demand
+  (`POST /api/catalog/dataset/fill-missing`). It only writes **empty** fields: manufacturer (brand detection from
+  the name), supplier (supplier defaults / “Deye дистрибутор (BG)” / “Електро склад (местен)” / own services), SKU
+  (`GE-<supplier id>`, model code from the name, or `GMS-<CAT>-<id>`), warranty by category/brand, missing
+  `ac_power_kw`/`kwh` parsed from the name, purchase price, explicit lead time and the frozen automatic tier.
+- Indicative price model (net EUR, Nov 2026): modules €/Wp by brand (AIKO 0.165, Jinko/JA 0.15, LONGi 0.125–0.14,
+  DAH 0.125, Tongwei/Ulica/Risen/Suntech 0.12, +0.01 full‑black); inverters `a + b·kW` per brand/topology (Deye LV
+  1‑ph 450+85·kW, LV 3‑ph 550+70·kW, HV 870+57·kW; Sungrow SH 300+90·kW, SG 250+60·kW, CX 1200+32·kW, HX
+  2500+22·kW; Huawei L1 450+90·kW, ≥100 kW 1500+25·kW; Solis grid 200+60·kW, hybrid 350+120·kW …); batteries
+  €/kWh (Deye LV 105–115, Dyness/DAH/Luxpower 118, HV modules 150–160, LONGi 170–200, Huawei/GoodWe 225, Sungrow
+  230–265, C&I cabinets 175–190, MWh containers 150); fixed prices for dongles, meters, EV chargers, racks/BMS,
+  transport, design, monitoring setup. Lead times: stock status → supplier default; C&I cabinets and ≥100 kW
+  inverters 60 days, 25–99 kW 20 days, Deye seed items 10 days. Every estimate is tagged `price_source="indicative"`,
+  `price_note`, `price_estimated_at`, `lead_source="indicative"`; the Excel import replaces the tag with
+  `excel-import` when a price/lead time is changed.
+- Excel layout: row 1 = technical key, row 2 = Bulgarian label, data from row 3; grey read‑only key columns, drop‑down
+  validation for category/tier/basis/stock/yes‑no, autofilter and frozen panes. Sheets: Артикули (all columns + flat
+  spec keys + `specs_json`), Труд, Типове покриви, Правила конструкция, Доставчици (settings.suppliers.list),
+  Настройки (flattened `group.key` scalars), Инструкции. Import matches by `id`/`code`/supplier name/setting path,
+  applies only non‑empty cells, `-` clears, creates keyless rows, validates enumerations and returns
+  `{tables: {…: {rows, created, updated, skipped, errors[]}}, created, updated, skipped, errors}`.
+
 ## Data sources
 
 - LONGi Hi‑MO X10 LR8‑66HVD‑650M datasheet — https://eu.longi.com/longi-solar-panels-datasheets/lr8-66hvd-640-670m

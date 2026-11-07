@@ -103,6 +103,21 @@ XM‑PL за плоски керемиди), LT ламарина (CompactMETAL T
 - Документите (оферта за клиента, вътрешна калкулация, техническо досие, Excel КСС/Поръчка/Запитване) са с единен
   фирмен стил: шрифт Inter, бланка, обобщение „Предложено решение“, ценови блок, спецификация по раздели, условия.
 
+### Пълен набор данни и редакция на всички таблици в Excel
+
+- При първи старт **всички** артикули получават цена, доставчик, срок, клас, код и гаранция. Там, където няма реална
+  цена/срок, системата попълва **ориентировъчни стойности** (модули €/Wp по марка, инвертори €/kW по марка и
+  топология, батерии €/kWh по сегмент, типични цени за аксесоари и услуги, срокове по доставчик и наличност).
+  Такива стойности са маркирани в спецификациите с `price_source = "indicative"` / `lead_source = "indicative"` и
+  се заменят с реалните оферти — през интерфейса, при синхронизация с доставчика или чрез Excel. Нищо въведено
+  ръчно не се презаписва; **Каталог → Всички таблици (Excel) → „Попълни липсващите стойности“** може да се пусне и
+  по‑късно, след добавяне на нови артикули.
+- **Каталог → Всички таблици (Excel)** експортира целия набор данни — *Артикули*, *Труд*, *Типове покриви*,
+  *Правила конструкция*, *Доставчици*, *Настройки* — като един `.xlsx` с лист за всяка таблица или `.zip` с отделен
+  файл за всяка. Ред 1 е технически ключ, ред 2 — българско име на колоната; сивите колони (ID/код) са ключове.
+  Редактираният файл (или целият `.zip`) се качва обратно с един бутон: празна клетка = без промяна, `-` изтрива
+  стойност, ред без ID създава нов запис; резултатът показва създадени/обновени редове и грешки по редове.
+
 ---
 
 ## English
@@ -129,6 +144,18 @@ values are derived (supplier defaults, price‑per‑unit percentile + brand + q
 selections. Quotes record the equipment lead time and bottleneck line. `GET /api/quotes/{id}/rfq`, `rfq.xlsx` and
 `rfq.zip` produce supplier‑ready request‑for‑quotation workbooks grouped by supplier. New columns are added to
 existing databases automatically on startup (`ensure_columns`).
+
+### Complete dataset and whole-database Excel round trip
+
+`services/datafill.py` completes the catalogue once at first start: every item gets a purchase price, supplier,
+lead time, tier, SKU, manufacturer and warranty. Values that are not real supplier quotes are **indicative**
+(€/Wp, €/kW, €/kWh models calibrated on priced items and public distributor prices) and are tagged
+`specs.price_source = "indicative"` / `lead_source = "indicative"`; existing data is never overwritten
+(`POST /api/catalog/dataset/fill-missing` re-runs it for new items). `services/dataset_io.py` exports all editable
+tables (`GET /api/catalog/dataset.xlsx` — one sheet per table, `GET /api/catalog/dataset.zip` — one workbook per
+table) and imports them back (`POST /api/catalog/dataset/import`, `.xlsx` or `.zip`): rows are matched by
+`id`/`code`/name, only filled cells are applied, `-` clears, rows without a key are created, and a per-table report
+with row-level errors is returned.
 
 ### Stack
 

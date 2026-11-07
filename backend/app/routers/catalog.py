@@ -19,7 +19,8 @@ from ..schemas import (
     RoofTypeOut,
 )
 from ..services.excel import export_catalog_xlsx, import_catalog_xlsx
-from ..services import procurement
+from ..services import dataset_io, procurement
+from ..services.datafill import fill_missing
 from ..services.settings import get_setting
 
 router = APIRouter(prefix="/catalog", tags=["catalog"])
@@ -152,6 +153,41 @@ def export_xlsx(db: Session = Depends(get_db), _: User = Depends(get_current_use
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=gmsun-catalog.xlsx"},
     )
+
+
+# ------------------------------------------------------------------ whole dataset (all tables) round trip
+@router.get("/dataset.xlsx")
+def dataset_xlsx(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    """One workbook, one sheet per editable table (items, labor, roof types, mounting rules, suppliers, settings)."""
+    return Response(
+        dataset_io.export_workbook(db),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=gmsun-dataset.xlsx"},
+    )
+
+
+@router.get("/dataset.zip")
+def dataset_zip(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    """Same tables as separate .xlsx files in one .zip package."""
+    return Response(dataset_io.export_zip(db), media_type="application/zip", headers={"Content-Disposition": "attachment; filename=gmsun-dataset.zip"})
+
+
+@router.post("/dataset/import")
+async def dataset_import(file: UploadFile = File(...), db: Session = Depends(get_db), _: User = Depends(require_admin)):
+    """Import an edited dataset workbook (.xlsx) or a .zip of per-table workbooks. Only filled cells are applied."""
+    data = await file.read()
+    try:
+        return dataset_io.import_dataset(db, data, file.filename or "")
+    except Exception as e:  # noqa: BLE001
+        db.rollback()
+        raise HTTPException(400, f"Импортът е неуспешен: {e}")
+
+
+@router.post("/dataset/fill-missing")
+def dataset_fill_missing(db: Session = Depends(get_db), _: User = Depends(require_admin)):
+    """Fill empty prices / lead times / tiers / SKUs / suppliers with marked indicative values (never overwrites data)."""
+    st = fill_missing(db)
+    return {k: v for k, v in st.items() if k != "unpriced_left"} | {"unpriced_left": st["unpriced_left"][:50]}
 
 
 # ------------------------------------------------------------------ labor

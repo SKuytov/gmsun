@@ -315,3 +315,9 @@ def seed(db: Session) -> None:
         item = by_name.get(name)
         db.add(MountingRule(roof_type=roof, catalog_item_id=item.id if item else None, name=name, basis=basis, factor=factor, round_up=ru, sort_order=i))
     db.commit()
+    # Complete dataset: fill still-empty prices / lead times / tiers / SKUs with clearly marked indicative values (once).
+    from .services.settings import get_setting
+    from .services.datafill import fill_missing
+
+    if not get_setting(db, "datafill").get("done"):
+        fill_missing(db)

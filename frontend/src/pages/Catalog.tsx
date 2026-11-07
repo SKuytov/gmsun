@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Copy, Download, ExternalLink, FileText, Plus, RefreshCw, Search, Trash2, Upload } from 'lucide-react'
+import { Copy, Database, Download, ExternalLink, FileText, Plus, RefreshCw, Search, Trash2, Upload } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Badge, Confirm, ErrorBox, Field, Input, Loading, Modal, NumInput, Select, Textarea, Toggle, cx, useToast } from '@/components/ui'
@@ -121,6 +121,7 @@ function ItemsTab({ lang }: { lang: string }) {
   const [editing, setEditing] = useState<Partial<CatalogItem> | null>(null)
   const [toDelete, setToDelete] = useState<CatalogItem | null>(null)
   const [importOpen, setImportOpen] = useState(false)
+  const [datasetOpen, setDatasetOpen] = useState(false)
   const [syncOpen, setSyncOpen] = useState(false)
   const [reseedOpen, setReseedOpen] = useState(false)
   const status = useQuery({ queryKey: ['catalog', 'supplier-status'], queryFn: () => get<SupplierStatus>('/api/catalog/supplier/status'), enabled: admin })
@@ -184,6 +185,9 @@ function ItemsTab({ lang }: { lang: string }) {
             </button>
             <button type="button" className="btn-ghost btn-sm" onClick={() => downloadFile('/api/catalog/export', 'gmsun-catalog.xlsx').catch((e) => toast.push(errMsg(e), 'bad'))}>
               <Download className="h-4 w-4" /> {t('export_xlsx')}
+            </button>
+            <button type="button" className="btn-ghost btn-sm" onClick={() => setDatasetOpen(true)} data-testid="button-dataset" title={t('dataset_hint')}>
+              <Database className="h-4 w-4" /> {t('dataset_all_tables')}
             </button>
             <button type="button" className="btn-accent btn-sm" onClick={() => setEditing({ category: cat || 'panel', unit: 'бр.', purchase_price: 0, active: true, specs: {} })} data-testid="button-new-item">
               <Plus className="h-4 w-4" /> {t('new_item')}
@@ -283,6 +287,7 @@ function ItemsTab({ lang }: { lang: string }) {
 
       {editing && <ItemModal item={editing} meta={meta.data} onClose={() => setEditing(null)} onSave={(it) => save.mutate(it)} busy={save.isPending} />}
       <ImportModal open={importOpen} onClose={() => setImportOpen(false)} categories={meta.data?.categories || []} lang={lang} onDone={invalidate} />
+      <DatasetModal open={datasetOpen} onClose={() => setDatasetOpen(false)} onDone={() => qc.invalidateQueries()} />
       <SyncModal open={syncOpen} onClose={() => setSyncOpen(false)} onDone={() => qc.invalidateQueries()} />
       <Confirm open={reseedOpen} onClose={() => setReseedOpen(false)} onConfirm={() => reseed.mutate()} title={t('aero_reseed')} text={t('aero_reseed_hint')} />
       <Confirm open={!!toDelete} onClose={() => setToDelete(null)} onConfirm={() => toDelete && remove.mutate(toDelete.id)} title={t('delete')} text={`${t('confirm_delete')} ${toDelete?.name}`} danger />
@@ -543,6 +548,130 @@ function ImportModal({ open, onClose, categories, lang, onDone }: { open: boolea
             {lang === 'bg' ? 'Създадени' : 'Created'}: <b>{res.created}</b> · {lang === 'bg' ? 'Обновени' : 'Updated'}: <b>{res.updated}</b> · {lang === 'bg' ? 'Пропуснати' : 'Skipped'}: <b>{res.skipped}</b>
           </p>
         )}
+        {err && <ErrorBox>{err}</ErrorBox>}
+      </div>
+    </Modal>
+  )
+}
+
+type DatasetReport = {
+  files: string[]
+  tables: Record<string, { title: string; rows: number; created: number; updated: number; skipped: number; errors: string[] }>
+  ignored_sheets: string[]
+  created: number
+  updated: number
+  skipped: number
+  errors: number
+}
+
+/** Whole-dataset round trip: every editable table as Excel (one workbook or a .zip of workbooks) and back. */
+function DatasetModal({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
+  const { t, lang } = useT()
+  const toast = useToast()
+  const [res, setRes] = useState<DatasetReport | null>(null)
+  const [fill, setFill] = useState<Record<string, number> | null>(null)
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+  const ref = useRef<HTMLInputElement>(null)
+  const dl = (path: string, name: string) => downloadFile(path, name).catch((e) => toast.push(errMsg(e), 'bad'))
+  const run = async (file: File) => {
+    setBusy(true)
+    setErr('')
+    setRes(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      setRes(await api<DatasetReport>('/api/catalog/dataset/import', { form: fd }))
+      onDone()
+    } catch (e) {
+      setErr(errMsg(e))
+    } finally {
+      setBusy(false)
+      if (ref.current) ref.current.value = ''
+    }
+  }
+  const runFill = async () => {
+    setBusy(true)
+    setErr('')
+    try {
+      const r = await post<Record<string, number> & { unpriced_left: string[] }>('/api/catalog/dataset/fill-missing')
+      const { unpriced_left: _u, ...rest } = r
+      setFill(rest)
+      onDone()
+    } catch (e) {
+      setErr(errMsg(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Modal open={open} onClose={onClose} title={t('dataset_all_tables')}>
+      <div className="flex flex-col gap-4">
+        <section className="flex flex-col gap-2">
+          <h4 className="text-sm font-semibold">{t('dataset_export')}</h4>
+          <p className="text-sm text-ink-2">{t('dataset_export_hint')}</p>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn-primary btn-sm" onClick={() => dl('/api/catalog/dataset.xlsx', 'gmsun-dataset.xlsx')} data-testid="button-dataset-xlsx">
+              <Download className="h-4 w-4" /> {t('dataset_one_xlsx')}
+            </button>
+            <button type="button" className="btn-ghost btn-sm" onClick={() => dl('/api/catalog/dataset.zip', 'gmsun-dataset.zip')} data-testid="button-dataset-zip">
+              <Download className="h-4 w-4" /> {t('dataset_zip')}
+            </button>
+          </div>
+        </section>
+        <section className="flex flex-col gap-2">
+          <h4 className="text-sm font-semibold">{t('dataset_import')}</h4>
+          <p className="text-sm text-ink-2">{t('dataset_import_hint')}</p>
+          <input ref={ref} type="file" accept=".xlsx,.zip" className="hidden" onChange={(e) => e.target.files?.[0] && run(e.target.files[0])} data-testid="input-dataset-file" />
+          <div>
+            <button type="button" className="btn-accent btn-sm" onClick={() => ref.current?.click()} disabled={busy} data-testid="button-dataset-import">
+              <Upload className="h-4 w-4" /> {busy ? '…' : t('dataset_choose_file')}
+            </button>
+          </div>
+          {res && (
+            <div className="rounded-md border border-line bg-surface-2 p-3 text-sm" data-testid="text-dataset-result">
+              <p>
+                {lang === 'bg' ? 'Файлове' : 'Files'}: {res.files.length} · {lang === 'bg' ? 'Създадени' : 'Created'}: <b>{res.created}</b> · {lang === 'bg' ? 'Обновени' : 'Updated'}: <b>{res.updated}</b> ·{' '}
+                {lang === 'bg' ? 'Без промяна' : 'Unchanged'}: <b>{res.skipped}</b> · {lang === 'bg' ? 'Грешки' : 'Errors'}: <b className={res.errors ? 'text-bad' : ''}>{res.errors}</b>
+              </p>
+              <ul className="mt-2 flex flex-col gap-1">
+                {Object.values(res.tables).map((tb) => (
+                  <li key={tb.title}>
+                    <span className="font-medium">{tb.title}</span>: {tb.rows} {lang === 'bg' ? 'реда' : 'rows'} · +{tb.created} / ✎{tb.updated}
+                    {tb.errors.length > 0 && (
+                      <ul className="ml-4 mt-1 list-disc text-xs text-bad">
+                        {tb.errors.slice(0, 15).map((e, i) => (
+                          <li key={i}>{e}</li>
+                        ))}
+                        {tb.errors.length > 15 && <li>… +{tb.errors.length - 15}</li>}
+                      </ul>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {res.ignored_sheets.length > 0 && (
+                <p className="mt-2 text-xs text-ink-3">
+                  {lang === 'bg' ? 'Пропуснати листове' : 'Ignored sheets'}: {res.ignored_sheets.join(', ')}
+                </p>
+              )}
+            </div>
+          )}
+        </section>
+        <section className="flex flex-col gap-2 border-t border-line pt-3">
+          <h4 className="text-sm font-semibold">{t('dataset_fill')}</h4>
+          <p className="text-sm text-ink-2">{t('dataset_fill_hint')}</p>
+          <div>
+            <button type="button" className="btn-ghost btn-sm" onClick={runFill} disabled={busy} data-testid="button-dataset-fill">
+              <RefreshCw className="h-4 w-4" /> {t('dataset_fill')}
+            </button>
+          </div>
+          {fill && (
+            <p className="text-xs text-ink-2">
+              {lang === 'bg' ? 'Попълнени' : 'Filled'}: {lang === 'bg' ? 'цени' : 'prices'} {fill.price} · {lang === 'bg' ? 'срокове' : 'lead times'} {fill.lead_time} · {lang === 'bg' ? 'класове' : 'tiers'} {fill.tier} ·{' '}
+              {lang === 'bg' ? 'доставчици' : 'suppliers'} {fill.supplier} · SKU {fill.sku}
+            </p>
+          )}
+        </section>
         {err && <ErrorBox>{err}</ErrorBox>}
       </div>
     </Modal>
