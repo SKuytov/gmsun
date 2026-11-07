@@ -1,0 +1,294 @@
+/* Tiny i18n: Bulgarian (default) + English. */
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+
+export type Lang = 'bg' | 'en'
+
+const dict = {
+  // shell
+  app_tagline: ['Оферти за фотоволтаични системи', 'Quotes for photovoltaic systems'],
+  nav_projects: ['Проекти', 'Projects'],
+  nav_catalog: ['Каталог', 'Catalog'],
+  nav_settings: ['Настройки', 'Settings'],
+  nav_logout: ['Изход', 'Sign out'],
+  language: ['Език', 'Language'],
+  loading: ['Зареждане…', 'Loading…'],
+  save: ['Запази', 'Save'],
+  saved: ['Запазено', 'Saved'],
+  cancel: ['Отказ', 'Cancel'],
+  delete: ['Изтрий', 'Delete'],
+  edit: ['Редакция', 'Edit'],
+  add: ['Добави', 'Add'],
+  close: ['Затвори', 'Close'],
+  search: ['Търсене', 'Search'],
+  yes: ['Да', 'Yes'],
+  no: ['Не', 'No'],
+  confirm_delete: ['Сигурни ли сте, че искате да изтриете?', 'Are you sure you want to delete this?'],
+  error: ['Грешка', 'Error'],
+  none: ['— няма —', '— none —'],
+  back: ['Назад', 'Back'],
+  next: ['Напред', 'Next'],
+  actions: ['Действия', 'Actions'],
+  total: ['Общо', 'Total'],
+  qty: ['Количество', 'Quantity'],
+  unit: ['Мярка', 'Unit'],
+  unit_price: ['Ед. цена', 'Unit price'],
+  name: ['Наименование', 'Name'],
+  price: ['Цена', 'Price'],
+  pcs: ['бр.', 'pcs'],
+  m: ['м', 'm'],
+
+  // login
+  login_title: ['Вход', 'Sign in'],
+  email: ['Имейл', 'Email'],
+  password: ['Парола', 'Password'],
+  login_btn: ['Влез', 'Sign in'],
+  login_failed: ['Грешен имейл или парола', 'Wrong email or password'],
+  server_url: ['Адрес на сървъра', 'Server address'],
+  server_url_hint: ['Например http://192.168.1.50 или https://gmsun.example.com. Празно = същия адрес като приложението.', 'e.g. http://192.168.1.50 or https://gmsun.example.com. Empty = same origin as the app.'],
+
+  // projects
+  projects_title: ['Проекти', 'Projects'],
+  new_project: ['Нов проект', 'New project'],
+  no_projects: ['Все още няма проекти. Създайте първия.', 'No projects yet. Create the first one.'],
+  project_number: ['№', 'No.'],
+  client: ['Клиент', 'Client'],
+  site: ['Обект', 'Site'],
+  status: ['Статус', 'Status'],
+  updated: ['Обновен', 'Updated'],
+  quotes: ['Оферти', 'Quotes'],
+  status_draft: ['Чернова', 'Draft'],
+  status_quoted: ['Офериран', 'Quoted'],
+  status_sent: ['Изпратена', 'Sent'],
+  status_accepted: ['Приета', 'Accepted'],
+  status_rejected: ['Отказана', 'Rejected'],
+  status_done: ['Изпълнен', 'Done'],
+  duplicate: ['Копирай', 'Duplicate'],
+  open: ['Отвори', 'Open'],
+
+  // wizard steps
+  step_client: ['Клиент и обект', 'Client & site'],
+  step_params: ['Параметри', 'Parameters'],
+  step_layout: ['Покрив и панели', 'Roof & panels'],
+  step_equipment: ['Оборудване', 'Equipment'],
+  step_materials: ['Материали', 'Materials'],
+  step_labor: ['Труд и условия', 'Labor & terms'],
+  step_quote: ['Оферта', 'Quote'],
+
+  project_name: ['Име на проекта', 'Project name'],
+  client_name: ['Име на клиента', 'Client name'],
+  client_company: ['Фирма', 'Company'],
+  client_eik: ['ЕИК', 'Company ID'],
+  client_vat: ['ДДС №', 'VAT No.'],
+  client_phone: ['Телефон', 'Phone'],
+  client_email: ['Имейл', 'Email'],
+  client_address: ['Адрес на клиента', 'Client address'],
+  site_address: ['Адрес на обекта', 'Site address'],
+  notes: ['Бележки', 'Notes'],
+
+  purpose: ['Предназначение', 'Purpose'],
+  purpose_self: ['За собствени нужди', 'Self-consumption'],
+  purpose_self_sell: ['Собствени нужди + продажба', 'Self-consumption + export'],
+  purpose_sell: ['Само продажба', 'Export only'],
+  phase: ['Инсталация', 'Grid connection'],
+  phase_1: ['Монофазна', 'Single-phase'],
+  phase_3: ['Трифазна', 'Three-phase'],
+  connected_power: ['Присъединена мощност (kW)', 'Connected power (kW)'],
+  roof_type: ['Тип покрив / основа', 'Roof / base type'],
+  voltage_class: ['Инвертор / батерии', 'Inverter / battery class'],
+  lv: ['Ниско напрежение (LV)', 'Low voltage (LV)'],
+  hv: ['Високо напрежение (HV)', 'High voltage (HV)'],
+  storage: ['Желано съхранение (kWh)', 'Desired storage (kWh)'],
+  annual_consumption: ['Годишна консумация (kWh)', 'Annual consumption (kWh)'],
+  expected_yield: ['Очакван годишен добив', 'Expected annual yield'],
+
+  // layout
+  layouts: ['Покривни равнини', 'Roof planes'],
+  add_layout: ['Добави равнина', 'Add plane'],
+  layout_name: ['Име', 'Name'],
+  upload_photo: ['Снимка', 'Photo'],
+  take_photo: ['Снимай', 'Camera'],
+  plane_w: ['Ширина (m)', 'Width (m)'],
+  plane_h: ['Височина / дължина (m)', 'Height / length (m)'],
+  panel_model: ['Модул', 'Module'],
+  orientation: ['Ориентация', 'Orientation'],
+  portrait: ['Портрет', 'Portrait'],
+  landscape: ['Пейзаж', 'Landscape'],
+  auto: ['Автоматично', 'Auto'],
+  setback: ['Отстъп от ръба (m)', 'Edge setback (m)'],
+  gap: ['Разстояние между модули (m)', 'Module gap (m)'],
+  row_spacing: ['Разстояние между редове (m)', 'Row spacing (m)'],
+  tilt: ['Наклон (°)', 'Tilt (°)'],
+  azimuth: ['Азимут (°, 180 = юг)', 'Azimuth (°, 180 = south)'],
+  tool_corners: ['1. Ъгли', '1. Corners'],
+  tool_roof: ['2. Контур', '2. Outline'],
+  tool_obstacle: ['3. Препятствия', '3. Obstacles'],
+  tool_panels: ['4. Панели', '4. Panels'],
+  tool_hint_corners: ['Влачете 4-те точки до ъглите на покривната равнина. Въведете реалните размери на равнината.', 'Drag the 4 points to the corners of the roof plane. Enter the real plane dimensions.'],
+  tool_hint_roof: ['Кликайте, за да очертаете използваемата площ (по подразбиране цялата равнина). Двоен клик затваря.', 'Click to outline the usable area (default: whole plane). Double-click to close.'],
+  tool_hint_obstacle: ['Очертайте комини, прозорци, антени. Двоен клик затваря препятствието.', 'Outline chimneys, windows, antennas. Double-click closes an obstacle.'],
+  tool_hint_panels: ['Клик върху панел го включва/изключва. Влачете за преместване. „+“ добавя панел.', 'Click a panel to toggle it. Drag to move. “+” adds a panel.'],
+  detect_roof: ['Автоматично разпознаване', 'Auto-detect roof'],
+  detect_obstacles: ['Намери препятствия', 'Find obstacles'],
+  autofill: ['Запълни автоматично', 'Auto-fill'],
+  clear_panels: ['Изчисти панелите', 'Clear panels'],
+  add_panel: ['+ Панел', '+ Panel'],
+  reset_outline: ['Нулирай контура', 'Reset outline'],
+  undo: ['Назад', 'Undo'],
+  modules: ['Модули', 'Modules'],
+  rails: ['Шини', 'Rails'],
+  save_layout: ['Запази разположението', 'Save layout'],
+  layout_saved: ['Разположението е запазено', 'Layout saved'],
+  rectified_view: ['Изправен изглед', 'Rectified view'],
+  photo_view: ['Снимка', 'Photo'],
+  no_photo: ['Няма снимка — работи се върху празна равнина с въведените размери.', 'No photo — working on a blank plane with the entered dimensions.'],
+  scale_hint: ['Мащаб', 'Scale'],
+
+  // equipment
+  inverter: ['Инвертор', 'Inverter'],
+  battery: ['Батерия', 'Battery'],
+  suggestions: ['Предложения от базата', 'Suggestions from the database'],
+  battery_qty: ['Брой батерии', 'Battery count'],
+  battery_accessories: ['Аксесоари (BMS, рак, кабели)', 'Accessories (BMS, rack, cables)'],
+  panel_count: ['Брой модули', 'Module count'],
+  from_layout: ['от разположението', 'from layout'],
+  manual: ['ръчно', 'manual'],
+  warnings: ['Предупреждения', 'Warnings'],
+  compatible: ['съвместима', 'compatible'],
+  strings: ['Стрингове', 'Strings'],
+
+  // materials
+  switchboard: ['Ел. табло', 'Switchboard'],
+  solar_cable: ['Соларен кабел', 'Solar cable'],
+  red_m: ['Червен (+), m', 'Red (+), m'],
+  black_m: ['Черен (−), m', 'Black (−), m'],
+  mc4: ['Конектори MC4', 'MC4 connectors'],
+  power_cable: ['Силов кабел', 'Power cable'],
+  length_m: ['Дължина, m', 'Length, m'],
+  mounting: ['Конструкция', 'Mounting'],
+  mounting_auto: ['Автоматично според покрива', 'Automatic by roof type'],
+  mounting_detailed: ['Подробна спецификация', 'Detailed BOM'],
+  mounting_lump: ['Обща цена на модул', 'Lump price per module'],
+  mounting_none: ['Без конструкция', 'No mounting'],
+  other_electrical: ['Други ел. материали', 'Other electrical items'],
+  extra_items: ['Допълнителни позиции', 'Extra items'],
+
+  // labor
+  labor: ['Труд (СМР)', 'Labor'],
+  labor_matrix: ['Дни × хора (таблица)', 'Days × workers (matrix)'],
+  labor_per_w: ['Цена на W', 'Price per W'],
+  labor_manual: ['Ръчна сума', 'Manual amount'],
+  days: ['Дни', 'Days'],
+  workers: ['Работници', 'Workers'],
+  transport: ['Транспорт', 'Transport'],
+  markup: ['Надценка %', 'Markup %'],
+  discount: ['Отстъпка %', 'Discount %'],
+  vat: ['ДДС %', 'VAT %'],
+  advance: ['Аванс %', 'Advance %'],
+  validity: ['Валидност (дни)', 'Validity (days)'],
+  delivery_fees: ['Включи такси за доставка', 'Include delivery fees'],
+
+  // quote
+  create_quote: ['Създай оферта', 'Create quote'],
+  recalculate: ['Преизчисли', 'Recalculate'],
+  new_version: ['Нова версия', 'New version'],
+  quote_lines: ['Позиции', 'Line items'],
+  add_line: ['Добави ред', 'Add line'],
+  net: ['Общо без ДДС', 'Net total'],
+  vat_amount: ['ДДС', 'VAT'],
+  gross: ['Общо с ДДС', 'Total incl. VAT'],
+  advance_amount: ['Аванс', 'Advance'],
+  balance: ['Остатък', 'Balance'],
+  cost: ['Себестойност', 'Cost'],
+  margin: ['Марж', 'Margin'],
+  pdf_client: ['PDF за клиента', 'Client PDF'],
+  pdf_internal: ['PDF вътрешен', 'Internal PDF'],
+  xlsx: ['Excel (КСС)', 'Excel (BOM)'],
+  preview: ['Преглед', 'Preview'],
+  locked: ['Заключен (ръчно)', 'Locked (manual)'],
+  hidden: ['Скрит', 'Hidden'],
+  no_quotes: ['Няма оферти за този проект. Съставете една от стъпките вляво и натиснете „Създай оферта“.', 'No quotes yet. Fill in the steps and press “Create quote”.'],
+  section_modules: ['Фотоволтаични модули', 'PV modules'],
+  section_inverter: ['Инвертор и батерии', 'Inverter & batteries'],
+  section_construction: ['Конструкция', 'Mounting structure'],
+  section_electrical: ['Електрически компоненти', 'Electrical components'],
+  section_labor: ['Строително-монтажни работи', 'Installation works'],
+  section_other: ['Други', 'Other'],
+
+  // catalog
+  catalog_title: ['Каталог', 'Catalog'],
+  category: ['Категория', 'Category'],
+  all: ['Всички', 'All'],
+  import_xlsx: ['Импорт от Excel', 'Import from Excel'],
+  export_xlsx: ['Експорт в Excel', 'Export to Excel'],
+  new_item: ['Нов артикул', 'New item'],
+  purchase_price: ['Доставна цена', 'Purchase price'],
+  sell_price: ['Продажна цена', 'Sell price'],
+  manufacturer: ['Производител', 'Manufacturer'],
+  active: ['Активен', 'Active'],
+  specs: ['Характеристики (JSON)', 'Specs (JSON)'],
+  warranty: ['Гаранция', 'Warranty'],
+  sku: ['Код', 'SKU'],
+  show_inactive: ['Покажи неактивните', 'Show inactive'],
+  import_hint: ['Приема ценови листи като тези от доставчика (име + цена по редове, секции за инвертори/батерии/аксесоари). Съществуващите артикули се обновяват по модел.', 'Accepts supplier price lists (name + price per row, sections for inverters/batteries/accessories). Existing items are matched by model code and updated.'],
+  labor_matrix_title: ['Таблица труд (дни × работници)', 'Labor matrix (days × workers)'],
+  roof_types_title: ['Типове покриви', 'Roof types'],
+  mounting_rules_title: ['Правила за конструкция', 'Mounting rules'],
+
+  // settings
+  settings_title: ['Настройки', 'Settings'],
+  address: ['Адрес', 'Address'],
+  phone: ['Телефон', 'Phone'],
+  currency: ['Валута', 'Currency'],
+  company: ['Фирма', 'Company'],
+  pricing: ['Ценообразуване', 'Pricing'],
+  texts: ['Текстове в офертата', 'Quote texts'],
+  users: ['Потребители', 'Users'],
+  logo: ['Лого', 'Logo'],
+  upload_logo: ['Качи лого', 'Upload logo'],
+  signatory: ['Съставил офертата', 'Quote signatory'],
+  new_user: ['Нов потребител', 'New user'],
+  role: ['Роля', 'Role'],
+  role_admin: ['Администратор', 'Administrator'],
+  role_user: ['Потребител', 'User'],
+  change_password: ['Смяна на парола', 'Change password'],
+  server: ['Сървър', 'Server'],
+} as const satisfies Record<string, readonly [string, string]>
+
+export type Key = keyof typeof dict
+
+interface Ctx {
+  lang: Lang
+  setLang: (l: Lang) => void
+  t: (k: Key, vars?: Record<string, string | number>) => string
+}
+
+const I18nCtx = createContext<Ctx>({ lang: 'bg', setLang: () => {}, t: (k) => dict[k][0] })
+
+export function I18nProvider({ children, initial = 'bg' }: { children: ReactNode; initial?: Lang }) {
+  const [lang, setLang] = useState<Lang>(initial)
+  const t = useCallback(
+    (k: Key, vars?: Record<string, string | number>) => {
+      let s: string = dict[k]?.[lang === 'bg' ? 0 : 1] ?? k
+      if (vars) for (const [vk, vv] of Object.entries(vars)) s = s.replace(`{${vk}}`, String(vv))
+      return s
+    },
+    [lang],
+  )
+  const value = useMemo(() => ({ lang, setLang, t }), [lang, t])
+  return <I18nCtx.Provider value={value}>{children}</I18nCtx.Provider>
+}
+
+export const useT = () => useContext(I18nCtx)
+
+export function fmtMoney(v: number | null | undefined, currency = 'EUR') {
+  if (v === null || v === undefined || Number.isNaN(v)) return '—'
+  return new Intl.NumberFormat('bg-BG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v) + ' ' + currency
+}
+export function fmtNum(v: number | null | undefined, digits = 2) {
+  if (v === null || v === undefined || Number.isNaN(v)) return '—'
+  return new Intl.NumberFormat('bg-BG', { maximumFractionDigits: digits }).format(v)
+}
+export function fmtDate(s: string | null | undefined) {
+  if (!s) return ''
+  return new Date(s).toLocaleDateString('bg-BG')
+}

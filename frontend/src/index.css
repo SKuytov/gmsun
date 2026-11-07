@@ -1,0 +1,143 @@
+@import '@fontsource-variable/onest';
+@import '@fontsource-variable/jetbrains-mono';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Warm, sober neutrals with a single sun-amber accent (solar installer tool). H S% L% */
+  --bg: 36 25% 97%;
+  --surface: 0 0% 100%;
+  --surface-2: 36 18% 94%;
+  --line: 30 10% 14%;
+  --ink: 24 12% 11%;
+  --ink-2: 24 8% 32%;
+  --ink-3: 24 6% 50%;
+  --sun: 39 91% 55%;
+  --sun-ink: 32 70% 28%;
+  --sun-soft: 40 95% 92%;
+  --ok: 150 48% 36%;
+  --warn: 32 85% 44%;
+  --bad: 4 68% 48%;
+
+  --text-xs: clamp(0.75rem, 0.72rem + 0.15vw, 0.8125rem);
+  --text-sm: clamp(0.8125rem, 0.78rem + 0.2vw, 0.875rem);
+  --text-base: clamp(0.9375rem, 0.9rem + 0.2vw, 1rem);
+  --text-lg: clamp(1.0625rem, 1rem + 0.4vw, 1.25rem);
+  --text-xl: clamp(1.375rem, 1.2rem + 0.8vw, 1.75rem);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-bg text-ink font-sans antialiased;
+  font-size: var(--text-base);
+  font-feature-settings: 'ss01', 'cv05', 'tnum';
+  -webkit-tap-highlight-color: transparent;
+  padding-top: env(safe-area-inset-top);
+}
+
+h1 {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+h2 {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+
+.text-xs {
+  font-size: var(--text-xs);
+}
+.text-sm {
+  font-size: var(--text-sm);
+}
+.text-base {
+  font-size: var(--text-base);
+}
+.text-lg {
+  font-size: var(--text-lg);
+}
+.text-xl {
+  font-size: var(--text-xl);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid hsl(var(--sun));
+  outline-offset: 2px;
+}
+
+@layer components {
+  .input {
+    @apply h-10 w-full rounded border border-line/15 bg-surface px-3 text-base text-ink placeholder:text-ink-3 focus:border-sun focus:outline-none focus:ring-2 focus:ring-sun/30 disabled:bg-surface-2 disabled:text-ink-3;
+  }
+  .input-sm {
+    @apply h-8 px-2 text-sm;
+  }
+  .label {
+    @apply mb-1 block text-xs font-medium uppercase tracking-wide text-ink-3;
+  }
+  .card {
+    @apply rounded-lg border border-line/10 bg-surface shadow-card;
+  }
+  .btn {
+    @apply inline-flex h-10 select-none items-center justify-center gap-2 whitespace-nowrap rounded px-3.5 text-sm font-semibold transition active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-ink text-white hover:bg-ink/90;
+  }
+  .btn-accent {
+    @apply btn bg-sun text-ink hover:brightness-95;
+  }
+  .btn-ghost {
+    @apply btn border border-line/15 bg-surface text-ink hover:bg-surface-2;
+  }
+  .btn-quiet {
+    @apply btn text-ink-2 hover:bg-surface-2;
+  }
+  .btn-danger {
+    @apply btn border border-bad/30 bg-surface text-bad hover:bg-bad/10;
+  }
+  .btn-sm {
+    @apply h-8 px-2.5 text-xs;
+  }
+  .badge {
+    @apply inline-flex items-center rounded-sm px-1.5 py-0.5 text-xs font-medium;
+  }
+  .tbl {
+    @apply w-full border-collapse text-sm;
+  }
+  .tbl th {
+    @apply border-b border-line/15 px-2 py-2 text-left text-xs font-semibold uppercase tracking-wide text-ink-3;
+  }
+  .tbl td {
+    @apply border-b border-line/[0.07] px-2 py-1.5 align-middle;
+  }
+  .tbl tr:hover td {
+    @apply bg-surface-2/60;
+  }
+  .cell-input {
+    @apply h-8 w-full rounded-sm border border-transparent bg-transparent px-1.5 text-sm hover:border-line/15 focus:border-sun focus:bg-surface focus:outline-none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
