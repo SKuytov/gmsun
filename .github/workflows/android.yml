@@ -20,7 +20,8 @@ jobs:
         with: { node-version: 22, cache: npm, cache-dependency-path: frontend/package-lock.json }
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 21 }
-      - uses: android-actions/setup-android@v3
+      # ubuntu-latest already ships the Android SDK (ANDROID_HOME); accept licences so Gradle can fetch platform 36
+      - run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
       - uses: gradle/actions/setup-gradle@v4
 
       - run: npm ci
