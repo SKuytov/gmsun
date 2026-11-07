@@ -219,7 +219,7 @@ export function EquipmentStep({ ctx }: { ctx: StepCtx }) {
                 : ''}
             </Badge>
             <Badge tone="neutral">MPPT: {String(stringsQ.data.mppts)}{invQty > 1 ? ` × ${invQty}` : ''}</Badge>
-            {Array.isArray(stringsQ.data.warnings) && stringsQ.data.warnings.map((w) => <Badge key={w} tone="warn">{w}</Badge>)}
+            {Array.isArray(stringsQ.data.warnings) && (stringsQ.data.warnings as string[]).map((w) => <Badge key={w} tone="warn">{w}</Badge>)}
           </div>
         )}
       </div>
