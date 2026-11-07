@@ -81,7 +81,33 @@ export default function ProjectsPage() {
       )}
 
       {list.length > 0 && (
-        <div className="card overflow-hidden">
+        <ul className="flex flex-col gap-2 md:hidden">
+          {list.map((p) => (
+            <li key={p.id} className="card p-3" data-testid={`card-project-${p.id}`}>
+              <Link to={`/projects/${p.id}/client`} className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="num text-xs text-ink-3">{p.number}</div>
+                  <div className="truncate font-medium">{p.client_name || p.name}</div>
+                  {p.name && p.name !== p.client_name && <div className="truncate text-xs text-ink-3">{p.name}</div>}
+                </div>
+                <Badge tone={statusTone[p.status] || 'neutral'}>{t(`status_${p.status}` as 'status_draft')}</Badge>
+              </Link>
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-2">
+                <span>{roofLabel(p.roof_type)}</span>
+                <span className="num">
+                  {fmtNum(p.connected_power_kw, 1)} kW {p.phase === 1 ? '1~' : '3~'}
+                  {p.kwp ? ` / ${fmtNum(p.kwp, 2)} kWp` : ''}
+                </span>
+                <span className="num">{p.latest_total ? fmtMoney(p.latest_total) : '—'}</span>
+                <span className="ml-auto text-ink-3">{fmtDate(p.updated_at)}</span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {list.length > 0 && (
+        <div className="card hidden overflow-hidden md:block">
           <div className="overflow-x-auto">
             <table className="tbl min-w-[720px]">
               <thead>

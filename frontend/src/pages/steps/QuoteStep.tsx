@@ -61,7 +61,7 @@ export function QuoteStep({ ctx }: { ctx: StepCtx }) {
             <span className={cx('num text-xs', q.id === selId ? 'text-white/70' : 'text-ink-3')}>{fmtMoney(q.total)}</span>
           </button>
         ))}
-        <button type="button" className="btn-accent btn-sm" onClick={() => create.mutate(undefined)} disabled={create.isPending} data-testid="button-create-quote">
+        <button type="button" className="btn-accent btn-sm" onClick={() => create.mutate(selId ?? undefined)} disabled={create.isPending} data-testid="button-create-quote">
           {create.isPending ? <Spinner /> : <Plus className="h-4 w-4" />} {quotes.data?.length ? t('new_version') : t('create_quote')}
         </button>
       </div>

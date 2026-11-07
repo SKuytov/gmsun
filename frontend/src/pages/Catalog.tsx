@@ -12,9 +12,39 @@ const TABS = ['items', 'labor', 'roofs', 'rules'] as const
 type Tab = (typeof TABS)[number]
 
 interface Meta {
-  categories: { code: string; label_bg: string; label_en: string }[]
-  bases?: { code: string; label_bg: string; label_en: string }[]
+  categories: string[]
+  mounting_bases: string[]
 }
+
+const CAT_LABELS: Record<string, [string, string]> = {
+  panel: ['Фотоволтаични модули', 'PV modules'],
+  inverter: ['Инвертори', 'Inverters'],
+  battery: ['Батерии', 'Batteries'],
+  battery_accessory: ['Аксесоари за батерии', 'Battery accessories'],
+  switchboard: ['Ел. табла', 'Switchboards'],
+  solar_cable: ['Соларен кабел', 'Solar cable'],
+  power_cable: ['Силов кабел', 'Power cable'],
+  mounting: ['Конструкция', 'Mounting'],
+  electrical: ['Ел. материали', 'Electrical'],
+  accessory: ['Аксесоари', 'Accessories'],
+  service: ['Услуги', 'Services'],
+  transport: ['Транспорт', 'Transport'],
+  other: ['Други', 'Other'],
+}
+const BASIS_LABELS: Record<string, [string, string]> = {
+  per_module: ['на модул', 'per module'],
+  per_line: ['на ред модули', 'per row of modules'],
+  per_rail: ['на шина (бр.)', 'per rail piece'],
+  per_rail_meter: ['на метър шина', 'per rail metre'],
+  per_fixation: ['на фиксатор / кука', 'per fixation / hook'],
+  per_mid_clamp: ['на средна скоба', 'per mid clamp'],
+  per_end_clamp: ['на крайна скоба', 'per end clamp'],
+  per_connector: ['на съединител', 'per rail connector'],
+  per_string: ['на стринг', 'per string'],
+  per_kwp: ['на kWp', 'per kWp'],
+  per_project: ['фиксирано за проект', 'fixed per project'],
+}
+const label = (map: Record<string, [string, string]>, code: string, lang: string) => (map[code] ? map[code][lang === 'bg' ? 0 : 1] : code)
 
 export default function CatalogPage() {
   const { t, lang } = useT()
@@ -74,10 +104,7 @@ function ItemsTab({ lang }: { lang: string }) {
     const s = q.trim().toLowerCase()
     return (items.data || []).filter((i) => (!cat || i.category === cat) && (!s || [i.name, i.sku || '', i.manufacturer || ''].some((v) => v.toLowerCase().includes(s))))
   }, [items.data, cat, q])
-  const catLabel = (code: string) => {
-    const c = meta.data?.categories.find((x) => x.code === code)
-    return c ? (lang === 'bg' ? c.label_bg : c.label_en) : code
-  }
+  const catLabel = (code: string) => label(CAT_LABELS, code, lang)
 
   return (
     <div className="flex flex-col gap-3">
@@ -85,8 +112,8 @@ function ItemsTab({ lang }: { lang: string }) {
         <Select value={cat} onChange={(e) => setCat(e.target.value)} className="w-auto" aria-label={t('category')} data-testid="select-category">
           <option value="">{t('all')}</option>
           {(meta.data?.categories || []).map((c) => (
-            <option key={c.code} value={c.code}>
-              {lang === 'bg' ? c.label_bg : c.label_en}
+            <option key={c} value={c}>
+              {catLabel(c)}
             </option>
           ))}
         </Select>
@@ -263,8 +290,8 @@ function ItemModal({ item, meta, onClose, onSave, busy }: { item: Partial<Catalo
         <Field label={t('category')}>
           <Select value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })}>
             {(meta?.categories || []).map((c) => (
-              <option key={c.code} value={c.code}>
-                {lang === 'bg' ? c.label_bg : c.label_en}
+              <option key={c} value={c}>
+                {label(CAT_LABELS, c, lang)}
               </option>
             ))}
           </Select>
@@ -336,8 +363,8 @@ function ImportModal({ open, onClose, categories, lang, onDone }: { open: boolea
         <Field label={`${t('category')} (${lang === 'bg' ? 'по подразбиране, ако файлът няма секции' : 'default if the file has no sections'})`}>
           <Select value={cat} onChange={(e) => setCat(e.target.value)}>
             {categories.map((c) => (
-              <option key={c.code} value={c.code}>
-                {lang === 'bg' ? c.label_bg : c.label_en}
+              <option key={c} value={c}>
+                {label(CAT_LABELS, c, lang)}
               </option>
             ))}
           </Select>
@@ -381,14 +408,14 @@ function LaborTab() {
       <p className="text-sm text-ink-2">{lang === 'bg' ? 'Цена за труд според брой дни и брой работници. Променете стойност директно в клетката.' : 'Labor price by number of days and workers. Edit a value directly in its cell.'}</p>
       {labor.isLoading && <Loading />}
       <div className="card overflow-x-auto p-2">
-        <table className="tbl">
+        <table className="tbl !w-auto">
           <thead>
             <tr>
               <th>
                 {t('days')} \ {t('workers')}
               </th>
               {workers.map((w) => (
-                <th key={w} className="text-center">
+                <th key={w} className="w-40 !text-center">
                   {w}
                 </th>
               ))}
@@ -604,11 +631,8 @@ function RulesTab({ lang }: { lang: string }) {
     onError: (e) => toast.push(errMsg(e), 'bad'),
   })
   const remove = useMutation({ mutationFn: (id: number) => del(`/api/catalog/mounting-rules/${id}`), onSuccess: inv, onError: (e) => toast.push(errMsg(e), 'bad') })
-  const bases = meta.data?.bases || []
-  const baseLabel = (code: string) => {
-    const b = bases.find((x) => x.code === code)
-    return b ? (lang === 'bg' ? b.label_bg : b.label_en) : code
-  }
+  const bases = meta.data?.mounting_bases || []
+  const baseLabel = (code: string) => label(BASIS_LABELS, code, lang)
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm text-ink-2">
@@ -661,8 +685,8 @@ function RulesTab({ lang }: { lang: string }) {
                 <td>
                   <Select className="input-sm" value={r.basis} onChange={(e) => save.mutate({ ...r, basis: e.target.value })}>
                     {bases.map((b) => (
-                      <option key={b.code} value={b.code}>
-                        {baseLabel(b.code)}
+                      <option key={b} value={b}>
+                        {baseLabel(b)}
                       </option>
                     ))}
                   </Select>

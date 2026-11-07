@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ORMModel(BaseModel):
@@ -31,7 +31,7 @@ class UserOut(ORMModel):
 
 
 class UserCreate(BaseModel):
-    email: EmailStr
+    email: str = Field(min_length=3, max_length=200, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
     name: str = ""
     password: str = Field(min_length=6)
     role: str = "user"
