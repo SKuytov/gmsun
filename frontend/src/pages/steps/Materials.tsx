@@ -1,16 +1,161 @@
-import { Plus, Trash2 } from 'lucide-react'
-import { useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { AlertTriangle, CheckCircle2, Plus, Trash2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { Field, Input, NumInput, Segmented, Select, Toggle } from '@/components/ui'
+import { post } from '@/lib/api'
 import { fmtMoney, fmtNum, useT } from '@/lib/i18n'
-import type { CatalogItem, Selections } from '@/lib/types'
+import type { CatalogItem, Design, Selections } from '@/lib/types'
 import type { StepCtx } from '../Project'
 
-function ItemSelect({ items, value, onChange, allowNone = true, label, testId }: { items: CatalogItem[]; value: number | null | undefined; onChange: (id: number | null) => void; allowNone?: boolean; label: string; testId?: string }) {
+function useDebounced<T>(v: T, ms = 500) {
+  const [d, setD] = useState(v)
+  useEffect(() => {
+    const h = setTimeout(() => setD(v), ms)
+    return () => clearTimeout(h)
+  }, [v, ms])
+  return d
+}
+
+const SECTION_ORDER = ['electrical', 'inverter', 'construction', 'modules']
+
+function DesignPanel({ ctx }: { ctx: StepCtx }) {
+  const { t, lang } = useT()
+  const { sel, project: p } = ctx
+  const key = useDebounced(JSON.stringify([sel, p.params, p.phase, p.roof_type]))
+  const q = useQuery({
+    queryKey: ['design', p.id, key],
+    queryFn: () => post<Design>(`/api/sizing/projects/${p.id}/design`, { selections: sel }),
+    placeholderData: (prev) => prev,
+  })
+  const d = q.data
+  if (!d) return <p className="text-sm text-ink-3">{q.isLoading ? '…' : '—'}</p>
+  const n = (v: unknown, digits = 0) => (typeof v === 'number' ? fmtNum(v, digits) : String(v ?? '—'))
+  const Row = ({ k, v }: { k: string; v: unknown }) => (
+    <div className="flex justify-between gap-3 text-sm">
+      <span className="text-ink-3">{k}</span>
+      <span className="num text-right">{String(v ?? '—')}</span>
+    </div>
+  )
+  const missing = d.roles.filter((r) => !r.item_id)
+  const sorted = [...d.roles].sort((a, b) => SECTION_ORDER.indexOf(a.section) - SECTION_ORDER.indexOf(b.section))
+  const warnings = [...(d.warnings || []), ...(d.strings?.warnings || [])]
+  return (
+    <div className="flex flex-col gap-3">
+      {warnings.length > 0 && (
+        <ul className="rounded-md border border-warn/40 bg-warn/10 p-2 text-sm">
+          {warnings.map((w, i) => (
+            <li key={i} className="flex gap-2">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warn" /> {w}
+            </li>
+          ))}
+        </ul>
+      )}
+      {d.strings?.checks?.length > 0 && (
+        <ul className="flex flex-col gap-1 text-sm">
+          {d.strings.checks.map((c, i) => (
+            <li key={i} className="flex gap-2">
+              {c.ok ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-ok" /> : <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-bad" />} {c.text}
+            </li>
+          ))}
+        </ul>
+      )}
+      {d.strings?.strings?.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="tbl text-xs">
+            <thead>
+              <tr>
+                <th>{t('strings')}</th>
+                <th>{lang === 'bg' ? 'Равнина' : 'Plane'}</th>
+                <th className="text-right">{t('modules')}</th>
+                <th className="text-right">Voc (min T)</th>
+                <th className="text-right">Vmp (STC)</th>
+                <th className="text-center">MPPT / {lang === 'bg' ? 'вход' : 'input'}</th>
+                <th className="text-right">ΔU %</th>
+              </tr>
+            </thead>
+            <tbody>
+              {d.strings.strings.map((s) => (
+                <tr key={s.id}>
+                  <td className="font-medium">{s.id}</td>
+                  <td>{s.plane}</td>
+                  <td className="num text-right">{s.modules}</td>
+                  <td className="num text-right">{n(s.voc_cold_v)} V</td>
+                  <td className="num text-right">{n(s.vmp_stc_v)} V</td>
+                  <td className="text-center">
+                    {s.mppt} / {s.input}
+                  </td>
+                  <td className="num text-right">{n(s.vdrop_pct, 2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="rounded-md bg-surface-2 p-3">
+          <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-3">{t('design_dc')}</h3>
+          <Row k={lang === 'bg' ? 'Соларен кабел' : 'PV cable'} v={`${n(d.dc.cable_mm2)} mm² · ${n(d.dc.red_m)} / ${n(d.dc.black_m)} m`} />
+          <Row k={lang === 'bg' ? 'Изчислителен ток' : 'Design current'} v={`${n(d.dc.design_current_a, 1)} A`} />
+          <Row k={lang === 'bg' ? 'Макс. пад' : 'Max. drop'} v={`${n(d.dc.vdrop_worst_pct, 2)} %`} />
+          <Row k={t('dc_box')} v={d.dc.box ? t('yes') : t('no')} />
+          <Row k="MC4" v={`${n(d.dc.mc4_pairs)} ${lang === 'bg' ? 'компл.' : 'pairs'}`} />
+        </div>
+        <div className="rounded-md bg-surface-2 p-3">
+          <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-3">{t('design_ac')}</h3>
+          <Row k={lang === 'bg' ? 'Макс. ток' : 'Max. current'} v={`${n(d.ac.i_max_a, 1)} A`} />
+          <Row k={lang === 'bg' ? 'Прекъсвач' : 'Breaker'} v={`${d.ac.breaker_poles ?? ''} ${n(d.ac.breaker_a)} A`} />
+          <Row k={lang === 'bg' ? 'Дефектнотокова' : 'RCD'} v={d.ac.rcd_a ? `${n(d.ac.rcd_a)} A / ${n(d.ac.rcd_ma)} mA` : '—'} />
+          <Row k={lang === 'bg' ? 'Кабел' : 'Cable'} v={d.ac.cable_mm2 ? `${n(d.ac.cores)}×${n(d.ac.cable_mm2)} mm² · ${n(d.ac.cable_m)} m` : '—'} />
+          <Row k={lang === 'bg' ? 'Пад' : 'Drop'} v={`${n(d.ac.vdrop_pct, 2)} %`} />
+        </div>
+        <div className="rounded-md bg-surface-2 p-3">
+          <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-3">{t('design_battery')}</h3>
+          <Row k={lang === 'bg' ? 'Прекъсвач' : 'Breaker'} v={d.battery.breaker_a ? `${n(d.battery.breaker_a)} A` : '—'} />
+          <Row k={lang === 'bg' ? 'Кабел' : 'Cable'} v={d.battery.cable_mm2 ? `${n(d.battery.cable_mm2)} mm² · ${n(d.battery.cable_m)} m` : '—'} />
+          <Row k={lang === 'bg' ? 'Входове' : 'Inputs'} v={n(d.battery.inputs)} />
+        </div>
+        <div className="rounded-md bg-surface-2 p-3">
+          <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-3">{t('design_grounding')}</h3>
+          <Row k="PE" v={d.grounding.pe_mm2 ? `${n(d.grounding.pe_mm2)} mm² · ${n(d.grounding.pe_m)} m` : '—'} />
+          <Row k={lang === 'bg' ? 'Изравняване' : 'Bonding'} v={`${n(d.grounding.bonding_mm2)} mm² · ${n(d.grounding.bonding_m)} m`} />
+          <Row k={lang === 'bg' ? 'Клеми' : 'Clamps'} v={n(d.grounding.bonding_clamps)} />
+          <Row k={lang === 'bg' ? 'Връзки / тръба' : 'Ties / conduit'} v={`${n(d.management.ties)} / ${n(Number(d.management.conduit_dc_m || 0) + Number(d.management.conduit_ac_m || 0))} m`} />
+        </div>
+      </div>
+      <details className="rounded-md border border-line/15">
+        <summary className="cursor-pointer px-3 py-2 text-sm font-medium">
+          {t('design_bom')} ({d.roles.length}){missing.length > 0 && <span className="ml-2 text-bad">· {missing.length} {t('missing_item')}</span>}
+        </summary>
+        <div className="max-h-80 overflow-auto">
+          <table className="tbl text-xs">
+            <tbody>
+              {sorted.map((r, i) => (
+                <tr key={i} className={r.item_id ? '' : 'text-bad'}>
+                  <td className="text-ink-3">{r.section}</td>
+                  <td>{r.role === 'pv_cable' ? r.name : r.item_name || r.name}</td>
+                  <td className="num whitespace-nowrap text-right">
+                    {fmtNum(r.qty, 0)} {r.unit}
+                  </td>
+                  <td className="num whitespace-nowrap text-right">{r.unit_price != null ? fmtMoney(r.unit_price) : t('missing_item')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
+      <p className="text-xs text-ink-3">
+        {lang === 'bg' ? 'Резерв' : 'Margins'}: {lang === 'bg' ? 'кабели' : 'cables'} {n(d.margins.cable_pct)} % · {lang === 'bg' ? 'крепежи' : 'fasteners'} {n(d.margins.fastener_pct)} % · {lang === 'bg' ? 'модули' : 'modules'} {n(d.margins.module_spare_pct)} %
+      </p>
+    </div>
+  )
+}
+
+function ItemSelect({ items, value, onChange, allowNone = true, label, testId, noneLabel }: { items: CatalogItem[]; value: number | null | undefined; onChange: (id: number | null) => void; allowNone?: boolean; label: string; testId?: string; noneLabel?: string }) {
   const { t } = useT()
   return (
     <Field label={label}>
       <Select value={value ?? ''} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)} data-testid={testId}>
-        {allowNone && <option value="">{t('none')}</option>}
+        {allowNone && <option value="">{noneLabel ?? t('none')}</option>}
         {items.map((x) => (
           <option key={x.id} value={x.id}>
             {x.name} — {fmtMoney(x.effective_price)}/{x.unit}
@@ -28,9 +173,15 @@ export function MaterialsStep({ ctx }: { ctx: StepCtx }) {
   const sb = by('switchboard').filter((x) => !x.specs.phases || Number(x.specs.phases) === p.phase)
   const roof = ctx.roofTypes.find((r) => r.code === p.roof_type)
   const electrical = by('electrical')
+  const mc4Items = items.filter((i) => i.active && /mc4/i.test(i.name))
+  const autoLabel = lang === 'bg' ? '— автоматично по проектирането —' : '— automatic from the design —'
   const mounting = by('mounting')
   const extras = sel.extra_items || []
   const el = sel.electrical_items || []
+  const params = (p.params || {}) as Record<string, unknown>
+  const num = (v: unknown) => (typeof v === 'number' ? v : undefined)
+  const setParam = (k: string, v: number) => ctx.update({ params: { ...params, [k]: v } })
+  const autoHint = lang === 'bg' ? 'празно = авто' : 'empty = auto'
 
   // Smart defaults: pre-select the first matching catalog item and estimate cable lengths once.
   // Explicit "none" is stored as null and is never overridden.
@@ -39,13 +190,6 @@ export function MaterialsStep({ ctx }: { ctx: StepCtx }) {
     const d: Partial<Selections> = {}
     const first = (xs: CatalogItem[]) => xs[0]?.id ?? null
     if (sel.switchboard_item_id === undefined) d.switchboard_item_id = first(sb.length ? sb : by('switchboard'))
-    if (sel.solar_cable_item_id === undefined) d.solar_cable_item_id = first(by('solar_cable'))
-    if (sel.mc4_item_id === undefined) d.mc4_item_id = first(electrical.filter((x) => /mc4/i.test(x.name)))
-    if (sel.power_cable_item_id === undefined) d.power_cable_item_id = first(by('power_cable'))
-    const n = ctx.panelQty || 0
-    if (sel.solar_cable_red_m === undefined) d.solar_cable_red_m = n ? Math.ceil(n * 1.2 + 15) : 0
-    if (sel.solar_cable_black_m === undefined) d.solar_cable_black_m = n ? Math.ceil(n * 1.2 + 15) : 0
-    if (sel.power_cable_m === undefined) d.power_cable_m = 15
     if (Object.keys(d).length) setSel(d)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items.length])
@@ -57,26 +201,79 @@ export function MaterialsStep({ ctx }: { ctx: StepCtx }) {
       <div className="card flex flex-col gap-3 p-4">
         <h2>{t('section_electrical')}</h2>
         <ItemSelect label={`${t('switchboard')} (${t(p.phase === 1 ? 'phase_1' : 'phase_3')})`} items={sb.length ? sb : by('switchboard')} value={sel.switchboard_item_id} onChange={(v) => setSel({ switchboard_item_id: v })} testId="select-switchboard" />
-        <ItemSelect label={t('solar_cable')} items={by('solar_cable')} value={sel.solar_cable_item_id} onChange={(v) => setSel({ solar_cable_item_id: v })} testId="select-solar-cable" />
+        <ItemSelect label={t('solar_cable')} items={by('solar_cable')} value={sel.solar_cable_item_id} onChange={(v) => setSel({ solar_cable_item_id: v })} testId="select-solar-cable" noneLabel={autoLabel} />
         <div className="grid grid-cols-2 gap-3">
-          <Field label={t('red_m')}>
-            <NumInput value={sel.solar_cable_red_m ?? 0} min={0} onChange={(v) => setSel({ solar_cable_red_m: v })} data-testid="input-red-m" />
+          <Field label={t('red_m')} hint={autoHint}>
+            <NumInput value={sel.solar_cable_red_m ?? null} min={0} placeholder={t('auto')} onChange={(v) => setSel({ solar_cable_red_m: v > 0 ? v : null })} data-testid="input-red-m" />
           </Field>
-          <Field label={t('black_m')}>
-            <NumInput value={sel.solar_cable_black_m ?? 0} min={0} onChange={(v) => setSel({ solar_cable_black_m: v })} />
-          </Field>
-        </div>
-        <div className="grid grid-cols-[1fr_7rem] gap-3">
-          <ItemSelect label={t('mc4')} items={electrical.filter((x) => /mc4/i.test(x.name))} value={sel.mc4_item_id} onChange={(v) => setSel({ mc4_item_id: v })} />
-          <Field label={t('qty')} hint={lang === 'bg' ? 'празно = авто' : 'empty = auto'}>
-            <NumInput value={sel.mc4_qty ?? null} min={0} onChange={(v) => setSel({ mc4_qty: v })} />
+          <Field label={t('black_m')} hint={autoHint}>
+            <NumInput value={sel.solar_cable_black_m ?? null} min={0} placeholder={t('auto')} onChange={(v) => setSel({ solar_cable_black_m: v > 0 ? v : null })} />
           </Field>
         </div>
         <div className="grid grid-cols-[1fr_7rem] gap-3">
-          <ItemSelect label={t('power_cable')} items={by('power_cable')} value={sel.power_cable_item_id} onChange={(v) => setSel({ power_cable_item_id: v })} testId="select-power-cable" />
-          <Field label={t('length_m')}>
-            <NumInput value={sel.power_cable_m ?? 0} min={0} onChange={(v) => setSel({ power_cable_m: v })} />
+          <ItemSelect label={t('mc4')} items={mc4Items} value={sel.mc4_item_id} onChange={(v) => setSel({ mc4_item_id: v })} noneLabel={autoLabel} />
+          <Field label={t('qty')} hint={autoHint}>
+            <NumInput value={sel.mc4_qty ?? null} min={0} placeholder={t('auto')} onChange={(v) => setSel({ mc4_qty: v > 0 ? v : null })} />
           </Field>
+        </div>
+        <div className="grid grid-cols-[1fr_7rem] gap-3">
+          <ItemSelect label={t('power_cable')} items={by('power_cable')} value={sel.power_cable_item_id} onChange={(v) => setSel({ power_cable_item_id: v })} testId="select-power-cable" noneLabel={autoLabel} />
+          <Field label={t('length_m')} hint={autoHint}>
+            <NumInput value={sel.power_cable_m ?? null} min={0} placeholder={t('auto')} onChange={(v) => setSel({ power_cable_m: v > 0 ? v : null })} />
+          </Field>
+        </div>
+
+        <h2 className="mt-2 text-base">{t('distances')}</h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Field label={t('dc_run_m')}>
+            <NumInput value={num(params.dc_run_m) ?? ctx.pricing.dc_run_default_m} min={0} onChange={(v) => setParam('dc_run_m', v)} data-testid="input-dc-run" />
+          </Field>
+          <Field label={t('ac_run_m')}>
+            <NumInput value={num(params.ac_run_m) ?? ctx.pricing.ac_run_default_m} min={0} onChange={(v) => setParam('ac_run_m', v)} />
+          </Field>
+          <Field label={t('battery_run_m')}>
+            <NumInput value={num(params.battery_run_m) ?? 2} min={0} onChange={(v) => setParam('battery_run_m', v)} />
+          </Field>
+          <Field label={t('backup_run_m')}>
+            <NumInput value={num(params.backup_run_m) ?? 5} min={0} onChange={(v) => setParam('backup_run_m', v)} />
+          </Field>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label={t('dc_box')}>
+            <Segmented
+              size="sm"
+              value={sel.dc_box || 'auto'}
+              onChange={(v) => setSel({ dc_box: v })}
+              options={[
+                { value: 'auto', label: t('auto') },
+                { value: 'yes', label: t('yes') },
+                { value: 'no', label: t('no') },
+              ]}
+            />
+          </Field>
+          <Field label={t('metering')}>
+            <Segmented
+              size="sm"
+              value={sel.metering || 'ct'}
+              onChange={(v) => setSel({ metering: v })}
+              options={[
+                { value: 'ct', label: t('metering_ct') },
+                { value: 'smart_meter', label: t('metering_smart') },
+              ]}
+            />
+          </Field>
+          <Field label={t('design_tmin_c')}>
+            <NumInput value={num(params.design_tmin_c) ?? ctx.pricing.design_tmin_c} onChange={(v) => setParam('design_tmin_c', v)} />
+          </Field>
+          <Field label={t('module_spare_pct')}>
+            <NumInput value={sel.module_spare_pct ?? ctx.pricing.module_spare_pct} min={0} max={50} onChange={(v) => setSel({ module_spare_pct: v })} />
+          </Field>
+        </div>
+        <div className="flex flex-col">
+          <Toggle checked={!!sel.dc_box_fuses} onChange={(v) => setSel({ dc_box_fuses: v })} label={`${t('dc_box_fuses')} (${lang === 'bg' ? 'авто при необходимост по IEC 62548' : 'auto when required by IEC 62548'})`} disabled={sel.dc_box === 'no'} />
+          <Toggle checked={!!sel.backup_output} onChange={(v) => setSel({ backup_output: v })} label={t('backup_output')} />
+          <Toggle checked={sel.earth_rod ?? p.roof_type === 'ground'} onChange={(v) => setSel({ earth_rod: v })} label={t('earth_rod')} />
+          <Toggle checked={sel.auto_electrical !== false} onChange={(v) => setSel({ auto_electrical: v })} label={t('auto_electrical')} />
         </div>
 
         <h2 className="mt-2 text-base">{t('other_electrical')}</h2>
@@ -109,6 +306,12 @@ export function MaterialsStep({ ctx }: { ctx: StepCtx }) {
       </div>
 
       <div className="flex flex-col gap-5">
+        <div className="card flex flex-col gap-3 p-4" data-testid="design-panel">
+          <h2>{t('design_title')}</h2>
+          <p className="text-xs text-ink-3">{t('design_hint')}</p>
+          <DesignPanel ctx={ctx} />
+        </div>
+
         <div className="card flex flex-col gap-3 p-4">
           <h2>{t('mounting')}</h2>
           <p className="text-xs text-ink-3">

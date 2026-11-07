@@ -37,6 +37,17 @@ DEFAULT_SETTINGS: dict[str, dict[str, Any]] = {
         "specific_yield_kwh_per_kwp": 1250,
         "dc_ac_ratio_max": 1.35,
         "quote_number_prefix": "",
+        # --- engineering defaults (industry practice; editable) ---
+        "cable_margin_pct": 15.0,  # cable reserve for routing, terminations and bends
+        "fastener_margin_pct": 10.0,  # screws/clamps/clips/ties loss & breakage reserve
+        "module_spare_pct": 0.0,  # spare modules ordered with the project
+        "design_tmin_c": -20.0,  # minimum ambient (Voc check) – Bulgaria lowland winter
+        "design_tcell_max_c": 70.0,  # max cell temperature (Vmp check)
+        "dc_vdrop_max_pct": 1.0,  # DC voltage drop target
+        "ac_vdrop_max_pct": 1.0,  # AC voltage drop target inverter -> board
+        "dc_run_default_m": 15.0,  # one-way array -> inverter distance
+        "ac_run_default_m": 10.0,  # one-way inverter -> main board distance
+        "dc_box_distance_m": 10.0,  # array SPD required beyond this (IEC 61643-32)
     },
     "texts": {
         "quote_title": "ДОСТАВКА И МОНТАЖ НА ОБОРУДВАНЕ ЗА ФОТОВОЛТАИЧНА ЦЕНТРАЛА",

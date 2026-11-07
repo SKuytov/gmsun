@@ -208,6 +208,23 @@ def quote_pdf(qid: int, mode: str = Query("client"), db: Session = Depends(get_d
     return FileResponse(str(path), media_type="application/pdf", filename=fname)
 
 
+@router.get("/quotes/{qid}/techfile.pdf")
+def quote_techfile(qid: int, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    """Technical file: string design, single-line diagram, mounting plan, full BOM, order list."""
+    from ..services.techfile import render_techfile_pdf
+
+    q = _quote(db, qid)
+    path = render_techfile_pdf(db, q)
+    return FileResponse(str(path), media_type="application/pdf", filename=f"Tehnichesko_dosie_{q.number}_v{q.version}.pdf")
+
+
+@router.get("/quotes/{qid}/techfile.html", response_class=HTMLResponse)
+def quote_techfile_html(qid: int, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    from ..services.techfile import render_techfile_html
+
+    return render_techfile_html(db, _quote(db, qid))
+
+
 @router.get("/quotes/{qid}/xlsx")
 def quote_xlsx(qid: int, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     """KSS-style Excel export (same structure as the original quote workbook)."""
@@ -253,6 +270,26 @@ def quote_xlsx(qid: int, db: Session = Depends(get_db), _: User = Depends(get_cu
     for col in "CDEF":
         ws.column_dimensions[col].width = 14
     ws["A4"].alignment = Alignment(wrap_text=True)
+    # ---- ordering sheet: material lines grouped by manufacturer with SKU and purchase price
+    wo = wb.create_sheet("Поръчка")
+    wo.append(["Доставчик / производител", "Код", "Наименование", "Мярка", "Количество", "Доставна цена", "Общо доставна", "Раздел", "Правило"])
+    for c in wo[1]:
+        c.font = Font(bold=True)
+    rows = []
+    for l in q.lines:
+        if l.hidden or l.section in ("labor", "other") or (l.catalog_item_id is None and not (l.meta or {}).get("role")):
+            continue
+        ci = l.catalog_item
+        mf = (ci.manufacturer if ci and ci.manufacturer else "Други / местна доставка")
+        meta = l.meta or {}
+        rule = f"{meta.get('basis')} × {meta.get('factor')}" if meta.get("basis") else (meta.get("role") or ("ръчно" if l.locked else ""))
+        rows.append([mf, ci.sku if ci and ci.sku else "", ci.name if ci else l.name, l.unit, l.qty, l.purchase_price or 0, round(l.qty * (l.purchase_price or 0), 2), l.section, rule])
+    for r in sorted(rows, key=lambda r: (r[0], r[7], r[2])):
+        wo.append(r)
+    wo.column_dimensions["A"].width = 26
+    wo.column_dimensions["C"].width = 70
+    for col in "BDEFGHI":
+        wo.column_dimensions[col].width = 14
     buf = io.BytesIO()
     wb.save(buf)
     return Response(

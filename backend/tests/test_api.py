@@ -141,3 +141,60 @@ def test_catalog_import_supplier_pricelist(client, auth):
 def test_catalog_export(client, auth):
     r = client.get("/api/catalog/export", headers=auth)
     assert r.status_code == 200 and r.content[:2] == b"PK"
+
+
+def test_engineering_design_and_techfile(client, auth):
+    """Automatic electrical design (IEC 62548 string check + roles BOM) and the technical file PDF."""
+    p = _make_project(client, auth)
+    pid = p["id"]
+    client.patch(f"/api/projects/{pid}", headers=auth, json={"params": {"dc_run_m": 18, "ac_run_m": 15}})
+    lay = client.post(f"/api/projects/{pid}/layouts", headers=auth, json={"name": "Юг", "plane_w_m": 15.0, "plane_h_m": 6.5, "orientation": "landscape", "setback_m": 0.3}).json()
+    lay = client.post(f"/api/projects/{pid}/layouts/{lay['id']}/autofill", headers=auth, json={}).json()
+    assert lay["summary"]["count"] >= 18
+    items = client.get("/api/catalog/items", headers=auth).json()
+
+    def find(cat, sub):
+        return next(i for i in items if i["category"] == cat and sub in i["name"])
+
+    sel = {
+        "inverter_item_id": find("inverter", "SUN-16K-SG05LP3")["id"],
+        "battery_item_id": find("battery", "RW-F16")["id"],
+        "battery_qty": 1,
+        "labor_mode": "per_w",
+    }
+    d = client.post(f"/api/sizing/projects/{pid}/design", headers=auth, json={"selections": sel})
+    assert d.status_code == 200, d.text
+    d = d.json()
+    assert d["strings"]["strings"], "string design must assign strings"
+    assert all(s["voc_cold_v"] <= 800 for s in d["strings"]["strings"])
+    assert all(c["ok"] for c in d["strings"]["checks"]), d["strings"]["checks"]
+    roles = {r["role"]: r for r in d["roles"]}
+    assert sum(1 for r in d["roles"] if r["role"] == "pv_cable") == 2  # red + black
+    for must in ("pv_cable", "mc4_pair", "ac_mcb", "ac_rcd", "ac_cable", "pe_cable", "battery_cable", "battery_breaker", "bonding_clamp", "dc_spd", "cable_tie_uv"):
+        assert must in roles, must
+    assert roles["ac_mcb"]["spec"]["rating_a"] >= 100 and roles["ac_mcb"]["spec"]["poles"] == "4P"
+    assert roles["ac_cable"]["spec"]["cross_section_mm2"] >= 10
+    assert roles["battery_cable"]["spec"]["cross_section_mm2"] >= 50
+    # margins applied: red cable qty is the rounded-up length with the cable margin
+    assert roles["pv_cable"]["qty"] >= d["dc"]["red_m"] or roles["pv_cable"]["qty"] >= d["dc"]["black_m"]
+
+    q = client.post(f"/api/projects/{pid}/quotes", headers=auth, json={"selections": sel})
+    assert q.status_code == 201, q.text
+    q = q.json()
+    elec = [l for l in q["lines"] if l["section"] == "electrical"]
+    assert len(elec) >= 15
+    assert any((l["meta"] or {}).get("role") == "ac_rcd" for l in elec)
+    cons = [l for l in q["lines"] if l["section"] == "construction"]
+    small = [l for l in cons if (l["meta"] or {}).get("margin_pct")]
+    assert small, "fastener margin must be applied to small parts"
+
+    tf = client.get(f"/api/quotes/{q['id']}/techfile.pdf", headers=auth)
+    assert tf.status_code == 200 and tf.content[:4] == b"%PDF"
+    html = client.get(f"/api/quotes/{q['id']}/techfile.html", headers=auth)
+    assert "Еднолинейна схема" in html.text and "<svg" in html.text
+    xlsx = client.get(f"/api/quotes/{q['id']}/xlsx", headers=auth)
+    assert xlsx.status_code == 200
+    import io
+    from openpyxl import load_workbook
+    wb = load_workbook(io.BytesIO(xlsx.content))
+    assert "Поръчка" in wb.sheetnames and wb["Поръчка"].max_row > 10

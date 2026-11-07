@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "gmsun",
+      "Group": "Servers",
+      "Host": "db",
+      "Port": 5432,
+      "MaintenanceDB": "gmsun",
+      "Username": "gmsun",
+      "SSLMode": "prefer",
+      "Comment": "gmsun production database (password = POSTGRES_PASSWORD from .env)"
+    }
+  }
+}

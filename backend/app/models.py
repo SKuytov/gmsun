@@ -61,6 +61,11 @@ CATEGORIES = [
     "power_cable",
     "mounting",
     "electrical",
+    "dc_protection",
+    "ac_protection",
+    "grounding",
+    "cable_management",
+    "monitoring",
     "accessory",
     "service",
     "transport",
@@ -305,6 +310,7 @@ class QuoteLine(Base):
     meta: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
     quote: Mapped[Quote] = relationship(back_populates="lines")
+    catalog_item: Mapped[CatalogItem | None] = relationship(lazy="joined")
 
 
 class AuditLog(Base):

@@ -4,20 +4,49 @@ The whole stack runs in Docker Compose on one machine (a VM or mini‑PC in the 
 
 ```
 browser / Android ──► web (nginx :80) ──► /api ──► api (FastAPI :8000) ──► db (PostgreSQL 16)
+                                   ├── /pgadmin ──► pgadmin (DB viewer/editor)
                                    └── static React app          └── /data volume (photos, PDFs, logo)
+Tailscale (host) ──► same ports over the private tailnet (100.x.y.z) from phones/laptops anywhere
 ```
 
-## 1. One‑shot install
+## 1. One‑command install (fresh Ubuntu Server)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/SKuytov/gmsun/main/deploy/install.sh | sudo bash
 ```
 
-What it does: installs Docker Engine + Compose plugin (falls back to the `noble` Docker repo if Docker has not
-published packages for your Ubuntu release yet), clones the repo to `/opt/gmsun`, writes `.env` with random
-`SECRET_KEY`, `POSTGRES_PASSWORD` and admin password, runs `docker compose up -d --build`.
+With a Tailscale pre‑auth key (joins the tailnet without a browser login):
 
-Environment overrides: `GMSUN_DIR=/srv/gmsun GMSUN_PORT=8080 sudo -E bash install.sh`.
+```bash
+curl -fsSL https://raw.githubusercontent.com/SKuytov/gmsun/main/deploy/install.sh | sudo TS_AUTHKEY=tskey-auth-xxxxx bash
+```
+
+What it does, in order:
+
+1. `apt` update, base tools, unattended security updates.
+2. Docker Engine + Compose plugin (falls back to the `noble` Docker repo if Docker has not published packages for your Ubuntu release yet).
+3. Clones the repo to `/opt/gmsun`, writes `.env` (chmod 600) with random `SECRET_KEY`, `POSTGRES_PASSWORD`, admin and pgAdmin passwords.
+4. `docker compose up -d --build` — PostgreSQL 16, API, web (nginx) and **pgAdmin 4** at `http://<server>/pgadmin/` with the gmsun database pre‑registered.
+5. **Tailscale**: installs `tailscaled`; with `TS_AUTHKEY` it runs `tailscale up --hostname=gmsun --ssh`, otherwise it prints the command to run once and open the login link.
+6. `ufw` (OpenSSH + HTTP port + Tailscale), nightly backup cron (02:30, last 14 kept), Docker log rotation.
+
+At the end it prints all URLs and passwords. Re‑running the same command later **updates** the installation (git pull + rebuild) and keeps `.env`.
+
+Environment overrides: `GMSUN_DIR=/srv/gmsun GMSUN_PORT=8080 GMSUN_NO_TAILSCALE=1 GMSUN_NO_UFW=1`.
+
+### Database viewer/editor (pgAdmin)
+
+Open `http://<server>/pgadmin/`, log in with `PGADMIN_EMAIL` / `PGADMIN_PASSWORD` from `.env`, expand
+**Servers → gmsun** and enter `POSTGRES_PASSWORD` once (it is saved). Tables live in schema `public`
+(`catalog_items`, `projects`, `layouts`, `quotes`, `quote_lines`, `settings`, `users`, …). Right‑click a table →
+*View/Edit Data* to edit rows like in phpMyAdmin. Always back up before bulk edits (`deploy/backup.sh`).
+
+### Tailscale access
+
+After `tailscale up` the server gets a stable private IP (`tailscale ip -4`) and a MagicDNS name (`gmsun`).
+Install Tailscale on the phones/laptops of the team, and use `http://gmsun/` or `http://100.x.y.z/` as the
+server address in the Android app — no port‑forwarding, works from any network. `--ssh` also enables
+Tailscale SSH to the server.
 
 ## 2. Manual install
 
@@ -43,6 +72,8 @@ Open `http://<server-ip>:<HTTP_PORT>/` and sign in.
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | `admin@gmsun.local` / `admin1234` | First admin, created only when the users table is empty |
 | `CORS_ORIGINS` | `*` | Allowed origins; the Android app needs the server origin allowed (keep `*` on a LAN) |
 | `SEED_DEMO` | `true` | Seed catalog, roof types, mounting rules, labor matrix and company defaults on first start |
+| `PGADMIN_EMAIL` / `PGADMIN_PASSWORD` | `admin@gmsun.local` / — | pgAdmin login at `/pgadmin/` |
+| `TS_AUTHKEY` | — | Optional Tailscale pre‑auth key used by the installer |
 
 ## 4. Updating
 
@@ -91,6 +122,17 @@ Health: `curl http://<server>/api/health` → `{"status":"ok", ...}`.
 
 ## 8. Firewall
 
+The installer configures this; manually:
+
 ```bash
-sudo ufw allow OpenSSH && sudo ufw allow 80/tcp && sudo ufw enable
+sudo ufw allow OpenSSH && sudo ufw allow 80/tcp && sudo ufw allow in on tailscale0 && sudo ufw enable
 ```
+
+## 9. Documents produced per quote
+
+| Document | Endpoint | Content |
+| --- | --- | --- |
+| Client PDF | `/api/quotes/{id}/pdf?mode=client` | Offer with sections, totals, terms |
+| Internal PDF | `/api/quotes/{id}/pdf?mode=internal` | Purchase prices, margins |
+| Excel (КСС) | `/api/quotes/{id}/xlsx` | Sheet 1: quote; sheet 2 **Поръчка** — order list by manufacturer (SKU, qty, purchase price, rule) |
+| Technical file | `/api/quotes/{id}/techfile.pdf` | KPIs, string design + IEC 62548 checks, single‑line diagram, AC/battery/earthing, per‑plane layout drawing with strings & rails, mounting plan, full BOM with derivation, order list, standards |

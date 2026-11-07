@@ -15,9 +15,8 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from ..models import CatalogItem, LaborOption, Layout, Project, Quote, QuoteLine, RoofTypeConfig
-from . import bom
+from . import bom, engineering
 from .settings import get_setting
-from .sizing import string_check
 
 SECTIONS: list[tuple[str, str, str]] = [
     ("modules", "Част фотоволтаични модули", "PV modules"),
@@ -70,6 +69,29 @@ def active_layout_summary(project: Project) -> dict[str, Any]:
     return total
 
 
+def _design(db: Session, project: Project, sel: dict[str, Any], pricing: dict[str, Any], panel: CatalogItem | None, inverter: CatalogItem | None, battery: CatalogItem | None, bq: int, panel_qty: int, layout_sum: dict[str, Any]) -> dict[str, Any]:
+    """Collect roof planes + rail statistics and run the engineering engine."""
+    pw = float((panel.specs or {}).get("width_mm", 1134)) / 1000 if panel else 1.134
+    planes: list[dict[str, Any]] = []
+    if sel.get("use_layout", True) and layout_sum.get("count"):
+        for lay in project.layouts:
+            s = lay.summary or {}
+            if int(s.get("count") or 0) > 0:
+                planes.append({"name": lay.name, "modules": int(s["count"]), "module_w_m": pw, "azimuth": lay.azimuth_deg, "tilt": lay.tilt_deg, "layout_id": lay.id})
+    if not planes and panel_qty > 0:
+        planes.append({"name": "Плоскост 1", "modules": panel_qty, "module_w_m": pw})
+    lines = layout_sum.get("lines") or []
+    rail_lines = sum(int(l.get("rails") or 2) for l in lines) if lines else math.ceil(panel_qty / 10) * 2
+    row_m = sum(float(l.get("length_m") or 0) for l in lines) if lines else panel_qty * (pw + 0.02)
+    try:
+        return engineering.full_design(
+            db, project=project, panel=panel, inverter=inverter, battery=battery, battery_qty=bq, panel_qty=panel_qty,
+            planes=planes, rail_lines=rail_lines, row_length_m=row_m, sel=sel, pricing=pricing,
+        )
+    except Exception as e:  # noqa: BLE001 - design must never block the quote
+        return {"roles": [], "warnings": [f"Грешка в инженерния модул: {e}"], "strings": {}}
+
+
 def build_lines(db: Session, project: Project, quote: Quote) -> tuple[list[dict[str, Any]], list[str], dict[str, Any]]:
     sel = quote.selections or {}
     pricing = get_setting(db, "pricing")
@@ -91,6 +113,11 @@ def build_lines(db: Session, project: Project, quote: Quote) -> tuple[list[dict[
     info.update({"panel_qty": panel_qty, "kwp": kwp, "panel_wp": panel_wp})
     if panel and panel_qty > 0:
         lines.append(_item_line("panel", "modules", panel, panel_qty, markup, name=f"{panel.name} ({kwp * 1000:.0f} W)"))
+        spare_pct = float(sel.get("module_spare_pct", pricing.get("module_spare_pct", 0)) or 0)
+        spare = math.ceil(panel_qty * spare_pct / 100.0 - 1e-9) if spare_pct > 0 else 0
+        if spare > 0:
+            lines.append(_item_line("panel:spare", "modules", panel, spare, markup, name=f"{panel.name} — резервни модули ({spare_pct:g} %)", meta={"spare": True}))
+            info["panel_spare"] = spare
     elif panel_qty > 0:
         warnings.append("Не е избран модел панел.")
     if sel.get("delivery_fees", True) and panel_qty > 0 and float(pricing.get("delivery_fee_equipment", 0)) > 0:
@@ -109,16 +136,12 @@ def build_lines(db: Session, project: Project, quote: Quote) -> tuple[list[dict[
             warnings.append(f"Мощността на панелите ({kwp:g} kWp) е над препоръчителната за инвертора ({ac:g} kW).")
         if int(inv_sp.get("phases", project.phase)) != project.phase:
             warnings.append("Фазите на инвертора не съответстват на инсталацията.")
-        sc = string_check(panel, inverter, panel_qty)
-        info["strings"] = sc
-        if sc.get("warning"):
-            warnings.append(sc["warning"])
     else:
         warnings.append("Не е избран инвертор.")
 
     battery = _item(db, sel.get("battery_item_id"))
+    bq = int(sel.get("battery_qty") or 1) if battery else 0
     if battery:
-        bq = int(sel.get("battery_qty") or 1)
         bsp = battery.specs or {}
         kwh = float(bsp.get("kwh") or 0)
         lines.append(_item_line("battery", "inverter", battery, bq, markup, name=f"{battery.name} ({kwh * bq:g} kWh)" if kwh else None))
@@ -140,14 +163,13 @@ def build_lines(db: Session, project: Project, quote: Quote) -> tuple[list[dict[
     mode = sel.get("mounting_mode", "auto")
     if roof and panel_qty > 0 and mode != "none":
         eff_mode = roof.pricing_mode if mode == "auto" else mode
-        strings = int((info.get("strings") or {}).get("strings") or sel.get("strings") or 1)
-        stats = bom.compute_stats(layout_sum, roof, modules_override=panel_qty, strings=strings)
+        stats = bom.compute_stats(layout_sum, roof, modules_override=panel_qty, strings=int((info.get("strings") or {}).get("strings") or 1))
         info["mounting_stats"] = stats.as_dict()
         if eff_mode == "lump":
             price = float(sel.get("lump_price_per_module") or roof.lump_price_per_module or 0)
             lines.append(_line("mount:lump", "construction", f"Модулна алуминиева конструкция за {roof.label_bg.lower()}", "бр.", panel_qty, price, meta={"mode": "lump"}))
         else:
-            ml = bom.mounting_lines(db, roof, stats, markup)
+            ml = bom.mounting_lines(db, roof, stats, markup, float(pricing.get("fastener_margin_pct", 0) or 0))
             if not ml:
                 warnings.append("Няма дефинирани правила за монтажни материали за този тип покрив.")
             lines.extend(ml)
@@ -162,27 +184,54 @@ def build_lines(db: Session, project: Project, quote: Quote) -> tuple[list[dict[
         lines.append(_item_line("switchboard", "electrical", sb, 1, markup))
     else:
         warnings.append("Не е избрано електрическо табло.")
-    sc_item = _item(db, sel.get("solar_cable_item_id"))
-    red_m = float(sel.get("solar_cable_red_m") or 0)
-    black_m = float(sel.get("solar_cable_black_m") or 0)
-    if sc_item:
-        if red_m > 0:
-            lines.append(_item_line("solar_cable:red", "electrical", sc_item, red_m, markup, name=f"Соларен кабел червен (+) {sc_item.name}"))
-        if black_m > 0:
-            lines.append(_item_line("solar_cable:black", "electrical", sc_item, black_m, markup, name=f"Соларен кабел черен (−) {sc_item.name}"))
-    elif red_m or black_m:
-        warnings.append("Въведена е дължина на соларен кабел, но не е избран модел кабел.")
-    mc4 = _item(db, sel.get("mc4_item_id"))
-    if mc4:
-        strings = int((info.get("strings") or {}).get("strings") or 1)
-        q = float(sel.get("mc4_qty") or (2 * strings + 2))
-        lines.append(_item_line("mc4", "electrical", mc4, q, markup))
-    pc = _item(db, sel.get("power_cable_item_id"))
-    pc_m = float(sel.get("power_cable_m") or 0)
-    if pc and pc_m > 0:
-        lines.append(_item_line("power_cable", "electrical", pc, pc_m, markup))
+    # engineering design: strings, protections, cables, earthing, consumables
+    design = _design(db, project, sel, pricing, panel, inverter, battery, bq, panel_qty, layout_sum)
+    info["design"] = design
+    sd = design.get("strings") or {}
+    info["strings"] = {"strings": sd.get("count", 0), "modules_per_string": sd.get("modules_per_string", 0), "mppts": sd.get("mppts", 0), "warnings": sd.get("warnings") or []}
+    warnings.extend(design.get("warnings") or [])
+    auto_el = sel.get("auto_electrical", True)
+    all_items = db.query(CatalogItem).filter(CatalogItem.active.is_(True)).all()
+    missing: list[str] = []
+    counters: dict[str, int] = {}
+    for r in design.get("roles") or []:
+        rk = r["role"]
+        if not auto_el and rk not in ("pv_cable", "mc4_pair", "ac_cable"):
+            continue
+        idx = counters.get(rk, 0)
+        counters[rk] = idx + 1
+        key = f"eng:{rk}:{idx}"
+        qty = float(r["qty"])
+        item: CatalogItem | None = None
+        # user overrides from the Materials step
+        if rk == "pv_cable":
+            if sel.get("solar_cable_item_id"):
+                item = _item(db, sel.get("solar_cable_item_id"))
+            ov = sel.get("solar_cable_red_m") if (r["spec"].get("color") == "red") else sel.get("solar_cable_black_m")
+            if isinstance(ov, (int, float)) and ov > 0:
+                qty = float(ov)
+        elif rk == "mc4_pair":
+            if sel.get("mc4_item_id"):
+                item = _item(db, sel.get("mc4_item_id"))
+            if isinstance(sel.get("mc4_qty"), (int, float)) and sel.get("mc4_qty") > 0:
+                qty = float(sel["mc4_qty"])
+        elif rk == "ac_cable" and idx == 0:
+            if sel.get("power_cable_item_id"):
+                item = _item(db, sel.get("power_cable_item_id"))
+            if isinstance(sel.get("power_cable_m"), (int, float)) and sel.get("power_cable_m") > 0:
+                qty = float(sel["power_cable_m"])
+        if item is None:
+            item = engineering.find_item_for_role(all_items, r)
+        meta = {"role": rk, "auto_qty": r["qty"], "spec": r["spec"]}
+        if item:
+            lines.append(_item_line(key, r["section"], item, qty, markup, name=r["name"] if rk in ("pv_cable",) else item.name, meta=meta))
+        else:
+            missing.append(r["name"])
+            lines.append(_line(key, r["section"], r["name"], r["unit"], qty, 0.0, meta={**meta, "missing_item": True}))
+    if missing:
+        warnings.append(f"Няма артикул в каталога за {len(missing)} позиции (добавете ги в Каталог с роля): " + "; ".join(missing[:6]) + (" …" if len(missing) > 6 else ""))
     for extra in sel.get("electrical_items") or []:
-        it = _item(db, extra.get("catalog_item_id"))
+        it = _item(db, extra.get("catalog_item_id") or extra.get("item_id"))
         if it:
             lines.append(_item_line(f"elec:{it.id}", "electrical", it, float(extra.get("qty") or 1), markup))
 

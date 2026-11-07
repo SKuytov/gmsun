@@ -119,7 +119,10 @@ def quantity_for_rule(rule: MountingRule, st: LayoutStats) -> float:
     return float(math.ceil(q - 1e-9)) if rule.round_up else round(q, 2)
 
 
-def mounting_lines(db: Session, roof: RoofTypeConfig, st: LayoutStats, default_markup: float) -> list[dict[str, Any]]:
+def mounting_lines(db: Session, roof: RoofTypeConfig, st: LayoutStats, default_markup: float, fastener_margin_pct: float = 0.0) -> list[dict[str, Any]]:
+    """Priced mounting lines. Small parts (specs.small_part: screws, clamps, clips,
+    caps, splices) get the fastener/consumable reserve on top (industry practice
+    5-10 % for loss and breakage on site)."""
     rules = (
         db.query(MountingRule)
         .filter(MountingRule.roof_type == roof.code, MountingRule.active.is_(True))
@@ -132,6 +135,10 @@ def mounting_lines(db: Session, roof: RoofTypeConfig, st: LayoutStats, default_m
         if qty <= 0:
             continue
         item: CatalogItem | None = r.item
+        meta_extra: dict[str, Any] = {}
+        if item and (item.specs or {}).get("small_part") and fastener_margin_pct > 0:
+            meta_extra = {"base_qty": qty, "margin_pct": fastener_margin_pct}
+            qty = float(math.ceil(qty * (1 + fastener_margin_pct / 100.0) - 1e-9))
         unit_price = item.price_for(default_markup) if item else 0.0
         purchase = item.purchase_price if item else 0.0
         out.append(
@@ -144,7 +151,7 @@ def mounting_lines(db: Session, roof: RoofTypeConfig, st: LayoutStats, default_m
                 "unit_price": unit_price,
                 "purchase_price": purchase,
                 "catalog_item_id": item.id if item else None,
-                "meta": {"rule_id": r.id, "basis": r.basis, "factor": r.factor},
+                "meta": {"rule_id": r.id, "basis": r.basis, "factor": r.factor, **meta_extra},
             }
         )
     return out

@@ -185,12 +185,19 @@ export interface Selections {
   battery_accessories?: { item_id: number; qty: number }[]
   switchboard_item_id?: number | null
   solar_cable_item_id?: number | null
-  solar_cable_red_m?: number
-  solar_cable_black_m?: number
+  solar_cable_red_m?: number | null
+  solar_cable_black_m?: number | null
   mc4_item_id?: number | null
-  mc4_qty?: number
+  mc4_qty?: number | null
   power_cable_item_id?: number | null
-  power_cable_m?: number
+  power_cable_m?: number | null
+  dc_box?: 'auto' | 'yes' | 'no'
+  dc_box_fuses?: boolean
+  backup_output?: boolean
+  metering?: 'ct' | 'smart_meter'
+  earth_rod?: boolean
+  auto_electrical?: boolean
+  module_spare_pct?: number
   electrical_items?: { item_id: number; qty: number }[]
   mounting_mode?: 'auto' | 'detailed' | 'lump' | 'none'
   lump_price_per_module?: number
@@ -294,6 +301,54 @@ export interface PricingSettings {
   specific_yield_kwh_per_kwp: number
   dc_ac_ratio_max: number
   quote_number_prefix: string
+  cable_margin_pct: number
+  fastener_margin_pct: number
+  module_spare_pct: number
+  design_tmin_c: number
+  design_tcell_max_c: number
+  dc_vdrop_max_pct: number
+  ac_vdrop_max_pct: number
+  dc_run_default_m: number
+  ac_run_default_m: number
+  dc_box_distance_m: number
+}
+
+export interface DesignRole {
+  role: string
+  name: string
+  qty: number
+  unit: string
+  section: string
+  spec: Record<string, unknown>
+  item_id: number | null
+  item_name: string | null
+  unit_price: number | null
+}
+
+export interface DesignString {
+  id: string
+  plane: string
+  modules: number
+  mppt: number
+  input: number
+  voc_cold_v: number
+  vmp_stc_v: number
+  vmp_hot_v: number
+  kwp: number
+  cable_one_way_m: number
+  vdrop_pct: number
+}
+
+export interface Design {
+  strings: { strings: DesignString[]; warnings: string[]; checks: { ok: boolean; text: string }[]; modules_per_string: number; fuses_required: boolean; fuse_a: number }
+  dc: Record<string, number | string | boolean>
+  ac: Record<string, number | string | boolean>
+  battery: Record<string, number | string | boolean>
+  grounding: Record<string, number | string | boolean>
+  management: Record<string, number | string | boolean>
+  margins: Record<string, number>
+  roles: DesignRole[]
+  warnings: string[]
 }
 
 export interface TextsSettings {

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Download, Eye, EyeOff, FileSpreadsheet, FileText, Lock, Plus, RefreshCw, Trash2, Unlock } from 'lucide-react'
+import { Download, DraftingCompass, Eye, EyeOff, FileSpreadsheet, FileText, Lock, Plus, RefreshCw, Trash2, Unlock } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Badge, Empty, Field, Input, Loading, Modal, NumInput, Select, Spinner, Stat, Textarea, Warn, cx, useToast } from '@/components/ui'
 import { del, downloadFile, errMsg, get, patch, post } from '@/lib/api'
@@ -107,11 +107,12 @@ function QuoteEditor({ quote: q0, ctx, lang }: { quote: Quote; ctx: StepCtx; lan
   const recalc = useMut(() => post<Quote>(`/api/quotes/${q.id}/recalculate`))
   const resync = useMut(() => patch<Quote>(`/api/quotes/${q.id}`, { selections: cleanSel(ctx.sel), ...quoteFieldsFromSel(ctx.sel) }))
 
-  const doc = async (kind: 'pdf' | 'pdf_internal' | 'xlsx') => {
+  const doc = async (kind: 'pdf' | 'pdf_internal' | 'xlsx' | 'techfile') => {
     setBusyDoc(kind)
     try {
       const base = `${q.number}-v${q.version}`
       if (kind === 'xlsx') await downloadFile(`/api/quotes/${q.id}/xlsx`, `${base}.xlsx`)
+      else if (kind === 'techfile') await downloadFile(`/api/quotes/${q.id}/techfile.pdf`, `${base}-techfile.pdf`)
       else await downloadFile(`/api/quotes/${q.id}/pdf?mode=${kind === 'pdf' ? 'client' : 'internal'}`, `${base}${kind === 'pdf_internal' ? '-internal' : ''}.pdf`)
     } catch (e) {
       toast.push(errMsg(e), 'bad')
@@ -275,6 +276,9 @@ function QuoteEditor({ quote: q0, ctx, lang }: { quote: Quote; ctx: StepCtx; lan
           </button>
           <button type="button" className="btn-ghost w-full" onClick={() => doc('xlsx')} disabled={!!busyDoc} data-testid="button-xlsx">
             {busyDoc === 'xlsx' ? <Spinner /> : <FileSpreadsheet className="h-4 w-4" />} {t('xlsx')}
+          </button>
+          <button type="button" className="btn-ghost w-full" onClick={() => doc('techfile')} disabled={!!busyDoc} data-testid="button-techfile">
+            {busyDoc === 'techfile' ? <Spinner /> : <DraftingCompass className="h-4 w-4" />} {t('techfile_pdf')}
           </button>
           <p className="text-center text-xs text-ink-3">
             {q.number} · v{q.version} · {fmtDate(q.created_at)} <Badge tone="neutral">{t(`status_${q.status}` as Key)}</Badge>

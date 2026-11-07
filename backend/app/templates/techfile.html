@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: A4; margin: 15mm 13mm 17mm 13mm;
+    @bottom-center { content: "{{ company.name }} · Техническо досие · оферта № {{ quote.number }} · стр. " counter(page) " / " counter(pages); font-size: 8pt; color: #777; font-family: 'DejaVu Sans', sans-serif; } }
+  body { font-family: 'DejaVu Sans', 'Liberation Sans', Arial, sans-serif; font-size: 9pt; color: #1b1f24; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #f0a500; padding-bottom: 8px; margin-bottom: 10px; }
+  .header .co { font-size: 8.5pt; color: #444; line-height: 1.35; }
+  .header .co b { font-size: 11pt; color: #1b1f24; }
+  .logo { max-height: 56px; max-width: 180px; }
+  .qno { text-align: right; font-size: 9pt; color: #444; }
+  .qno .num { font-size: 13pt; font-weight: bold; color: #1b1f24; }
+  h1 { font-size: 15pt; margin: 8px 0 4px; letter-spacing: 1px; }
+  h2 { font-size: 11.5pt; margin: 14px 0 6px; padding-bottom: 3px; border-bottom: 1px solid #f0a500; page-break-after: avoid; }
+  h3 { font-size: 9.5pt; margin: 8px 0 4px; page-break-after: avoid; }
+  .sub { color: #666; font-size: 9pt; margin: 0 0 8px; }
+  table.t { width: 100%; border-collapse: collapse; margin: 4px 0 8px; page-break-inside: auto; }
+  table.t th { background: #1b1f24; color: #fff; font-weight: 600; font-size: 8pt; padding: 4px 5px; text-align: left; }
+  table.t td { padding: 3px 5px; border-bottom: 1px solid #e6e6e6; font-size: 8.5pt; vertical-align: top; }
+  table.t tr.section td { background: #fff4d6; font-weight: bold; border-top: 1px solid #f0a500; }
+  table.t tr.group td { background: #eef2f7; font-weight: bold; }
+  .r { text-align: right; white-space: nowrap; }
+  .c { text-align: center; }
+  .kpi { display: flex; gap: 8px; margin: 8px 0 4px; }
+  .kpi div { flex: 1; background: #f6f7f9; border-radius: 4px; padding: 6px 8px; text-align: center; }
+  .kpi .v { font-weight: bold; font-size: 11pt; white-space: nowrap; }
+  .kpi .l { font-size: 7.5pt; color: #777; text-transform: uppercase; }
+  .grid { display: flex; gap: 12px; }
+  .box { flex: 1 1 0; min-width: 0; overflow: hidden; border: 1px solid #ddd; border-radius: 4px; padding: 6px 9px; font-size: 8.6pt; }
+  .box h3 { margin: 0 0 4px; font-size: 8.5pt; text-transform: uppercase; color: #777; letter-spacing: .5px; }
+  .box table { width: 100%; table-layout: fixed; }
+  .box table td { padding: 1px 6px 1px 0; vertical-align: top; word-wrap: break-word; }
+  .box table td:first-child { width: 40%; }
+  .box table td:first-child { color: #666; }
+  .ok { color: #1e8e3e; font-weight: bold; }
+  .bad { color: #c0392b; font-weight: bold; }
+  .warn { background: #fff4d6; border-left: 3px solid #f0a500; padding: 4px 8px; margin: 3px 0; font-size: 8.5pt; }
+  .fig { border: 1px solid #ddd; border-radius: 4px; padding: 6px; margin: 6px 0; page-break-inside: avoid; }
+  .fig svg { width: 100%; height: auto; display: block; }
+  .fig img { max-width: 100%; max-height: 95mm; display: block; margin: 0 auto; }
+  .cap { font-size: 8pt; color: #666; margin-top: 3px; }
+  .muted { color: #777; font-size: 8pt; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
+  .pb { page-break-before: always; }
+  ol.rules { margin: 4px 0 0 16px; padding: 0; font-size: 8.5pt; line-height: 1.45; }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="co">
+    {% if logo_uri %}<img class="logo" src="{{ logo_uri }}"><br>{% endif %}
+    <b>{{ company.name }}</b><br>{{ company.address }}<br>
+    {% if company.phone %}Тел.: {{ company.phone }} · {% endif %}{{ company.email }}
+  </div>
+  <div class="qno">
+    <div class="num">Техническо досие</div>
+    Оферта № {{ quote.number }}{% if quote.version > 1 %} / rev.{{ quote.version }}{% endif %}<br>
+    Проект {{ project.number }} · {{ date_str }}
+  </div>
+</div>
+
+<h1>Фотоволтаична централа {{ (((info.kwp or 0) * 1000) | round | int) | thousands }} Wp{% if info.storage_kwh %} с батерия {{ info.storage_kwh | num }} kWh{% endif %}</h1>
+<p class="sub">{{ project.client_name }}{% if project.client_company %} · {{ project.client_company }}{% endif %}{% if project.site_address %} · {{ project.site_address }}{% endif %}</p>
+
+<div class="kpi">
+  <div><div class="v">{{ info.panel_qty }} × {{ info.panel_wp | num }} Wp</div><div class="l">Модули</div></div>
+  <div><div class="v">{{ info.kwp | num }} kWp</div><div class="l">Инсталирана DC мощност</div></div>
+  <div><div class="v">{{ inverter.specs.ac_power_kw | num if inverter else '—' }} kW</div><div class="l">Инвертор AC</div></div>
+  <div><div class="v">{{ sd.count or 0 }} × {{ sd.modules_per_string or 0 }}</div><div class="l">Стрингове</div></div>
+  <div><div class="v">{{ annual_yield | thousands }} kWh</div><div class="l">Очакван годишен добив</div></div>
+</div>
+
+<div class="grid">
+  <div class="box"><h3>Обект</h3><table>
+    <tr><td>Тип покрив</td><td>{{ roof.label_bg if roof else project.roof_type }}</td></tr>
+    <tr><td>Фази / присъединена мощност</td><td>{{ project.phase }} ф. / {{ project.connected_power_kw | num }} kW</td></tr>
+    <tr><td>Разстояние масив → инвертор</td><td>{{ dc.run_m | num }} m (еднопосочно)</td></tr>
+    <tr><td>Разстояние инвертор → ГРТ</td><td>{{ ac.run_m | num }} m</td></tr>
+    {% if bat %}<tr><td>Разстояние батерия → инвертор</td><td>{{ bat.run_m | num }} m</td></tr>{% endif %}
+  </table></div>
+  <div class="box"><h3>Проектни параметри</h3><table>
+    <tr><td>Мин. температура (Voc)</td><td>{{ sd.tmin_c | num }} °C</td></tr>
+    <tr><td>Макс. температура клетка (Vmp)</td><td>{{ sd.tcell_max_c | num }} °C</td></tr>
+    <tr><td>Резерв кабели</td><td>{{ margins.cable_pct | num }} %</td></tr>
+    <tr><td>Резерв крепежни елементи</td><td>{{ margins.fastener_pct | num }} %</td></tr>
+    <tr><td>Макс. пад на напрежение DC / AC</td><td>{{ dc.vdrop_limit_pct | num }} % / {{ ac.vdrop_limit_pct | num }} %</td></tr>
+    <tr><td>Специфичен добив</td><td>{{ specific_yield }} kWh/kWp·год.</td></tr>
+  </table></div>
+</div>
+
+{% set qw = quote.selections.get('_warnings') or [] %}{% if qw %}
+<h3>Забележки от проверките</h3>
+{% for w in qw %}<div class="warn">{{ w }}</div>{% endfor %}
+{% endif %}
+
+<h2>1. Оборудване</h2>
+<div class="grid">
+  {% if panel %}<div class="box"><h3>Модул</h3><b>{{ panel.name }}</b><table>
+    <tr><td>Pmax / η</td><td>{{ panel.specs.wp }} Wp / {{ panel.specs.efficiency }} %</td></tr>
+    <tr><td>Voc / Isc</td><td>{{ panel.specs.voc }} V / {{ panel.specs.isc }} A</td></tr>
+    <tr><td>Vmp / Imp</td><td>{{ panel.specs.vmp }} V / {{ panel.specs.imp }} A</td></tr>
+    <tr><td>Темп. коеф. Voc / Pmax</td><td>{{ panel.specs.temp_coeff_voc }} / {{ panel.specs.temp_coeff_pmax }} %/°C</td></tr>
+    <tr><td>Макс. предпазител</td><td>{{ panel.specs.max_series_fuse_a }} A · {{ panel.specs.max_system_v }} V</td></tr>
+    <tr><td>Размери / тегло</td><td>{{ panel.specs.height_mm }}×{{ panel.specs.width_mm }}×{{ panel.specs.thickness_mm }} mm / {{ panel.specs.weight_kg }} kg</td></tr>
+  </table></div>{% endif %}
+  {% if inverter %}<div class="box"><h3>Инвертор</h3><b>{{ inverter.name }}</b><table>
+    <tr><td>AC мощност / макс. ток</td><td>{{ inverter.specs.ac_power_kw }} kW / {{ inverter.specs.max_ac_current_a }} A</td></tr>
+    <tr><td>Макс. PV вход</td><td>{{ inverter.specs.max_pv_kw }} kW ({{ inverter.specs.max_pv_access_kw }} kWp)</td></tr>
+    <tr><td>DC напрежение / MPPT</td><td>{{ inverter.specs.max_dc_voltage }} V / {{ inverter.specs.mppt_v_min }}–{{ inverter.specs.mppt_v_max }} V · {{ inverter.specs.mppt_count }} MPPT × {{ inverter.specs.strings_per_mppt }}</td></tr>
+    <tr><td>Ток на MPPT (раб./Isc)</td><td>{{ inverter.specs.max_input_current_a }} / {{ inverter.specs.max_isc_a }} A</td></tr>
+    <tr><td>Батерия</td><td>{{ inverter.specs.battery_v_min }}–{{ inverter.specs.battery_v_max }} V · {{ inverter.specs.max_charge_a }} A</td></tr>
+    <tr><td>Размери / тегло / IP</td><td>{{ inverter.specs.dims_mm }} mm / {{ inverter.specs.weight_kg }} kg / {{ inverter.specs.ip }}</td></tr>
+    {% if inverter.specs.clearance_cm %}<tr><td>Монтажни отстояния</td><td>{{ inverter.specs.clearance_cm }} cm</td></tr>{% endif %}
+  </table>{% if not inverter.specs.specs_verified %}<div class="muted">Характеристиките не са потвърдени от производител — проверете.</div>{% endif %}</div>{% endif %}
+  {% if battery %}<div class="box"><h3>Батерия</h3><b>{{ battery.name }}</b><table>
+    <tr><td>Капацитет</td><td>{{ bat.qty }} × {{ battery.specs.kwh }} kWh = {{ bat.kwh }} kWh{% if battery.specs.usable_kwh %} ({{ battery.specs.usable_kwh }} kWh използваем/модул){% endif %}</td></tr>
+    <tr><td>Напрежение</td><td>{{ battery.specs.nominal_v }} V{% if battery.specs.ah %} · {{ battery.specs.ah }} Ah{% endif %}</td></tr>
+    {% if battery.specs.max_charge_a %}<tr><td>Макс. ток</td><td>{{ battery.specs.max_charge_a }} A</td></tr>{% endif %}
+    {% if battery.specs.dims_mm %}<tr><td>Размери / тегло / IP</td><td>{{ battery.specs.dims_mm }} mm / {{ battery.specs.weight_kg }} kg / {{ battery.specs.ip }}</td></tr>{% endif %}
+    <tr><td>Вграден прекъсвач</td><td>{{ 'да' if battery.specs.built_in_breaker else 'не/неизвестно' }}</td></tr>
+  </table></div>{% endif %}
+</div>
+
+<h2>2. Стрингово оформление и DC проверки</h2>
+<table class="t">
+  <tr><th>Стринг</th><th>Плоскост</th><th class="r">Модули</th><th class="r">kWp</th><th class="r">Vmp STC</th><th class="r">Voc @ {{ sd.tmin_c | num }} °C</th><th class="r">Vmp @ {{ sd.tcell_max_c | num }} °C</th><th class="c">MPPT / вход</th><th class="r">Кабел (едн.)</th><th class="r">ΔU</th></tr>
+  {% for s in sd.strings %}
+  <tr><td><span class="dot" style="background:{{ colors[loop.index0 % colors|length] }}"></span>{{ s.id }}</td><td>{{ s.plane }}</td><td class="r">{{ s.modules }}</td><td class="r">{{ s.kwp | num }}</td><td class="r">{{ s.vmp_stc_v | num }} V</td><td class="r">{{ s.voc_cold_v | num }} V</td><td class="r">{{ s.vmp_hot_v | num }} V</td><td class="c">{{ s.mppt }} / {{ s.input }}</td><td class="r">{{ s.cable_one_way_m | num }} m</td><td class="r">{{ s.vdrop_pct | num }} %</td></tr>
+  {% endfor %}
+</table>
+<div class="grid">
+  <div class="box"><h3>Проверки (IEC 62548 / IEC 60364-7-712)</h3>
+    {% for c in sd.checks %}<div><span class="{{ 'ok' if c.ok else 'bad' }}">{{ '✓' if c.ok else '✗' }}</span> {{ c.text }}</div>{% endfor %}
+    <div class="muted" style="margin-top:4px">Voc(T) = Voc·(1 + |β<sub>Voc</sub>|·(25 − T<sub>min</sub>)); Vmp(T) = Vmp·(1 − |β<sub>Pmax</sub>|·(T<sub>cell</sub> − 25)). Допустими модули в стринг: {{ sd.ns_min }}–{{ sd.ns_max }}.</div>
+  </div>
+  <div class="box"><h3>DC кабели и защита</h3><table>
+    <tr><td>Соларен кабел</td><td>{{ dc.cable_mm2 | num }} mm² H1Z2Z2-K · I<sub>z</sub> ≈ {{ dc.cable_iz_a }} A ≥ 1,25×Isc = {{ dc.design_current_a }} A</td></tr>
+    <tr><td>Дължина (+ / −)</td><td>{{ dc.red_m_raw | num }} m / {{ dc.black_m_raw | num }} m → с резерв {{ dc.margin_pct | num }} %: <b>{{ dc.red_m | num }} / {{ dc.black_m | num }} m</b></td></tr>
+    <tr><td>Макс. пад DC</td><td>{{ dc.vdrop_worst_pct | num }} % (лимит {{ dc.vdrop_limit_pct | num }} %)</td></tr>
+    <tr><td>Стрингови предпазители</td><td>{{ 'необходими' if sd.fuses_required else 'не са необходими' }} — {{ sd.fuse_rule }}</td></tr>
+    <tr><td>DC табло при масива</td><td>{{ 'да' if dc.box else 'не' }} — {{ dc.box_reason }}</td></tr>
+    <tr><td>DC разединител</td><td>{{ 'вграден в инвертора' if dc.dc_switch_integrated else 'външен' }}</td></tr>
+    <tr><td>MC4 комплекти</td><td>{{ dc.mc4_pairs }} (2 на стринг{% if dc.box %} + 2 на стринг за DC таблото{% endif %} + 1 резерва)</td></tr>
+  </table></div>
+</div>
+
+<h2>3. Еднолинейна схема</h2>
+<div class="fig">{{ sld | safe }}<div class="cap">Принципна еднолинейна схема — стрингове → {% if dc.box %}DC табло → {% endif %}инвертор{% if bat %} (+ батерия){% endif %} → главно разпределително табло → мрежа. Защитите са според ръководството на инвертора и IEC 60364-7-712.</div></div>
+
+<div class="grid">
+  <div class="box"><h3>AC страна</h3><table>
+    <tr><td>Макс. AC ток</td><td>{{ ac.i_max_a }} A ({{ ac.phase }} ф.)</td></tr>
+    <tr><td>Прекъсвач вход</td><td>{{ ac.breaker_poles }} {{ ac.breaker_a }} A крива C</td></tr>
+    <tr><td>Дефектнотокова защита</td><td>{{ ac.rcd_a }} A / {{ ac.rcd_ma }} mA тип {{ ac.rcd_type }}</td></tr>
+    <tr><td>Катоден отводител</td><td>AC тип 2 в ГРТ{% if ac.spd_integrated %} (+ вграден в инвертора){% endif %}</td></tr>
+    <tr><td>Кабел</td><td>СВТ {{ ac.cores }}×{{ ac.cable_mm2 | num }} mm² · {{ ac.cable_m_raw | num }} m → {{ ac.cable_m | num }} m · ΔU {{ ac.vdrop_pct }} %</td></tr>
+    <tr><td>Измерване</td><td>{{ 'токови трансформатори (3 бр., в комплекта)' if ac.metering == 'ct' else 'смарт електромер Modbus' }}</td></tr>
+  </table></div>
+  {% if bat %}<div class="box"><h3>Батерийна верига</h3><table>
+    <tr><td>Входове на инвертора</td><td>{{ bat.inputs }}{% if bat.busbar %} → шинен разпределител{% endif %}</td></tr>
+    <tr><td>DC прекъсвач</td><td>{{ bat.breaker_a }} A (по ръководството на Deye за {{ inverter.specs.ac_power_kw if inverter }} kW)</td></tr>
+    <tr><td>Кабел</td><td>{{ bat.cable_mm2 | num }} mm² · {{ bat.cable_m | num }} m общо (+/−)</td></tr>
+    <tr><td>Макс. ток зареждане</td><td>{{ bat.max_charge_a | num }} A</td></tr>
+  </table></div>{% endif %}
+  <div class="box"><h3>Заземяване</h3><table>
+    <tr><td>PE инвертор</td><td>{{ grd.pe_mm2 | num }} mm² · {{ grd.pe_m | num }} m</td></tr>
+    <tr><td>Изравняване конструкция</td><td>{{ grd.bonding_mm2 }} mm² · {{ grd.bonding_m | num }} m · {{ grd.bonding_clamps }} клеми (1 на шинна линия)</td></tr>
+    <tr><td>Заземител</td><td>{{ 'нов кол + шина' if grd.earth_rod else 'съществуващ заземител на сградата' }}</td></tr>
+  </table></div>
+</div>
+
+{% for pl in planes %}
+<h2 class="{{ 'pb' if loop.first else '' }}">4.{{ loop.index }} Разположение и монтажен план — {{ pl.name }}</h2>
+<p class="sub">{{ pl.summary.count }} модула · {{ pl.summary.kwp | num }} kWp · азимут {{ pl.azimuth | num }}° · наклон {{ pl.tilt | num }}° · площ модули {{ pl.summary.area_m2 | num }} m²</p>
+{% if pl.photo %}<div class="fig"><img src="{{ pl.photo }}"><div class="cap">Разположение върху снимка на обекта</div></div>{% endif %}
+<div class="fig">{{ pl.svg | safe }}<div class="cap">Монтажен план (в метри): модули оцветени по стринг с пореден номер, шини (плътни линии) и точки на закрепване (●) през {{ roof.fixation_spacing_m | num if roof else '—' }} m. Стрингове: {% for s in pl.strings %}<span class="dot" style="background:{{ colors[(s.id[1:]|int - 1) % colors|length] }}"></span>{{ s.id }} ({{ s.modules }}) {% endfor %}</div></div>
+<table class="t"><tr><th>Ред</th><th class="r">Модули</th><th class="r">Дължина</th><th class="r">Шини</th><th class="r">Точки на закрепване</th></tr>
+{% for ln in pl.summary.lines %}<tr><td>{{ loop.index }} ({{ 'хоризонтален' if ln.direction == 'h' else 'вертикален' }})</td><td class="r">{{ ln.modules }}</td><td class="r">{{ ln.length_m | num }} m</td><td class="r">{{ ln.rails }}</td><td class="r">{{ ((ln.length_m / (roof.fixation_spacing_m if roof else 1.2)) | round(0, 'ceil') | int + 1) * ln.rails }}</td></tr>{% endfor %}
+</table>
+{% endfor %}
+
+<h2>5. Конструкция — изчисление</h2>
+<div class="kpi">
+  <div><div class="v">{{ stats.lines }}</div><div class="l">Шинни линии</div></div>
+  <div><div class="v">{{ stats.rail_m | num }} m</div><div class="l">Шини (с {{ roof.waste_pct | num if roof else 0 }} % отпадък)</div></div>
+  <div><div class="v">{{ stats.rail_pieces }}</div><div class="l">Шини × {{ roof.rail_stock_length_m | num if roof else '—' }} m</div></div>
+  <div><div class="v">{{ stats.fixations }}</div><div class="l">Точки на закрепване</div></div>
+  <div><div class="v">{{ stats.mid_clamps }} / {{ stats.end_clamps }}</div><div class="l">Средни / крайни скоби</div></div>
+  <div><div class="v">{{ stats.connectors }}</div><div class="l">Съединители</div></div>
+</div>
+<ol class="rules">
+  <li>Шинни линии = непрекъснати редове модули × {{ roof.rails_per_module if roof else 2 }} шини/модул; дължина на шините = дължина на реда × шини + {{ roof.waste_pct | num if roof else 0 }} % отпадък при рязане.</li>
+  <li>Точки на закрепване (куки/мостове/шпилки) = ⌈дължина на реда / {{ roof.fixation_spacing_m | num if roof else 1.2 }} m⌉ + 1 за всяка шина; стъпката се потвърждава със статично изчисление за снеговата/ветровата зона на обекта.</li>
+  <li>Скоби: средни = (модули − 1) × шини за всеки ред; крайни = 2 × шини за всеки ред (разстояние ≥ 40 mm от края на шината, затягане 15 Nm).</li>
+  <li>Съединители = брой шини − брой шинни линии; капачки — по 1 лява и 1 дясна на линия.</li>
+  <li>Дребни крепежни елементи (винтове, скоби, клипси, съединители, капачки) са с резерв {{ margins.fastener_pct | num }} % за загуби на обекта.</li>
+</ol>
+{% if roof and roof.notes %}<p class="muted">{{ roof.notes }}</p>{% endif %}
+
+<h2 class="pb">6. Пълна спецификация (BOM)</h2>
+<table class="t">
+  <tr><th>№</th><th>Наименование</th><th>Код / производител</th><th class="c">Мярка</th><th class="r">Кол.</th><th>Извод</th></tr>
+  {% set ns = namespace(i=0) %}
+  {% for sec in sections %}
+  <tr class="section"><td colspan="6">{{ sec.title }}</td></tr>
+  {% for l in sec.lines %}{% set ns.i = ns.i + 1 %}
+  <tr><td>{{ ns.i }}</td><td>{{ l.name }}{% if l.meta.missing_item %} <span class="bad">(няма в каталога)</span>{% endif %}</td><td class="muted">{% if l.catalog_item %}{{ l.catalog_item.sku or '' }} {{ l.catalog_item.manufacturer or '' }}{% endif %}</td><td class="c">{{ l.unit }}</td><td class="r"><b>{{ l.qty | num }}</b></td>
+    <td class="muted">{% if l.meta.basis %}{{ l.meta.basis }} × {{ l.meta.factor }}{% if l.meta.margin_pct %} + {{ l.meta.margin_pct | num }} % (база {{ l.meta.base_qty | num }}){% endif %}{% elif l.meta.role %}{{ l.meta.role }}{% if l.meta.auto_qty and l.meta.auto_qty != l.qty %} · авто {{ l.meta.auto_qty | num }}{% endif %}{% elif l.locked %}ръчно{% endif %}</td></tr>
+  {% endfor %}
+  {% endfor %}
+</table>
+
+<h2>7. Списък за поръчка по доставчик</h2>
+{% for mf, rows in order.items() %}
+<table class="t">
+  <tr class="group"><td colspan="5">{{ mf }} — {{ rows | length }} позиции</td></tr>
+  <tr><th>Код</th><th>Наименование</th><th class="c">Мярка</th><th class="r">Количество</th><th class="r">Доставна цена</th></tr>
+  {% for r in rows %}<tr><td class="muted">{{ r.item.sku if r.item and r.item.sku else '—' }}</td><td>{{ r.item.name if r.item else r.line.name }}</td><td class="c">{{ r.line.unit }}</td><td class="r"><b>{{ r.line.qty | num }}</b></td><td class="r">{% if r.line.purchase_price %}{{ r.line.purchase_price | money }}{% else %}—{% endif %}</td></tr>{% endfor %}
+</table>
+{% endfor %}
+
+<h2>8. Приложими стандарти и бележки</h2>
+<ol class="rules">
+  <li>IEC 62548 / БДС EN 62548 — проектиране на PV масиви: стрингове, защита от свръхток, заземяване, разединители.</li>
+  <li>IEC 60364-7-712 / HD 60364-7-712 — електрически уредби: фотоволтаични захранващи системи (DC разединител, SPD, маркировка).</li>
+  <li>IEC 61643-32 — избор и монтаж на катодни отводители за PV (SPD при масива при разстояние > 10 m до инвертора).</li>
+  <li>IEC 61730 / IEC 61215 — модули; EN 50618 — соларни кабели H1Z2Z2-K; EN 62852 — конектори MC4.</li>
+  <li>Наредба № 6 (присъединяване към мрежата), Наредба № 3 за устройството на електрическите уредби, EN 1991-1-3/1-4 (снег/вятър) за конструкцията.</li>
+  <li>Монтажни инструкции на производителите (Deye — отстояния 50 cm страни, 100 cm отпред; Aerocompact — затягане 15 Nm скоби, 10 Nm WCL клеми, няма компоненти в зоната на съединителя).</li>
+  <li>Количествата с „indicative“ цени в каталога са ориентировъчни — потвърдете с доставчика при поръчка.</li>
+</ol>
+<p class="muted">Документът е генериран автоматично от gmsun по данните в офертата; всички количества могат да бъдат коригирани ръчно в офертата преди печат.</p>
+</body>
+</html>

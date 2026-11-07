@@ -44,9 +44,34 @@ services:
     restart: unless-stopped
     depends_on:
       - api
+      - pgadmin
     ports:
       - "${HTTP_PORT:-80}:80"
+
+  # Database viewer/editor (like phpMyAdmin, for PostgreSQL) — served at http://<server>/pgadmin/
+  # The gmsun database server is pre-registered; the DB password is asked once on first connect.
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@gmsun.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-change-me-pgadmin}
+      PGADMIN_CONFIG_SERVER_MODE: "True"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+      PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION: "False"
+      PGADMIN_LISTEN_PORT: "5050"
+      SCRIPT_NAME: /pgadmin
+      PGADMIN_SERVER_JSON_FILE: /pgadmin4/servers.json
+    volumes:
+      - pgadmin:/var/lib/pgadmin
+      - ./deploy/pgadmin/servers.json:/pgadmin4/servers.json:ro
+    expose:
+      - "5050"
 
 volumes:
   pgdata:
   appdata:
+  pgadmin:

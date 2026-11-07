@@ -199,6 +199,22 @@ function PricingTab() {
         {num('specific_yield_kwh_per_kwp', bg ? 'Специф. добив kWh/kWp' : 'Specific yield kWh/kWp', bg ? 'за оценка на годишното производство' : 'for the annual yield estimate')}
         {num('dc_ac_ratio_max', 'DC/AC max', bg ? 'праг за предупреждение при оразмеряване' : 'warning threshold when sizing', 0.05)}
       </div>
+      <div className="card flex flex-col gap-3 p-4">
+        <h2>{t('engineering_defaults')}</h2>
+        <p className="text-xs text-ink-3">{bg ? 'Индустриални резерви и проектни граници за автоматичната спецификация (IEC 62548 / IEC 60364-7-712). Резервът за кабели покрива отрязъци и трасета, а за дребни крепежи — загуби при монтаж.' : 'Industry margins and design limits for the automatic BOM (IEC 62548 / IEC 60364-7-712). The cable margin covers off-cuts and routing; the fastener margin covers losses on site.'}</p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {num('cable_margin_pct', t('cable_margin_pct'), bg ? 'типично 10–20 %' : 'typically 10–20 %')}
+          {num('fastener_margin_pct', t('fastener_margin_pct'), bg ? 'типично 5–10 %' : 'typically 5–10 %')}
+          {num('module_spare_pct', t('module_spare_pct'), bg ? '0 = без резервни' : '0 = no spares')}
+          {num('design_tmin_c', t('design_tmin_c'), bg ? 'за Voc на стринга' : 'for string Voc')}
+          {num('design_tcell_max_c', t('design_tcell_max_c'), bg ? 'за Vmp на стринга' : 'for string Vmp')}
+          {num('dc_vdrop_max_pct', t('dc_vdrop_max_pct'), undefined, 0.1)}
+          {num('ac_vdrop_max_pct', t('ac_vdrop_max_pct'), undefined, 0.1)}
+          {num('dc_run_default_m', t('dc_run_default_m'))}
+          {num('ac_run_default_m', t('ac_run_default_m'))}
+          {num('dc_box_distance_m', t('dc_box_distance_m'), bg ? 'IEC 61643-32: SPD при масива над 10 m' : 'IEC 61643-32: SPD at the array above 10 m')}
+        </div>
+      </div>
       <div className="card flex flex-col gap-2 p-4">
         <Toggle checked={draft.show_unit_prices_client} onChange={(v) => setDraft({ ...draft, show_unit_prices_client: v })} label={bg ? 'Единични цени в клиентския PDF' : 'Unit prices in client PDF'} />
         <Toggle checked={draft.client_pdf_collapse_construction} onChange={(v) => setDraft({ ...draft, client_pdf_collapse_construction: v })} label={bg ? 'Конструкцията като един ред в клиентския PDF' : 'Collapse structure into one line in client PDF'} />

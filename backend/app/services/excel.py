@@ -37,7 +37,9 @@ def model_key(name: str) -> str:
     n = (name or "").upper()
     m = re.search(r"SUN-\d+(?:\.\d+)?K-[A-Z0-9]+(?:-[A-Z0-9]+)*", n)
     if m:
-        return re.sub(r"-EU$", "", m.group()).replace("-", "")
+        # ignore region / hardware-revision suffixes (-EU, -SM2, -AM2 ...) so that
+        # 'SUN-5K-SG05LP3-EU' and 'SUN-5K-SG05LP3-EU-SM2' are the same model
+        return re.sub(r"(-(EU|SM2|AM2|AM3|BM3|BM4|EM6|GM8|GM10|P|PLUS))+$", "", m.group()).replace("-", "")
     m = re.search(r"\b(RW-[A-Z]?\d+(?:\.\d+)?|SE-[A-Z]\d+(?:\.\d+)?(?:\s?(?:MAX|PRO|C))?|BOS-[A-Z]\d*|GB-[A-Z]\d*|GE-[A-Z]\d*|AI-W\d+(?:\.\d+)?)", n)
     if m:
         return re.sub(r"[^A-Z0-9]", "", m.group())
