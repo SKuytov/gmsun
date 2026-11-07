@@ -87,7 +87,7 @@ export function EquipmentStep({ ctx }: { ctx: StepCtx }) {
   const invQty = Math.max(1, Math.round(sel.inverter_qty || 1))
   const stringsQ = useQuery({
     queryKey: ['sizing', 'strings', panelId, sel.inverter_item_id, ctx.panelQty, invQty],
-    queryFn: () => get<Record<string, number | string[]>>(`/api/sizing/strings?panel_id=${panelId}&inverter_id=${sel.inverter_item_id}&n_panels=${ctx.panelQty}&n_inverters=${invQty}`),
+    queryFn: () => get<Record<string, number | string[] | { strings: number }[]>>(`/api/sizing/strings?panel_id=${panelId}&inverter_id=${sel.inverter_item_id}&n_panels=${ctx.panelQty}&n_inverters=${invQty}`),
     enabled: !!panelId && !!sel.inverter_item_id && ctx.panelQty > 0,
   })
 
@@ -208,7 +208,15 @@ export function EquipmentStep({ ctx }: { ctx: StepCtx }) {
           <div className="mt-3 flex flex-wrap gap-2 text-xs">
             <Badge tone="neutral">
               {t('strings')}: {String(stringsQ.data.strings)} × {String(stringsQ.data.modules_per_string)}
-              {invQty > 1 ? ` (${Math.round(Number(stringsQ.data.strings) / invQty * 10) / 10} / ${lang === 'bg' ? 'инв.' : 'inv.'})` : ''}
+              {invQty > 1
+                ? (() => {
+                    const per = Array.isArray(stringsQ.data.per_inverter) ? (stringsQ.data.per_inverter as { strings: number }[]).map((x) => x.strings) : []
+                    const lo = per.length ? Math.min(...per) : 0
+                    const hi = per.length ? Math.max(...per) : 0
+                    const n = lo === hi ? String(lo) : `${lo}–${hi}`
+                    return lang === 'bg' ? ` · по ${n} на инвертор` : ` · ${n} per inverter`
+                  })()
+                : ''}
             </Badge>
             <Badge tone="neutral">MPPT: {String(stringsQ.data.mppts)}{invQty > 1 ? ` × ${invQty}` : ''}</Badge>
             {Array.isArray(stringsQ.data.warnings) && stringsQ.data.warnings.map((w) => <Badge key={w} tone="warn">{w}</Badge>)}
