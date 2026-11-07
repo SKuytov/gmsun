@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: A4; margin: 16mm 14mm 18mm 14mm;
+    @bottom-center { content: "{{ company.name }} · Оферта № {{ quote.number }} · стр. " counter(page) " / " counter(pages); font-size: 8pt; color: #777; font-family: 'DejaVu Sans', sans-serif; } }
+  body { font-family: 'DejaVu Sans', 'Liberation Sans', Arial, sans-serif; font-size: 9.5pt; color: #1b1f24; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #f0a500; padding-bottom: 8px; margin-bottom: 12px; }
+  .header .co { font-size: 8.5pt; color: #444; line-height: 1.35; }
+  .header .co b { font-size: 11pt; color: #1b1f24; }
+  .logo { max-height: 56px; max-width: 180px; }
+  .qno { text-align: right; font-size: 9pt; color: #444; }
+  .qno .num { font-size: 13pt; font-weight: bold; color: #1b1f24; }
+  h1 { text-align: center; letter-spacing: 6px; font-size: 16pt; margin: 10px 0 6px; }
+  .title { text-align: center; font-weight: bold; font-size: 10pt; margin: 0 0 12px; text-transform: uppercase; line-height: 1.4; }
+  .grid { display: flex; gap: 14px; margin-bottom: 12px; }
+  .box { flex: 1; border: 1px solid #ddd; border-radius: 4px; padding: 7px 9px; font-size: 8.8pt; }
+  .box h3 { margin: 0 0 4px; font-size: 8.5pt; text-transform: uppercase; color: #777; letter-spacing: .5px; }
+  .box table td { padding: 1px 6px 1px 0; vertical-align: top; }
+  .box table td:first-child { color: #666; white-space: nowrap; }
+  table.lines { width: 100%; border-collapse: collapse; margin-top: 6px; }
+  table.lines th { background: #1b1f24; color: #fff; font-weight: 600; font-size: 8.5pt; padding: 5px 6px; text-align: left; }
+  table.lines td { padding: 4px 6px; border-bottom: 1px solid #e6e6e6; font-size: 9pt; }
+  table.lines tr.section td { background: #fff4d6; font-weight: bold; border-top: 1px solid #f0a500; }
+  table.lines .r { text-align: right; white-space: nowrap; }
+  table.lines .c { text-align: center; }
+  .totals { width: 55%; margin-left: auto; margin-top: 10px; border-collapse: collapse; }
+  .totals td { padding: 4px 8px; font-size: 9.5pt; }
+  .totals td.r { text-align: right; white-space: nowrap; }
+  .totals tr.grand td { font-weight: bold; font-size: 11.5pt; border-top: 2px solid #1b1f24; padding-top: 6px; }
+  .section { margin-top: 12px; page-break-inside: avoid; }
+  .section h3 { font-size: 9.5pt; margin: 0 0 3px; color: #1b1f24; }
+  .section p { margin: 0; white-space: pre-line; font-size: 8.8pt; line-height: 1.45; }
+  .pay { display: flex; gap: 10px; margin-top: 10px; }
+  .pay .card { flex: 1; border: 1px solid #f0a500; border-radius: 4px; padding: 6px 10px; }
+  .pay .card .lbl { font-size: 8pt; color: #777; text-transform: uppercase; }
+  .pay .card .val { font-size: 11.5pt; font-weight: bold; }
+  .sign { display: flex; justify-content: space-between; margin-top: 26px; font-size: 9pt; }
+  .sign .s { width: 45%; border-top: 1px solid #999; padding-top: 4px; text-align: center; }
+  .layout-img { max-width: 100%; max-height: 95mm; display: block; margin: 6px auto; border: 1px solid #ddd; }
+  .kpi { display: flex; gap: 8px; margin: 8px 0 4px; }
+  .kpi div { flex: 1; background: #f6f7f9; border-radius: 4px; padding: 6px 8px; text-align: center; }
+  .kpi .v { font-weight: bold; font-size: 11pt; }
+  .kpi .l { font-size: 7.5pt; color: #777; text-transform: uppercase; }
+  .muted { color: #777; font-size: 8pt; }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="co">
+    {% if logo_uri %}<img class="logo" src="{{ logo_uri }}"><br>{% endif %}
+    <b>{{ company.name }}</b><br>
+    {{ company.address }}<br>
+    {% if company.eik %}ЕИК: {{ company.eik }}{% endif %}{% if company.vat_no %} · ДДС №: {{ company.vat_no }}{% endif %}<br>
+    {% if company.phone %}Тел.: {{ company.phone }} · {% endif %}{{ company.email }}{% if company.website %} · {{ company.website }}{% endif %}
+  </div>
+  <div class="qno">
+    <div class="num">№ {{ quote.number }}{% if quote.version > 1 %} / rev.{{ quote.version }}{% endif %}</div>
+    Дата: {{ date_str }}<br>
+    Валидност: {{ quote.valid_days }} дни (до {{ valid_until }})<br>
+    Проект: {{ project.number }}
+  </div>
+</div>
+
+<h1>О Ф Е Р Т А</h1>
+<div class="title">{{ title }}</div>
+
+<div class="grid">
+  <div class="box">
+    <h3>Клиент</h3>
+    <table>
+      <tr><td>Име:</td><td><b>{{ project.client_name }}</b>{% if project.client_company %} — {{ project.client_company }}{% endif %}</td></tr>
+      {% if project.client_eik %}<tr><td>ЕИК:</td><td>{{ project.client_eik }}</td></tr>{% endif %}
+      {% if project.client_phone %}<tr><td>Тел.:</td><td>{{ project.client_phone }}</td></tr>{% endif %}
+      {% if project.client_email %}<tr><td>E-mail:</td><td>{{ project.client_email }}</td></tr>{% endif %}
+      {% if project.client_address %}<tr><td>Адрес:</td><td>{{ project.client_address }}</td></tr>{% endif %}
+    </table>
+  </div>
+  <div class="box">
+    <h3>Обект</h3>
+    <table>
+      <tr><td>Адрес:</td><td>{{ project.site_address or "—" }}</td></tr>
+      <tr><td>Предназначение:</td><td>{{ purpose_label }}</td></tr>
+      <tr><td>Инсталация:</td><td>{{ "Монофазна" if project.phase == 1 else "Трифазна" }}, присъединена мощност {{ project.connected_power_kw|num }} kW</td></tr>
+      <tr><td>Покрив:</td><td>{{ roof_label }}</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="kpi">
+  <div><div class="v">{{ info.get('kwp', 0)|num }} kWp</div><div class="l">Инсталирана мощност</div></div>
+  <div><div class="v">{{ info.get('panel_qty', 0) }} бр.</div><div class="l">Фотоволтаични модули</div></div>
+  <div><div class="v">{{ (info.get('storage_kwh') or 0)|num }} kWh</div><div class="l">Батерийно съхранение</div></div>
+  <div><div class="v">{{ annual_yield|int|thousands }} kWh</div><div class="l">Очакван годишен добив*</div></div>
+  <div><div class="v">{{ quote.execution_days or "—" }} {% if quote.execution_days %}{{ "ден" if quote.execution_days == 1 else "дни" }}{% endif %}</div><div class="l">Срок за изпълнение</div></div>
+</div>
+
+<table class="lines">
+  <thead>
+    <tr>
+      <th style="width:6%">№</th>
+      <th>Наименование</th>
+      <th class="c" style="width:9%">Мярка</th>
+      <th class="r" style="width:11%">Количество</th>
+      {% if show_unit_prices %}<th class="r" style="width:13%">Ед. цена</th>{% endif %}
+      <th class="r" style="width:14%">Общо, {{ quote.currency }}</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for sec in sections %}
+    <tr class="section"><td>{{ sec.roman }}</td><td colspan="{{ 4 if show_unit_prices else 3 }}">{{ sec.title }}</td><td class="r">{{ sec.total|money }}</td></tr>
+    {% for ln in sec.lines %}
+    <tr>
+      <td>{{ loop.index }}</td>
+      <td>{{ ln.name }}</td>
+      <td class="c">{{ ln.unit }}</td>
+      <td class="r">{{ ln.qty|num }}</td>
+      {% if show_unit_prices %}<td class="r">{{ ln.unit_price|money }}</td>{% endif %}
+      <td class="r">{% if show_unit_prices %}{{ ln.total|money }}{% endif %}</td>
+    </tr>
+    {% endfor %}
+  {% endfor %}
+  </tbody>
+</table>
+
+<table class="totals">
+  {% if quote.discount_amount %}
+  <tr><td>Сума:</td><td class="r">{{ quote.subtotal|money }} {{ quote.currency }}</td></tr>
+  <tr><td>Отстъпка {{ quote.discount_pct|num }} %:</td><td class="r">− {{ quote.discount_amount|money }} {{ quote.currency }}</td></tr>
+  {% endif %}
+  <tr><td>Общо без ДДС:</td><td class="r">{{ quote.net_total|money }} {{ quote.currency }}</td></tr>
+  <tr><td>ДДС {{ quote.vat_pct|num }} %:</td><td class="r">{{ quote.vat_amount|money }} {{ quote.currency }}</td></tr>
+  <tr class="grand"><td>Общо с ДДС:</td><td class="r">{{ quote.total|money }} {{ quote.currency }}</td></tr>
+</table>
+
+<div class="pay">
+  <div class="card"><div class="lbl">Аванс {{ quote.advance_pct|num }} %</div><div class="val">{{ quote.advance_amount|money }} {{ quote.currency }}</div><div class="muted">{{ "без ДДС" if advance_basis == "net" else "с ДДС" }}</div></div>
+  <div class="card"><div class="lbl">Остатък след монтаж</div><div class="val">{{ quote.balance_amount|money }} {{ quote.currency }}</div><div class="muted">{{ "без ДДС" if advance_basis == "net" else "с ДДС" }}</div></div>
+  <div class="card"><div class="lbl">Срок за изпълнение</div><div class="val">{% if quote.execution_days %}{{ quote.execution_days }} {{ "работен ден" if quote.execution_days == 1 else "работни дни" }}{% else %}по договаряне{% endif %}</div><div class="muted">{% if quote.workers %}{{ quote.workers }} монтажници{% endif %}</div></div>
+</div>
+
+{% if layout_images %}
+<div class="section">
+  <h3>Разположение на модулите</h3>
+  {% for im in layout_images %}<img class="layout-img" src="{{ im }}">{% endfor %}
+</div>
+{% endif %}
+
+{% if texts.payment %}<div class="section"><h3>Условия на плащане:</h3><p>{{ texts.payment }}</p></div>{% endif %}
+{% if texts.warranty %}<div class="section"><h3>Гаранционни условия:</h3><p>{{ texts.warranty }}</p></div>{% endif %}
+{% if texts.notes %}<div class="section"><h3>Забележки:</h3><p>{{ texts.notes }}</p></div>{% endif %}
+{% if quote.notes %}<div class="section"><h3>Допълнително:</h3><p>{{ quote.notes }}</p></div>{% endif %}
+<p class="muted">* Ориентировъчен добив при специфичен добив {{ specific_yield }} kWh/kWp годишно и зададена ориентация; реалният добив зависи от засенчване и метеорологичните условия.</p>
+
+<div class="sign">
+  <div class="s">Дата: {{ date_str }}</div>
+  <div class="s">Съставил офертата: {{ company.signatory }}</div>
+</div>
+</body>
+</html>
