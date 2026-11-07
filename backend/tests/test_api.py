@@ -197,4 +197,7 @@ def test_engineering_design_and_techfile(client, auth):
     import io
     from openpyxl import load_workbook
     wb = load_workbook(io.BytesIO(xlsx.content))
-    assert "Поръчка" in wb.sheetnames and wb["Поръчка"].max_row > 10
+    assert wb.sheetnames == ["Оферта"]  # client version has no purchase data
+    xlsx = client.get(f"/api/quotes/{q['id']}/xlsx?internal=true", headers=auth)
+    wb = load_workbook(io.BytesIO(xlsx.content))
+    assert "Поръчка" in wb.sheetnames and wb["Поръчка"].max_row > 10 and "Доставчици" in wb.sheetnames

@@ -4,8 +4,8 @@ import { useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Badge, Confirm, ErrorBox, Field, Input, Loading, Modal, NumInput, Select, Textarea, Toggle, cx, useToast } from '@/components/ui'
 import { api, del, downloadFile, errMsg, get, patch, post, put } from '@/lib/api'
-import { fmtMoney, fmtNum, useT } from '@/lib/i18n'
-import type { CatalogItem, LaborOption, MountingRule, RoofType } from '@/lib/types'
+import { fmtMoney, fmtNum, useT, type Key } from '@/lib/i18n'
+import type { CatalogItem, LaborOption, MountingRule, RoofType, Tier } from '@/lib/types'
 import { useAuth } from '@/lib/auth'
 import { DocLinks, useMountingSystems } from '@/components/MountingSystem'
 
@@ -97,6 +97,18 @@ export default function CatalogPage() {
 }
 
 // ----------------------------------------------------------------- items
+export function TierBadge({ tier, manual }: { tier?: Tier | null; manual?: boolean }) {
+  const { t } = useT()
+  if (!tier) return <span className="text-ink-3">—</span>
+  const tone = tier === 'premium' ? 'bg-sun-soft text-sun-ink' : tier === 'economy' ? 'bg-ok/15 text-ok' : 'bg-line/20 text-ink-2'
+  return (
+    <span className={cx('inline-flex items-center whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] font-medium', tone)} title={manual ? undefined : t('tier_auto')}>
+      {t(`tier_${tier}` as Key)}
+      {!manual && <span className="ml-0.5 opacity-60">·</span>}
+    </span>
+  )
+}
+
 function ItemsTab({ lang }: { lang: string }) {
   const { t } = useT()
   const qc = useQueryClient()
@@ -195,6 +207,9 @@ function ItemsTab({ lang }: { lang: string }) {
                   <th>{t('category')}</th>
                   <th>{t('name')}</th>
                   <th>{t('manufacturer')}</th>
+                  <th>{t('supplier')}</th>
+                  <th className="text-right">{t('lead_time_days')}</th>
+                  <th>{t('tier')}</th>
                   <th>{t('unit')}</th>
                   <th className="text-right">{t('purchase_price')}</th>
                   <th className="text-right">{t('markup')}</th>
@@ -232,6 +247,13 @@ function ItemsTab({ lang }: { lang: string }) {
                       </span>
                     </td>
                     <td className="text-ink-2">{i.manufacturer}</td>
+                    <td className="text-ink-2">{i.supplier || <span className="text-ink-3">—</span>}</td>
+                    <td className={cx('num text-right', i.lead_time_days == null && 'text-ink-3')} title={i.lead_time_days == null ? t('lead_time_hint') : undefined}>
+                      {i.effective_lead_time_days ?? '—'}
+                    </td>
+                    <td>
+                      <TierBadge tier={i.effective_tier} manual={!!i.tier} />
+                    </td>
                     <td className="text-ink-2">{i.unit}</td>
                     <td className="num text-right">{i.purchase_price ? fmtNum(i.purchase_price) : <span className="text-warn">0</span>}</td>
                     <td className="num text-right text-ink-3">{i.markup_pct ?? '·'}</td>
@@ -273,6 +295,8 @@ function ItemModal({ item, meta, onClose, onSave, busy }: { item: Partial<Catalo
   const toast = useToast()
   const qc = useQueryClient()
   const [f, setF] = useState<Partial<CatalogItem>>({ ...item })
+  const suppliersQ = useQuery({ queryKey: ['settings', 'suppliers'], queryFn: () => get<{ value: { list?: { name: string }[] } }>('/api/settings/suppliers') })
+  const supplierNames = (suppliersQ.data?.value.list || []).map((x) => x.name)
   const [specs, setSpecs] = useState(JSON.stringify(item.specs || {}, null, 2))
   const [specsErr, setSpecsErr] = useState('')
   const [autofill, setAutofill] = useState(true)
@@ -412,6 +436,28 @@ function ItemModal({ item, meta, onClose, onSave, busy }: { item: Partial<Catalo
         </Field>
         <Field label={t('warranty')}>
           <Input value={f.warranty || ''} onChange={(e) => setF({ ...f, warranty: e.target.value })} />
+        </Field>
+        <Field label={t('supplier')}>
+          <Input list="gmsun-suppliers" value={f.supplier || ''} onChange={(e) => setF({ ...f, supplier: e.target.value || null })} data-testid="input-item-supplier" />
+          <datalist id="gmsun-suppliers">
+            {supplierNames.map((n) => (
+              <option key={n} value={n} />
+            ))}
+          </datalist>
+        </Field>
+        <Field label={t('supplier_sku')}>
+          <Input value={f.supplier_sku || ''} onChange={(e) => setF({ ...f, supplier_sku: e.target.value || null })} />
+        </Field>
+        <Field label={t('lead_time_days')} hint={t('lead_time_hint')}>
+          <NumInput value={f.lead_time_days ?? null} min={0} onChange={(v) => setF({ ...f, lead_time_days: v == null ? null : Math.round(v) })} data-testid="input-item-lead" />
+        </Field>
+        <Field label={t('tier')} hint={f.tier ? undefined : `${t('tier_auto')}${f.effective_tier ? `: ${t(`tier_${f.effective_tier}` as Key)}` : ''}`}>
+          <Select value={f.tier || ''} onChange={(e) => setF({ ...f, tier: (e.target.value || null) as Tier | null })}>
+            <option value="">{t('tier_auto')}</option>
+            <option value="economy">{t('tier_economy')}</option>
+            <option value="standard">{t('tier_standard')}</option>
+            <option value="premium">{t('tier_premium')}</option>
+          </Select>
         </Field>
         <Field label={t('active')} className="self-end">
           <Toggle checked={f.active !== false} onChange={(v) => setF({ ...f, active: v })} />

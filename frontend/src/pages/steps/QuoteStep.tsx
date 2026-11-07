@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { Badge, Empty, Field, Input, Loading, Modal, NumInput, Select, Spinner, Stat, Textarea, Warn, cx, useToast } from '@/components/ui'
 import { del, downloadFile, errMsg, get, patch, post } from '@/lib/api'
 import { fmtDate, fmtMoney, fmtNum, useT, type Key } from '@/lib/i18n'
-import type { Quote, QuoteLine, Selections } from '@/lib/types'
+import type { Quote, QuoteLine, RfqSupplier, Selections } from '@/lib/types'
 import type { StepCtx } from '../Project'
 
 const SECTIONS = ['modules', 'inverter', 'construction', 'electrical', 'labor', 'other'] as const
@@ -33,7 +33,7 @@ export function QuoteStep({ ctx }: { ctx: StepCtx }) {
   const quotes = useQuery({ queryKey: ['quotes', p.id], queryFn: () => get<Quote[]>(`/api/projects/${p.id}/quotes`) })
   const [selId, setSelId] = useState<number | null>(null)
   useEffect(() => {
-    if (quotes.data && (selId === null || !quotes.data.some((q) => q.id === selId))) setSelId(quotes.data[quotes.data.length - 1]?.id ?? null)
+    if (quotes.data && (selId === null || !quotes.data.some((q) => q.id === selId))) setSelId(quotes.data.length ? Math.max(...quotes.data.map((q) => q.id)) : null)
   }, [quotes.data, selId])
 
   const create = useMutation({
@@ -107,11 +107,20 @@ function QuoteEditor({ quote: q0, ctx, lang }: { quote: Quote; ctx: StepCtx; lan
   const recalc = useMut(() => post<Quote>(`/api/quotes/${q.id}/recalculate`))
   const resync = useMut(() => patch<Quote>(`/api/quotes/${q.id}`, { selections: cleanSel(ctx.sel), ...quoteFieldsFromSel(ctx.sel) }))
 
-  const doc = async (kind: 'pdf' | 'pdf_internal' | 'xlsx' | 'techfile') => {
+  const rfqQ = useQuery({ queryKey: ['rfq', q.id, q.updated_at], queryFn: () => get<RfqSupplier[]>(`/api/quotes/${q.id}/rfq`) })
+
+  const doc = async (kind: 'pdf' | 'pdf_internal' | 'xlsx' | 'xlsx_internal' | 'techfile' | 'rfq' | 'rfq_zip' | `rfq:${string}`) => {
     setBusyDoc(kind)
     try {
       const base = `${q.number}-v${q.version}`
       if (kind === 'xlsx') await downloadFile(`/api/quotes/${q.id}/xlsx`, `${base}.xlsx`)
+      else if (kind === 'xlsx_internal') await downloadFile(`/api/quotes/${q.id}/xlsx?internal=true`, `${base}-internal.xlsx`)
+      else if (kind === 'rfq') await downloadFile(`/api/quotes/${q.id}/rfq.xlsx`, `Zapitvane_${q.number}.xlsx`)
+      else if (kind === 'rfq_zip') await downloadFile(`/api/quotes/${q.id}/rfq.zip`, `Zapitvania_${q.number}.zip`)
+      else if (kind.startsWith('rfq:')) {
+        const sup = kind.slice(4)
+        await downloadFile(`/api/quotes/${q.id}/rfq.xlsx?supplier=${encodeURIComponent(sup)}`, `Zapitvane_${sup.replace(/[^\w.-]+/g, '_')}_${q.number}.xlsx`)
+      }
       else if (kind === 'techfile') await downloadFile(`/api/quotes/${q.id}/techfile.pdf`, `${base}-techfile.pdf`)
       else await downloadFile(`/api/quotes/${q.id}/pdf?mode=${kind === 'pdf' ? 'client' : 'internal'}`, `${base}${kind === 'pdf_internal' ? '-internal' : ''}.pdf`)
     } catch (e) {
@@ -266,6 +275,7 @@ function QuoteEditor({ quote: q0, ctx, lang }: { quote: Quote; ctx: StepCtx; lan
           <Stat label={t('battery')} value={info.storage_kwh ? `${fmtNum(Number(info.storage_kwh), 1)} kWh` : '—'} />
           {stats && <Stat label={t('rails')} value={`${stats.rail_pieces} × ${fmtNum(stats.rail_m, 0)} m`} sub={`${stats.fixations} ${lang === 'bg' ? 'куки' : 'hooks'} · ${stats.mid_clamps + stats.end_clamps} ${lang === 'bg' ? 'скоби' : 'clamps'}`} />}
           {q.execution_days && <Stat label={t('days')} value={`${q.execution_days} × ${q.workers}`} />}
+          {!!info.lead_time_days && <Stat label={t('lead_time')} value={`${String(info.lead_time_days)} ${lang === 'bg' ? 'раб. дни' : 'wd'}`} sub={typeof info.lead_bottleneck === 'string' ? info.lead_bottleneck : undefined} />}
         </div>
         <div className="card flex flex-col gap-2 p-3">
           <button type="button" className="btn-primary w-full" onClick={() => doc('pdf')} disabled={!!busyDoc} data-testid="button-pdf">
@@ -277,12 +287,49 @@ function QuoteEditor({ quote: q0, ctx, lang }: { quote: Quote; ctx: StepCtx; lan
           <button type="button" className="btn-ghost w-full" onClick={() => doc('xlsx')} disabled={!!busyDoc} data-testid="button-xlsx">
             {busyDoc === 'xlsx' ? <Spinner /> : <FileSpreadsheet className="h-4 w-4" />} {t('xlsx')}
           </button>
+          <button type="button" className="btn-ghost w-full" onClick={() => doc('xlsx_internal')} disabled={!!busyDoc}>
+            {busyDoc === 'xlsx_internal' ? <Spinner /> : <FileSpreadsheet className="h-4 w-4" />} {t('xlsx_internal')}
+          </button>
           <button type="button" className="btn-ghost w-full" onClick={() => doc('techfile')} disabled={!!busyDoc} data-testid="button-techfile">
             {busyDoc === 'techfile' ? <Spinner /> : <DraftingCompass className="h-4 w-4" />} {t('techfile_pdf')}
           </button>
           <p className="text-center text-xs text-ink-3">
             {q.number} · v{q.version} · {fmtDate(q.created_at)} <Badge tone="neutral">{t(`status_${q.status}` as Key)}</Badge>
           </p>
+        </div>
+        <div className="card flex flex-col gap-2 p-3" data-testid="rfq-card">
+          <div>
+            <h3 className="text-sm font-semibold">{t('rfq_title')}</h3>
+            <p className="text-xs text-ink-3">{t('rfq_hint')}</p>
+          </div>
+          {(rfqQ.data || []).length > 0 && (
+            <ul className="flex flex-col divide-y divide-line/10 text-sm">
+              {(rfqQ.data || []).map((s) => (
+                <li key={s.supplier} className="flex items-center gap-2 py-1.5">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-medium" title={s.supplier === 'Неразпределени' ? t('rfq_unassigned_hint') : s.email || ''}>
+                      {s.supplier === 'Неразпределени' ? t('rfq_unassigned') : s.supplier}
+                    </div>
+                    <div className="text-xs text-ink-3">
+                      {s.lines} {lang === 'bg' ? 'поз.' : 'lines'} · {fmtMoney(s.value)} · {s.lead_time_days} {lang === 'bg' ? 'раб. дни' : 'wd'}
+                      {s.unpriced > 0 && <span className="ml-1 text-warn">· {s.unpriced} {t('unpriced')}</span>}
+                    </div>
+                  </div>
+                  <button type="button" className="btn-quiet btn-sm" onClick={() => doc(`rfq:${s.supplier}`)} disabled={!!busyDoc} title={t('xlsx')} aria-label={`${t('xlsx')} ${s.supplier}`}>
+                    {busyDoc === `rfq:${s.supplier}` ? <Spinner /> : <FileSpreadsheet className="h-4 w-4" />}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="flex flex-col gap-2">
+            <button type="button" className="btn-ghost btn-sm w-full" onClick={() => doc('rfq')} disabled={!!busyDoc} data-testid="button-rfq">
+              {busyDoc === 'rfq' ? <Spinner /> : <FileSpreadsheet className="h-4 w-4" />} {t('rfq_all_xlsx')}
+            </button>
+            <button type="button" className="btn-ghost btn-sm w-full" onClick={() => doc('rfq_zip')} disabled={!!busyDoc} data-testid="button-rfq-zip">
+              {busyDoc === 'rfq_zip' ? <Spinner /> : <Download className="h-4 w-4" />} {t('rfq_zip')}
+            </button>
+          </div>
         </div>
       </aside>
 

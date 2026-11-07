@@ -73,6 +73,9 @@ CATEGORIES = [
 ]
 
 
+TIERS = ("economy", "standard", "premium")
+
+
 class CatalogItem(Base):
     __tablename__ = "catalog_items"
 
@@ -91,6 +94,11 @@ class CatalogItem(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     specs: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    # procurement
+    supplier: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)  # who we order it from
+    supplier_sku: Mapped[str | None] = mapped_column(String(64), nullable=True)  # code in the supplier's system
+    lead_time_days: Mapped[int | None] = mapped_column(Integer, nullable=True)  # None -> supplier default
+    tier: Mapped[str | None] = mapped_column(String(16), nullable=True)  # economy | standard | premium | None=auto
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 

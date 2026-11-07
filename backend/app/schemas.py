@@ -70,6 +70,10 @@ class CatalogItemBase(BaseModel):
     active: bool = True
     specs: dict[str, Any] = Field(default_factory=dict)
     sort_order: int = 0
+    supplier: str | None = None
+    supplier_sku: str | None = None
+    lead_time_days: int | None = None
+    tier: str | None = None
 
 
 class CatalogItemCreate(CatalogItemBase):
@@ -91,11 +95,17 @@ class CatalogItemUpdate(BaseModel):
     active: bool | None = None
     specs: dict[str, Any] | None = None
     sort_order: int | None = None
+    supplier: str | None = None
+    supplier_sku: str | None = None
+    lead_time_days: int | None = None
+    tier: str | None = None
 
 
 class CatalogItemOut(CatalogItemBase, ORMModel):
     id: int
     effective_price: float = 0.0
+    effective_lead_time_days: int | None = None  # item override or supplier default
+    effective_tier: str | None = None  # manual tier or automatic classification
     updated_at: datetime | None = None
 
 

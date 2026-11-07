@@ -83,6 +83,26 @@ XM‑PL за плоски керемиди), LT ламарина (CompactMETAL T
 потвърждава с AEROTOOL на производителя. Цените на елементите извън офертата на доставчика са **ориентировъчни**
 (`price_source: indicative`) — заменете ги с актуални.
 
+### Автоматични предложения, класове и срокове на доставка
+
+- Всеки артикул има **доставчик**, **код при доставчика**, **срок на доставка (раб. дни)** и **клас** (икономичен /
+  стандартен / премиум). Непопълненото се извежда автоматично: срокът — от настройките на доставчика
+  (green‑energy.bg 3 дни, Aerocompact 15 дни, общ 7, при „backorder/изчерпан“ 21), класът — от цената за единица
+  (€/Wp, €/kW, €/kWh) спрямо еквивалентите в каталога, марката и качеството (гаранция, ефективност, цикли).
+- **Стъпка 4 → „Генерирай предложения“** оразмерява четири пълни конфигурации — **Най‑ниска цена**, **Балансиран**
+  (цена + стойност на времето за доставка), **Премиум** и **Най‑бърза доставка** — всяка с модули, инвертор, батерия,
+  конструкция, защити, кабели и труд, крайна цена, марж, срок (с най‑бавната позиция) и доставчици. Един клик прилага
+  варианта; всичко остава ръчно редактируемо. При избрана стратегия и еквивалентните дребни материали (кабели,
+  защити, скоби) се избират по нея.
+- Офертата показва **срок на доставка на оборудването** (max по позициите) и позицията‑„тясно място“.
+- **Запитвания към доставчици**: от стъпка 7 — един Excel с лист за всеки доставчик или ZIP с отделни файлове
+  (`Zayavka_<доставчик>_<оферта>.xlsx`) с код, наименование, количество, последна цена, очакван срок и колона
+  „Вашата оферта“ — готови за изпращане за оферта/поръчка. Артикулите без доставчик са в лист „Неразпределени“.
+- **Настройки → Доставчици и срокове** — списък доставчици (срок, имейл, контакт), марки по клас и тежести на
+  класификацията; **Текстове** — уводен и заключителен текст на офертата и бележка към запитването.
+- Документите (оферта за клиента, вътрешна калкулация, техническо досие, Excel КСС/Поръчка/Запитване) са с единен
+  фирмен стил: шрифт Inter, бланка, обобщение „Предложено решение“, ценови блок, спецификация по раздели, условия.
+
 ---
 
 ## English
@@ -99,6 +119,16 @@ XM‑PL за плоски керемиди), LT ламарина (CompactMETAL T
 - **Aerocompact catalogue.** 14 roof/terrain types mapped to the matching AEROCOMPACT system (CompactPITCH XM‑F/XT/XT‑R/XM‑PL/XW, CompactMETAL TL/TS/TM/TR, CompactFLAT S10/S10 PLUS, CompactGROUND GS) with 159 components, article numbers, leaflets, assembly instructions and checklists; quantities follow the manufacturer's assembly rules, the technical file documents the system limits.
 - **Admin.** Users/roles, company details and logo, default pricing and quote texts.
 - **Bilingual UI** (Bulgarian default, English toggle), PWA, Capacitor Android app.
+
+### Procurement automation (tiers, lead times, proposals, RFQs)
+
+Catalog items carry `supplier`, `supplier_sku`, `lead_time_days` and `tier` (economy / standard / premium); missing
+values are derived (supplier defaults, price‑per‑unit percentile + brand + quality). The **proposal engine**
+(`POST /api/projects/{id}/proposals`) sizes four complete, costed configurations — cheapest, balanced
+(price + €/day of lead time), premium and fastest delivery — and `…/proposals/apply` sets them as the project
+selections. Quotes record the equipment lead time and bottleneck line. `GET /api/quotes/{id}/rfq`, `rfq.xlsx` and
+`rfq.zip` produce supplier‑ready request‑for‑quotation workbooks grouped by supplier. New columns are added to
+existing databases automatically on startup (`ensure_columns`).
 
 ### Stack
 

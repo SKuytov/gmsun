@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from ..models import CatalogItem, LaborOption, Layout, Project, Quote, QuoteLine, RoofTypeConfig
 from . import bom, engineering
+from . import procurement
 from .settings import get_setting
 
 SECTIONS: list[tuple[str, str, str]] = [
@@ -192,6 +193,7 @@ def build_lines(db: Session, project: Project, quote: Quote) -> tuple[list[dict[
     warnings.extend(design.get("warnings") or [])
     auto_el = sel.get("auto_electrical", True)
     all_items = db.query(CatalogItem).filter(CatalogItem.active.is_(True)).all()
+    pick = procurement.chooser(db, sel.get("strategy"), all_items) if sel.get("strategy") else None
     missing: list[str] = []
     counters: dict[str, int] = {}
     for r in design.get("roles") or []:
@@ -221,7 +223,7 @@ def build_lines(db: Session, project: Project, quote: Quote) -> tuple[list[dict[
             if isinstance(sel.get("power_cable_m"), (int, float)) and sel.get("power_cable_m") > 0:
                 qty = float(sel["power_cable_m"])
         if item is None:
-            item = engineering.find_item_for_role(all_items, r)
+            item = engineering.find_item_for_role(all_items, r, pick)
         meta = {"role": rk, "auto_qty": r["qty"], "spec": r["spec"]}
         if item:
             lines.append(_item_line(key, r["section"], item, qty, markup, name=r["name"] if rk in ("pv_cable",) else item.name, meta=meta))
@@ -268,6 +270,26 @@ def build_lines(db: Session, project: Project, quote: Quote) -> tuple[list[dict[
     for ln in lines:
         if ln["catalog_item_id"] and ln["unit_price"] <= 0:
             warnings.append(f"Липсва цена за „{ln['name']}“ в каталога.")
+
+    # procurement: supplier + lead time per line, overall delivery time = slowest line
+    scfg = get_setting(db, "suppliers")
+    cache: dict[int, CatalogItem | None] = {}
+    lead_max, bottleneck = 0, None
+    for ln in lines:
+        iid = ln.get("catalog_item_id")
+        if not iid:
+            continue
+        it = cache.get(iid) if iid in cache else cache.setdefault(iid, _item(db, iid))
+        if not it:
+            continue
+        ld = procurement.lead_time_days(it, scfg)
+        ln["meta"] = {**(ln.get("meta") or {}), "lead_time_days": ld, "supplier": procurement.supplier_of(it), "supplier_sku": it.supplier_sku or it.sku}
+        if ld > lead_max:
+            lead_max, bottleneck = ld, ln["name"]
+    info["lead_time_days"] = lead_max
+    info["lead_bottleneck"] = bottleneck
+    if sel.get("strategy"):
+        info["strategy"] = sel["strategy"]
 
     return lines, warnings, info
 

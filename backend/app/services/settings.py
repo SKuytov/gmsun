@@ -54,6 +54,39 @@ DEFAULT_SETTINGS: dict[str, dict[str, Any]] = {
         "warranty": "1. Гаранция на носеща конструкция: 60 месеца.\n2. Гаранция на инвертор и батерии: 10 години (производител).\n3. Гаранция на фотоволтаични модули: 15 години продуктова, 30 години линейна за мощност.",
         "notes": "1. Офертата е валидна за оборудването, описано в нея.\n2. Разположението на модулите ще бъде по предварително уточнена схема.\n3. Всички цени са в EUR.",
         "payment": "1. Аванс при подписване на договор.\n2. Остатък след монтаж и пуск на централата.",
+        "intro": "Благодарим Ви за интереса към GM SUN SYSTEM SOLAR. Въз основа на данните за обекта и потреблението Ви подготвихме следното предложение за доставка и монтаж на фотоволтаична централа. Всички позиции са описани в приложената спецификация и могат да бъдат уточнени според Вашите предпочитания.",
+        "closing": "Оставаме на разположение за въпроси и безплатен оглед на място.",
+        "rfq_note": "Моля, потвърдете наличност, цена и срок на доставка за посочените позиции. При липса на точен артикул предложете еквивалент със същите технически параметри.",
+    },
+    # Procurement: who we order from and how long it takes (working days). Item-level lead time overrides the
+    # supplier default; items marked as back-order at the supplier get at least ``backorder_lead_time_days``.
+    "suppliers": {
+        "list": [
+            {"name": "green-energy.bg", "contact": "", "email": "", "phone": "", "url": "https://green-energy.bg", "lead_time_days": 3,
+             "notes": "Инвертори, батерии, модули и аксесоари – наличните на склад артикули се доставят за 1–3 работни дни."},
+            {"name": "Aerocompact", "contact": "", "email": "", "phone": "", "url": "https://www.aerocompact.com", "lead_time_days": 15,
+             "notes": "Монтажни системи – поръчка през дистрибутор, обичайно 2–3 седмици."},
+        ],
+        "default_lead_time_days": 7,
+        "backorder_lead_time_days": 21,
+        "delivery_address": "",  # empty → company address is used in RFQ documents
+    },
+    # Automatic tier classification (economy / standard / premium) and proposal engine weights.
+    "procurement": {
+        "brand_tiers": {
+            "premium": ["Huawei", "SMA", "Fronius", "Sungrow", "LONGi", "AIKO", "Jinko", "JA Solar", "BYD", "Aerocompact", "Victron", "Tesla"],
+            "economy": ["Deye", "Solis", "Luxpower", "Felicity", "Dyness", "Tongwei", "Canadian", "Risen", "Pylontech", "Must", "Growatt"],
+        },
+        "tier_weights": {"price": 0.6, "brand": 0.25, "quality": 0.15},
+        "tier_economy_max": 0.38,
+        "tier_premium_min": 0.62,
+        # Balanced strategy: how much a day of lead time "costs" when ranking alternatives (EUR/day) and the maximum
+        # acceptable lead time for the Fastest strategy before falling back to the next quickest option.
+        "balanced_eur_per_day": 25.0,
+        "fastest_max_days": 10,
+        "candidate_panels": 6,  # how many panel models to evaluate per strategy (top-N by that strategy's ranking)
+        "candidate_inverters": 4,
+        "candidate_batteries": 3,
     },
 }
 

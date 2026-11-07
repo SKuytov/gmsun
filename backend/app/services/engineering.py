@@ -29,6 +29,7 @@ line in the quote.
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -446,9 +447,12 @@ def full_design(
 
 
 # ----------------------------------------------------------------------- catalog matching
-def find_item_for_role(items: list[CatalogItem], r: dict[str, Any]) -> CatalogItem | None:
+def find_item_for_role(items: list[CatalogItem], r: dict[str, Any], chooser: Callable[[list[CatalogItem]], CatalogItem] | None = None) -> CatalogItem | None:
     """Pick the catalog item with specs.role == role; for rated parts the smallest
-    rating >= required; for cables the smallest cross-section >= required."""
+    rating >= required; for cables the smallest cross-section >= required.
+
+    ``chooser`` (optional) decides between technically equivalent items (same rating / cross-section), e.g. the
+    cheapest, the fastest to deliver or the premium brand – see ``procurement.chooser``."""
     spec = r.get("spec") or {}
     cands = [it for it in items if it.active and (it.specs or {}).get("role") == r["role"]]
     if not cands:
@@ -477,4 +481,9 @@ def find_item_for_role(items: list[CatalogItem], r: dict[str, Any]) -> CatalogIt
     if not good:
         return None
     good.sort(key=lambda it: (_f(it.specs, "rating_a") or 0, _f(it.specs, "cross_section_mm2") or 0, it.purchase_price or 0))
+    if chooser is not None:
+        top = good[0]
+        same = [it for it in good if (_f(it.specs, "rating_a") or 0) == (_f(top.specs, "rating_a") or 0) and (_f(it.specs, "cross_section_mm2") or 0) == (_f(top.specs, "cross_section_mm2") or 0)]
+        if len(same) > 1:
+            return chooser(same)
     return good[0]

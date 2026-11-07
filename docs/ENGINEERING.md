@@ -111,6 +111,29 @@ AEROTOOL report, as the technical file states.
 | `fastener_margin_pct` | 10 % | screws, clamps, caps, clips, ties, lugs, end sleeves (`small_part`) |
 | `module_spare_pct` | 0 % | spare PV modules line |
 
+## Procurement model and proposal engine (`services/procurement.py`, `services/proposals.py`)
+
+- **Lead time** per line: item `lead_time_days` → supplier default (Settings → suppliers) → global default; items
+  with `stock_status` `backorder`/`outofstock` use the backorder lead time. Quote `_info.lead_time_days` = max over
+  visible lines, `_info.lead_bottleneck` = that line.
+- **Tier classification**: within an equivalence group (category + rating: €/Wp for modules, €/kW for inverters,
+  €/kWh for batteries, unit price otherwise) each item gets `score = 0.6·price_pct + 0.25·brand + 0.15·quality`;
+  score ≤ 0.38 → economy, ≥ 0.62 → premium, else standard. Manual `tier` overrides. Brand lists and weights are
+  configurable (`procurement` setting).
+- **Strategies**: `economy` (min total), `balanced` (total + `balanced_eur_per_day` × lead days), `premium`
+  (max quality/tier, then price), `fastest` (min lead time, then price). Candidates: top‑N priced panels,
+  inverters that fit (AC ≥ kWp/dc_ac_max·0.98, kWp ≤ max PV·1.02, AC ≤ connected·1.1, not oversized) and compatible
+  batteries (voltage class, parallel limit). Every variant is fully costed through `pricing.build_lines` (same engine
+  as the quote), so proposal totals equal the quote after apply + recalc. Unpriced items carry a 1e6 penalty so
+  priced equivalents win; `missing_price` lists what still needs a price.
+- **Strategy‑aware part picking**: `procurement.chooser()` selects among equivalent protections/cables/clamps for
+  the active strategy; without a strategy the previous deterministic choice is kept.
+- **RFQ workbooks** (`services/workbooks.py`): one sheet per supplier (or ZIP of files) with SKU, name, unit, qty,
+  last purchase price, expected lead time and an empty “your offer” column; a summary sheet lists suppliers, line
+  counts, value and lead time.
+- **Schema migration**: `db.ensure_columns()` adds new nullable columns to existing SQLite/PostgreSQL tables at
+  startup, so upgrades need no manual migration.
+
 ## Data sources
 
 - LONGi Hi‑MO X10 LR8‑66HVD‑650M datasheet — https://eu.longi.com/longi-solar-panels-datasheets/lr8-66hvd-640-670m

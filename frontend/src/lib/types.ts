@@ -25,7 +25,77 @@ export interface CatalogItem {
   specs: Record<string, unknown>
   sort_order: number
   effective_price: number
+  supplier?: string | null
+  supplier_sku?: string | null
+  lead_time_days?: number | null
+  tier?: Tier | null
+  effective_lead_time_days?: number | null
+  effective_tier?: Tier | null
   updated_at?: string | null
+}
+
+export type Tier = 'economy' | 'standard' | 'premium'
+export type Strategy = 'economy' | 'balanced' | 'premium' | 'fastest'
+
+export interface ProposalKeyItem {
+  role: string
+  label: string
+  item_id?: number | null
+  name: string
+  manufacturer?: string | null
+  qty: number
+  tier?: Tier | null
+  lead_time_days?: number | null
+  supplier?: string | null
+  unit_price?: number
+  warranty?: string | null
+}
+
+export interface ProposalVariant {
+  strategy: Strategy
+  label_bg: string
+  label_en: string
+  selections: Selections
+  kwp: number
+  panel_qty: number
+  battery_kwh: number
+  subtotal: number
+  vat: number
+  total: number
+  cost: number
+  margin: number
+  lead_time_days: number
+  lead_bottleneck: string | null
+  suppliers: Record<string, number>
+  by_section: Record<string, number>
+  execution_days?: number | null
+  yield_kwh: number
+  key_items: ProposalKeyItem[]
+  warnings: string[]
+  missing_price: string[]
+  evaluated: number
+  quality: number
+  delta_total: number
+  delta_days: number
+  same_as?: Strategy | null
+}
+
+export interface ProposalsResult {
+  target_kwp: number
+  target_basis: 'layout' | 'selection' | 'consumption' | 'connected_power' | 'default'
+  layout_fixed: boolean
+  target_kwh: number
+  variants: ProposalVariant[]
+}
+
+export interface RfqSupplier {
+  supplier: string
+  lines: number
+  value: number
+  lead_time_days: number
+  email?: string | null
+  contact?: string | null
+  unpriced: number
 }
 
 export interface LaborOption {
@@ -202,6 +272,7 @@ export interface Selections {
   mounting_mode?: 'auto' | 'detailed' | 'lump' | 'none'
   lump_price_per_module?: number
   labor_mode?: 'matrix' | 'per_w' | 'manual'
+  strategy?: Strategy | null
   labor_option_id?: number | null
   install_price_per_w?: number
   labor_price?: number
@@ -356,4 +427,36 @@ export interface TextsSettings {
   warranty: string
   notes: string
   payment: string
+  intro: string
+  closing: string
+  rfq_note: string
+}
+
+export interface SupplierCfg {
+  name: string
+  contact?: string
+  email?: string
+  phone?: string
+  url?: string
+  lead_time_days?: number | null
+  notes?: string
+}
+
+export interface SuppliersSettings {
+  list: SupplierCfg[]
+  default_lead_time_days: number
+  backorder_lead_time_days: number
+  delivery_address: string
+}
+
+export interface ProcurementSettings {
+  brand_tiers: { premium: string[]; economy: string[] }
+  tier_weights: { price: number; brand: number; quality: number }
+  tier_economy_max: number
+  tier_premium_min: number
+  balanced_eur_per_day: number
+  fastest_max_days: number
+  candidate_panels: number
+  candidate_inverters: number
+  candidate_batteries: number
 }

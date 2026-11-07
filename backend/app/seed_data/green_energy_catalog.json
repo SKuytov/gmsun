@@ -29,7 +29,8 @@
      1550
     ],
     "chemistry": "LiFePO4",
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -59,7 +60,8 @@
      1550
     ],
     "chemistry": "LiFePO4",
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -89,7 +91,8 @@
      1550
     ],
     "chemistry": "LiFePO4",
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -119,7 +122,8 @@
      1550
     ],
     "chemistry": "LiFePO4",
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -144,7 +148,8 @@
     "cycles": 8000,
     "weight_kg": 20.1,
     "chemistry": "LiFePO4",
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -171,7 +176,8 @@
     "cycles": 8000,
     "weight_kg": 27.5,
     "chemistry": "LiFePO4",
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -196,7 +202,8 @@
     "nominal_v": 380.0,
     "cycles": 8000,
     "chemistry": "LiFePO4",
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -221,7 +228,8 @@
     "nominal_v": 380.0,
     "cycles": 8000,
     "chemistry": "LiFePO4",
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -246,7 +254,8 @@
     "nominal_v": 380.0,
     "cycles": 8000,
     "chemistry": "LiFePO4",
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -279,7 +288,8 @@
     ],
     "ip_rating": "IP55",
     "chemistry": "LiFePO4",
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -314,7 +324,8 @@
     "ip_rating": "IP67",
     "dod_pct": 0.0,
     "chemistry": "LiFePO4",
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -347,7 +358,8 @@
     ],
     "ip_rating": "IP55",
     "chemistry": "LiFePO4",
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -381,7 +393,8 @@
     "ip_rating": "IP55",
     "chemistry": "LiFePO4",
     "nominal_v": 220.0,
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -423,7 +436,8 @@
     "phases": 3,
     "hybrid": true,
     "battery_voltage_class": "LV",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -451,7 +465,8 @@
     "v_max": 1500.0,
     "weight_kg": 41.5,
     "chemistry": "LiFePO4",
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -494,7 +509,8 @@
     "height_mm": 1762,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 96
+    "cells": 96,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -537,7 +553,8 @@
     "height_mm": 1762,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 96
+    "cells": 96,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -580,7 +597,8 @@
     "height_mm": 1762,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 96
+    "cells": 96,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -623,7 +641,8 @@
     "height_mm": 1762,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 96
+    "cells": 96,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -666,7 +685,8 @@
     "height_mm": 1762,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 96
+    "cells": 96,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -709,7 +729,8 @@
     "height_mm": 1762,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 96
+    "cells": 96,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -752,7 +773,8 @@
     "height_mm": 1762,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 96
+    "cells": 96,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -788,7 +810,8 @@
      690,
      436,
      270
-    ]
+    ],
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -811,7 +834,8 @@
     "weight_kg": 3200.0,
     "ip_rating": "IP55",
     "spec_source": "product-page",
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -850,7 +874,8 @@
     "height_mm": 2278,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 182
+    "cells": 182,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -870,7 +895,8 @@
     "datasheet_url": "https://green-energy.bg/wp-content/uploads/2026/08/goodwe-sec1000.pdf",
     "image_url": "https://green-energy.bg/wp-content/uploads/2026/08/sec-1000-1.png",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -893,7 +919,8 @@
      "5 KW"
     ],
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -929,7 +956,8 @@
     "cycles": 8000,
     "weight_kg": 116.0,
     "ip_rating": "IP20",
-    "ah": 314
+    "ah": 314,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -963,7 +991,8 @@
     "dod_pct": 90.0,
     "chemistry": "LiFePO4",
     "voltage_class": "LV",
-    "ah": 314
+    "ah": 314,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -1017,7 +1046,8 @@
      371,
      161
     ],
-    "phases": 1
+    "phases": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -1071,7 +1101,8 @@
      371,
      161
     ],
-    "phases": 1
+    "phases": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -1128,7 +1159,8 @@
      219
     ],
     "phases": 3,
-    "model": "S5-GR3P10K"
+    "model": "S5-GR3P10K",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -1185,7 +1217,8 @@
      219
     ],
     "phases": 3,
-    "model": "S5-GR3P20K"
+    "model": "S5-GR3P20K",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -1240,7 +1273,8 @@
      563,
      219
     ],
-    "phases": 3
+    "phases": 3,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -1295,7 +1329,8 @@
      563,
      219
     ],
-    "phases": 3
+    "phases": 3,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -1314,7 +1349,8 @@
     "product_url": "https://green-energy.bg/produkt/huawei-smart-pv-optimizer-600w/",
     "image_url": "https://green-energy.bg/wp-content/uploads/2026/08/optimizator-huawei-smart-pv-optimizer-450w-p2-6-600x600-1.png",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -1333,7 +1369,8 @@
     "product_url": "https://green-energy.bg/produkt/huawei-smart-pv-optimizer-450w/",
     "image_url": "https://green-energy.bg/wp-content/uploads/2026/08/optimizator-huawei-smart-pv-optimizer-450w-p2-6-600x600-1.png",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -1379,7 +1416,8 @@
     ],
     "ip_rating": "IP66",
     "phases": 3,
-    "model": "SUN2000-215KTL-H0"
+    "model": "SUN2000-215KTL-H0",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -1427,7 +1465,8 @@
     "phases": 1,
     "model": "SUN2000-2KTL-L1",
     "battery_voltage_class": "HV",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -1475,7 +1514,8 @@
     "phases": 1,
     "model": "SUN2000-3KTL-L1",
     "battery_voltage_class": "HV",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -1512,7 +1552,8 @@
     "temp_coeff_isc": 0.046,
     "height_mm": 2382,
     "width_mm": 1134,
-    "thickness_mm": 30
+    "thickness_mm": 30,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -1551,7 +1592,8 @@
     "height_mm": 1762,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 96
+    "cells": 96,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -1589,7 +1631,8 @@
     "hybrid": true,
     "battery_voltage_class": "LV",
     "mppt_count": 2,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -1627,7 +1670,8 @@
     "hybrid": true,
     "battery_voltage_class": "LV",
     "mppt_count": 2,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -1664,7 +1708,8 @@
     "hybrid": true,
     "battery_voltage_class": "LV",
     "mppt_count": 2,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -1715,7 +1760,8 @@
     "weight_kg": 38.0,
     "phases": 3,
     "model": "SUN-8K-SG04LP3-EU",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -1765,7 +1811,8 @@
     "battery_max_charge_a": 240.0,
     "weight_kg": 38.0,
     "phases": 3,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -1801,7 +1848,8 @@
     "hybrid": true,
     "battery_voltage_class": "LV",
     "mppt_count": 2,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -1837,7 +1885,8 @@
     "hybrid": true,
     "battery_voltage_class": "LV",
     "mppt_count": 2,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -1873,7 +1922,8 @@
     "hybrid": true,
     "battery_voltage_class": "LV",
     "mppt_count": 2,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -1909,7 +1959,8 @@
     "hybrid": true,
     "battery_voltage_class": "LV",
     "mppt_count": 2,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -1961,7 +2012,8 @@
     "weight_kg": 52.0,
     "phases": 1,
     "model": "SUN-14K-SG01LP1-EU",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -2024,7 +2076,8 @@
     "weight_kg": 161.7,
     "phases": 3,
     "model": "SUN-100K-SG02HP3-EU-GM8",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -2087,7 +2140,8 @@
     "weight_kg": 161.7,
     "phases": 3,
     "model": "SUN-100K-SG02HP3-EU-GM8",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -2154,7 +2208,8 @@
     "weight_kg": 161.7,
     "phases": 3,
     "model": "SUN-125K-SG02HP3-EU-GM10",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -2174,7 +2229,8 @@
     "product_url": "https://green-energy.bg/produkt/deye-sdm630mct/",
     "image_url": "https://green-energy.bg/wp-content/uploads/2026/08/eastron-sdm-630-mct-etl.jpg",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -2195,7 +2251,8 @@
     "image_url": "https://green-energy.bg/wp-content/uploads/2026/08/deye-stick-logger-lsw-3-1-600x667-1.jpg",
     "specs_verified": false,
     "spec_source": "supplier-listing",
-    "role": "dongle"
+    "role": "dongle",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -2216,7 +2273,8 @@
     "image_url": "https://green-energy.bg/wp-content/uploads/2026/08/deye-stick-logger-lsw-3-1-600x667-1.jpg",
     "specs_verified": false,
     "spec_source": "supplier-listing",
-    "role": "dongle"
+    "role": "dongle",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -2237,7 +2295,8 @@
     "image_url": "https://green-energy.bg/wp-content/uploads/2026/08/sun-smart-plug01p1-f-a.webp",
     "specs_verified": false,
     "spec_source": "supplier-listing",
-    "role": "dongle"
+    "role": "dongle",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -2259,7 +2318,8 @@
     "image_url": "https://green-energy.bg/wp-content/uploads/2026/08/dae-tx01-product-1.webp",
     "specs_verified": false,
     "spec_source": "supplier-listing",
-    "role": "dongle"
+    "role": "dongle",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -2281,7 +2341,8 @@
     "image_url": "https://green-energy.bg/wp-content/uploads/2026/08/inteligenten-tokov-senzor-deye-sun-smart-ct01-za-energien-monitoring-1-600x667-1.jpg",
     "specs_verified": false,
     "spec_source": "supplier-listing",
-    "role": "dongle"
+    "role": "dongle",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -2316,7 +2377,8 @@
     "dod_pct": 80.0,
     "chemistry": "LiFePO4",
     "voltage_class": "LV",
-    "ah": 100
+    "ah": 100,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -2350,7 +2412,8 @@
     "dod_pct": 80.0,
     "chemistry": "LiFePO4",
     "voltage_class": "LV",
-    "ah": 230
+    "ah": 230,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -2389,7 +2452,8 @@
     "height_mm": 1762,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 96
+    "cells": 96,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -2428,7 +2492,8 @@
     "height_mm": 1762,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 96
+    "cells": 96,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -2467,7 +2532,8 @@
     "height_mm": 1762,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 96
+    "cells": 96,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -2506,7 +2572,8 @@
     "height_mm": 1762,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 96
+    "cells": 96,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -2545,7 +2612,8 @@
     "height_mm": 1762,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 96
+    "cells": 96,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -2566,7 +2634,8 @@
     "datasheet_url": "https://green-energy.bg/wp-content/uploads/2026/08/huawei-luna2000-241-2s1-datasheet-2026.03.03.pdf",
     "image_url": "https://green-energy.bg/wp-content/uploads/2026/08/huawei-battery.png",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -2626,7 +2695,8 @@
     ],
     "ip_rating": "IP66",
     "phases": 1,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -2686,7 +2756,8 @@
     ],
     "ip_rating": "IP66",
     "phases": 1,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -2746,7 +2817,8 @@
     ],
     "ip_rating": "IP66",
     "phases": 1,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -2806,7 +2878,8 @@
     ],
     "ip_rating": "IP66",
     "phases": 1,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -2866,7 +2939,8 @@
     ],
     "ip_rating": "IP66",
     "phases": 1,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -2886,7 +2960,8 @@
     "datasheet_url": "https://green-energy.bg/wp-content/uploads/2026/07/2026-kstar-ev-charger.pdf",
     "image_url": "https://green-energy.bg/wp-content/uploads/2026/07/kstar-greenflow-dc-charger-cda24d_cda48d.webp",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -2920,7 +2995,8 @@
     ],
     "dod_pct": 95.0,
     "chemistry": "LiFePO4",
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -2962,7 +3038,8 @@
     "height_mm": 2382,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 132
+    "cells": 132,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -3004,7 +3081,8 @@
     "height_mm": 2382,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 132
+    "cells": 132,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -3046,7 +3124,8 @@
     "height_mm": 2382,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 132
+    "cells": 132,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -3088,7 +3167,8 @@
     "height_mm": 2382,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 132
+    "cells": 132,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -3130,7 +3210,8 @@
     "height_mm": 2382,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 132
+    "cells": 132,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -3172,7 +3253,8 @@
     "height_mm": 2382,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 132
+    "cells": 132,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -3215,7 +3297,8 @@
     "height_mm": 2382,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 132
+    "cells": 132,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -3258,7 +3341,8 @@
     "height_mm": 2382,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 132
+    "cells": 132,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -3301,7 +3385,8 @@
     "height_mm": 2382,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 132
+    "cells": 132,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -3344,7 +3429,8 @@
     "height_mm": 2382,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 132
+    "cells": 132,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -3387,7 +3473,8 @@
     "height_mm": 2382,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 132
+    "cells": 132,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -3430,7 +3517,8 @@
     "height_mm": 2382,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 132
+    "cells": 132,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -3473,7 +3561,8 @@
     "height_mm": 2382,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 132
+    "cells": 132,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -3513,7 +3602,8 @@
     "height_mm": 1990,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 120
+    "cells": 120,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -3553,7 +3643,8 @@
     "height_mm": 1990,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 120
+    "cells": 120,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -3593,7 +3684,8 @@
     "height_mm": 1990,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 120
+    "cells": 120,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -3633,7 +3725,8 @@
     "height_mm": 1990,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 120
+    "cells": 120,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -3673,7 +3766,8 @@
     "height_mm": 1990,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 120
+    "cells": 120,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -3713,7 +3807,8 @@
     "height_mm": 1990,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 120
+    "cells": 120,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -3754,7 +3849,8 @@
     "height_mm": 1800,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 108
+    "cells": 108,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -3795,7 +3891,8 @@
     "height_mm": 1800,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 108
+    "cells": 108,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -3836,7 +3933,8 @@
     "height_mm": 1800,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 108
+    "cells": 108,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -3877,7 +3975,8 @@
     "height_mm": 1800,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 108
+    "cells": 108,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -3918,7 +4017,8 @@
     "height_mm": 1800,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 108
+    "cells": 108,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -3959,7 +4059,8 @@
     "height_mm": 1800,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 108
+    "cells": 108,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -4015,7 +4116,8 @@
     ],
     "ip_rating": "IP20",
     "phases": 1,
-    "model": "SNA2-EU-LT"
+    "model": "SNA2-EU-LT",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -4049,7 +4151,8 @@
     "voltage_class": "LV",
     "cycles": 6000,
     "ip_rating": "IP20",
-    "ah": 100
+    "ah": 100,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -4089,7 +4192,8 @@
     "dod_pct": 90.0,
     "chemistry": "LiFePO4",
     "voltage_class": "LV",
-    "model": "SUN-100K-SG02HP3-EU-GM10"
+    "model": "SUN-100K-SG02HP3-EU-GM10",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -4121,7 +4225,8 @@
     "spec_source": "product-page",
     "voltage_class": "LV",
     "nominal_v": 51.2,
-    "ah": 280
+    "ah": 280,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -4156,7 +4261,8 @@
     "dod_pct": 90.0,
     "chemistry": "LiFePO4",
     "voltage_class": "LV",
-    "ah": 314
+    "ah": 314,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -4191,7 +4297,8 @@
     ],
     "chemistry": "LiFePO4",
     "voltage_class": "LV",
-    "dod_pct": 90.0
+    "dod_pct": 90.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -4226,7 +4333,8 @@
     ],
     "chemistry": "LiFePO4",
     "voltage_class": "LV",
-    "dod_pct": 90.0
+    "dod_pct": 90.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -4261,7 +4369,8 @@
     "chemistry": "LiFePO4",
     "voltage_class": "LV",
     "weight_kg": 119.0,
-    "ah": 314
+    "ah": 314,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -4287,7 +4396,8 @@
     "weight_kg": 2600.0,
     "ip_rating": "IP55",
     "spec_source": "datasheet-auto",
-    "kwh": 241.0
+    "kwh": 241.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -4309,7 +4419,8 @@
     "kwh": 2250.0,
     "weight_kg": 27.0,
     "spec_source": "product-page",
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -4343,7 +4454,8 @@
     "dod_pct": 80.0,
     "chemistry": "LiFePO4",
     "voltage_class": "LV",
-    "ah": 230
+    "ah": 230,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -4378,7 +4490,8 @@
     "ip_rating": "IP54",
     "dod_pct": 90.0,
     "chemistry": "LiFePO4",
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -4418,7 +4531,8 @@
     "width_mm": 1134,
     "thickness_mm": 30,
     "cells": 144,
-    "efficiency": 23.9
+    "efficiency": 23.9,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -4444,7 +4558,8 @@
     "nominal_v": 400.0,
     "ip_rating": "IP54",
     "chemistry": "LiFePO4",
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -4470,7 +4585,8 @@
     "nominal_v": 400.0,
     "ip_rating": "IP54",
     "chemistry": "LiFePO4",
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -4502,7 +4618,8 @@
     ],
     "chemistry": "LiFePO4",
     "voltage_class": "HV",
-    "nominal_v": 220.0
+    "nominal_v": 220.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -4532,7 +4649,8 @@
     ],
     "chemistry": "LiFePO4",
     "nominal_v": 220.0,
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -4566,7 +4684,8 @@
     "dod_pct": 95.0,
     "chemistry": "LiFePO4",
     "voltage_class": "LV",
-    "ah": 1953
+    "ah": 1953,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -4600,7 +4719,8 @@
     ],
     "ip_rating": "IP55",
     "chemistry": "LiFePO4",
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -4622,7 +4742,8 @@
     "specs_verified": false,
     "ip_rating": "IP55",
     "spec_source": "product-page",
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -4649,7 +4770,8 @@
      350
     ],
     "spec_source": "datasheet-auto",
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -4676,7 +4798,8 @@
      330
     ],
     "spec_source": "datasheet-auto",
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -4736,7 +4859,8 @@
     "phases": 3,
     "model": "SG250HX-20",
     "start_voltage": 500.0,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -4784,7 +4908,8 @@
     "phases": 3,
     "model": "SG350HX",
     "start_voltage": 500.0,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -4844,7 +4969,8 @@
     "phases": 3,
     "model": "SG350HX-20",
     "start_voltage": 500.0,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -4898,7 +5024,8 @@
     "phases": 3,
     "model": "SG150CX",
     "start_voltage": 180.0,
-    "mppt_count": 7
+    "mppt_count": 7,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -4952,7 +5079,8 @@
     "ip_rating": "IP66",
     "phases": 3,
     "model": "SG125CX-P2",
-    "start_voltage": 180.0
+    "start_voltage": 180.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -4986,7 +5114,8 @@
     "ac_power_kw": 110.0,
     "phases": 3,
     "hybrid": false,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -5032,7 +5161,8 @@
     "phases": 3,
     "model": "SG33CX",
     "start_voltage": 200.0,
-    "mppt_count": 3
+    "mppt_count": 3,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -5078,7 +5208,8 @@
     "phases": 3,
     "model": "SG40CX",
     "start_voltage": 200.0,
-    "mppt_count": 3
+    "mppt_count": 3,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -5124,7 +5255,8 @@
     "phases": 3,
     "model": "SG50CX",
     "start_voltage": 200.0,
-    "mppt_count": 3
+    "mppt_count": 3,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -5179,7 +5311,8 @@
     "ip_rating": "IP66",
     "phases": 3,
     "model": "SG33CX-P2",
-    "start_voltage": 160.0
+    "start_voltage": 160.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -5234,7 +5367,8 @@
     "phases": 3,
     "model": "SG50CX-P2",
     "start_voltage": 160.0,
-    "mppt_count": 3
+    "mppt_count": 3,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -5291,7 +5425,8 @@
     "ip_rating": "IP66",
     "phases": 3,
     "model": "SG25CX-P2 2",
-    "start_voltage": 160.0
+    "start_voltage": 160.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -5348,7 +5483,8 @@
     "phases": 3,
     "model": "SG30CX-P2 2",
     "start_voltage": 160.0,
-    "mppt_count": 3
+    "mppt_count": 3,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -5405,7 +5541,8 @@
     "phases": 3,
     "model": "SG36CX-P2 2",
     "start_voltage": 160.0,
-    "mppt_count": 3
+    "mppt_count": 3,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -5462,7 +5599,8 @@
     "phases": 3,
     "model": "SG40CX-P2 2",
     "start_voltage": 160.0,
-    "mppt_count": 3
+    "mppt_count": 3,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -5506,7 +5644,8 @@
     "mppt_v_max": 1000.0,
     "max_input_current_a": 25.0,
     "mppt_count": 2,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -5550,7 +5689,8 @@
     "mppt_v_max": 1000.0,
     "max_input_current_a": 25.0,
     "mppt_count": 2,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -5594,7 +5734,8 @@
     "mppt_v_max": 1000.0,
     "max_input_current_a": 25.0,
     "mppt_count": 2,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -5652,7 +5793,8 @@
     "model": "SG3.0RS",
     "start_voltage": 40.0,
     "mppt_v_min": 40.0,
-    "mppt_v_max": 560.0
+    "mppt_v_max": 560.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -5710,7 +5852,8 @@
     "model": "SG3.6RS",
     "start_voltage": 40.0,
     "mppt_v_min": 40.0,
-    "mppt_v_max": 560.0
+    "mppt_v_max": 560.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -5768,7 +5911,8 @@
     "model": "SG4.0RS",
     "start_voltage": 40.0,
     "mppt_v_min": 40.0,
-    "mppt_v_max": 560.0
+    "mppt_v_max": 560.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -5826,7 +5970,8 @@
     "model": "SG5.0RS",
     "start_voltage": 40.0,
     "mppt_v_min": 40.0,
-    "mppt_v_max": 560.0
+    "mppt_v_max": 560.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -5883,7 +6028,8 @@
     "model": "SG6.0RS",
     "start_voltage": 40.0,
     "mppt_v_min": 40.0,
-    "mppt_v_max": 560.0
+    "mppt_v_max": 560.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -5931,7 +6077,8 @@
     "max_pv_kw": 3.0,
     "start_voltage": 40.0,
     "mppt_v_min": 40.0,
-    "mppt_v_max": 560.0
+    "mppt_v_max": 560.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -5979,7 +6126,8 @@
     "max_pv_kw": 3.0,
     "start_voltage": 40.0,
     "mppt_v_min": 40.0,
-    "mppt_v_max": 560.0
+    "mppt_v_max": 560.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -6027,7 +6175,8 @@
     "max_pv_kw": 3.0,
     "start_voltage": 40.0,
     "mppt_v_min": 40.0,
-    "mppt_v_max": 560.0
+    "mppt_v_max": 560.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -6071,7 +6220,8 @@
     "mppt_v_max": 1000.0,
     "max_input_current_a": 25.0,
     "mppt_count": 2,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -6130,7 +6280,8 @@
     "ip_rating": "IP65",
     "phases": 3,
     "model": "SG5.0RT",
-    "start_voltage": 180.0
+    "start_voltage": 180.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -6189,7 +6340,8 @@
     "ip_rating": "IP65",
     "phases": 3,
     "model": "SG5.0RT",
-    "start_voltage": 180.0
+    "start_voltage": 180.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -6248,7 +6400,8 @@
     "phases": 3,
     "model": "SG6.0RT",
     "start_voltage": 180.0,
-    "mppt_count": 2
+    "mppt_count": 2,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -6307,7 +6460,8 @@
     "phases": 3,
     "model": "SG7.0RT",
     "start_voltage": 180.0,
-    "mppt_count": 2
+    "mppt_count": 2,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -6365,7 +6519,8 @@
     "phases": 3,
     "model": "SG10RT",
     "start_voltage": 180.0,
-    "mppt_count": 2
+    "mppt_count": 2,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -6423,7 +6578,8 @@
     "phases": 3,
     "model": "SG10RT",
     "start_voltage": 180.0,
-    "mppt_count": 2
+    "mppt_count": 2,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -6486,7 +6642,8 @@
     "ip_rating": "IP65",
     "phases": 3,
     "model": "SH15T",
-    "start_voltage": 150.0
+    "start_voltage": 150.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -6549,7 +6706,8 @@
     "ip_rating": "IP65",
     "phases": 3,
     "model": "SH20T",
-    "start_voltage": 150.0
+    "start_voltage": 150.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -6612,7 +6770,8 @@
     "ip_rating": "IP65",
     "phases": 3,
     "model": "SH25T",
-    "start_voltage": 150.0
+    "start_voltage": 150.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -6669,7 +6828,8 @@
     "ip_rating": "IP65",
     "phases": 3,
     "model": "SH5.0RT-20",
-    "start_voltage": 150.0
+    "start_voltage": 150.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -6726,7 +6886,8 @@
     "ip_rating": "IP65",
     "phases": 3,
     "model": "SH6.0RT-20",
-    "start_voltage": 150.0
+    "start_voltage": 150.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -6783,7 +6944,8 @@
     "ip_rating": "IP65",
     "phases": 3,
     "model": "SH8.0RT-20",
-    "start_voltage": 150.0
+    "start_voltage": 150.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -6839,7 +7001,8 @@
     "ip_rating": "IP65",
     "phases": 3,
     "model": "SH10RT-20",
-    "start_voltage": 150.0
+    "start_voltage": 150.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -6896,7 +7059,8 @@
     "ip_rating": "IP65",
     "phases": 3,
     "model": "SH5.0RT",
-    "start_voltage": 150.0
+    "start_voltage": 150.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -6953,7 +7117,8 @@
     "ip_rating": "IP65",
     "phases": 3,
     "model": "SH6.0RT",
-    "start_voltage": 150.0
+    "start_voltage": 150.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -7010,7 +7175,8 @@
     "ip_rating": "IP65",
     "phases": 3,
     "model": "SH8.0RT",
-    "start_voltage": 150.0
+    "start_voltage": 150.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -7066,7 +7232,8 @@
     "ip_rating": "IP65",
     "phases": 3,
     "model": "SH10RT",
-    "start_voltage": 150.0
+    "start_voltage": 150.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -7128,7 +7295,8 @@
     "model": "SH3.0RS",
     "start_voltage": 40.0,
     "mppt_v_min": 40.0,
-    "mppt_v_max": 560.0
+    "mppt_v_max": 560.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -7191,7 +7359,8 @@
     "model": "SH3.6RS",
     "start_voltage": 40.0,
     "mppt_v_min": 40.0,
-    "mppt_v_max": 560.0
+    "mppt_v_max": 560.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -7254,7 +7423,8 @@
     "model": "SH4.0RS",
     "start_voltage": 40.0,
     "mppt_v_min": 40.0,
-    "mppt_v_max": 560.0
+    "mppt_v_max": 560.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -7317,7 +7487,8 @@
     "model": "SH5.0RS",
     "start_voltage": 40.0,
     "mppt_v_min": 40.0,
-    "mppt_v_max": 560.0
+    "mppt_v_max": 560.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -7380,7 +7551,8 @@
     "model": "SH6.0RS",
     "start_voltage": 40.0,
     "mppt_v_min": 40.0,
-    "mppt_v_max": 560.0
+    "mppt_v_max": 560.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -7434,7 +7606,8 @@
      750,
      268
     ],
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -7488,7 +7661,8 @@
      750,
      268
     ],
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -7542,7 +7716,8 @@
      750,
      268
     ],
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -7596,7 +7771,8 @@
      750,
      268
     ],
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -7650,7 +7826,8 @@
      750,
      268
     ],
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -7686,7 +7863,8 @@
     "ip_rating": "IP67",
     "dod_pct": 100.0,
     "chemistry": "LiFePO4",
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -7727,7 +7905,8 @@
     "height_mm": 2382,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 144
+    "cells": 144,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -7761,7 +7940,8 @@
     "ip_rating": "IP54",
     "dod_pct": 90.0,
     "chemistry": "LiFePO4",
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -7781,7 +7961,8 @@
     "product_url": "https://green-energy.bg/produkt/zaryadna-stancziya-deye-deye-smart-wallbox-ac-charger-sun-evse22k01-eu-ac/",
     "image_url": "https://green-energy.bg/wp-content/uploads/2026/01/picture1.png",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -7819,7 +8000,8 @@
     "height_mm": 1800,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 108
+    "cells": 108,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -7839,7 +8021,8 @@
     "datasheet_url": "https://green-energy.bg/wp-content/uploads/2025/11/ds-su215e100lm-v2.1-250821-en.pdf",
     "image_url": "https://green-energy.bg/wp-content/uploads/2025/11/risenbattery.png",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -7873,7 +8056,8 @@
     "ip_rating": "IP54",
     "dod_pct": 90.0,
     "chemistry": "LiFePO4",
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -7907,7 +8091,8 @@
     "chemistry": "LiFePO4",
     "voltage_class": "LV",
     "cycles": 6000,
-    "ah": 100
+    "ah": 100,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -7941,7 +8126,8 @@
     "dod_pct": 95.0,
     "voltage_class": "LV",
     "cycles": 8000,
-    "ah": 200
+    "ah": 200,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -7961,7 +8147,8 @@
     "datasheet_url": "https://green-energy.bg/wp-content/uploads/2025/10/20240530_idc30e_eur_datasheet_v4_en.pdf",
     "image_url": "https://green-energy.bg/wp-content/uploads/2025/10/sungrow-idc30e_1024x1024@2x.webp",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -7981,7 +8168,8 @@
     "datasheet_url": "https://green-energy.bg/wp-content/uploads/2025/10/ds_20241022_idc180e_datasheet_global_v3_en.pdf",
     "image_url": "https://green-energy.bg/wp-content/uploads/2025/10/sungrow-idc180e-120-150-180kw-isolated-air-cooling-fast-dc-charger_1024x1024@2x.webp",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -8002,7 +8190,8 @@
     "datasheet_url": "https://green-energy.bg/wp-content/uploads/2025/10/datasheet_sun-xl02-a_231221_en.pdf",
     "image_url": "https://green-energy.bg/wp-content/uploads/2025/10/deye-optimizer.jpg",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -8036,7 +8225,8 @@
     "chemistry": "LiFePO4",
     "voltage_class": "LV",
     "ip_rating": "IP20",
-    "ah": 280
+    "ah": 280,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -8098,7 +8288,8 @@
      384
     ],
     "phases": 3,
-    "model": "K-EHV-5G"
+    "model": "K-EHV-5G",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -8119,7 +8310,8 @@
     "datasheet_url": "https://green-energy.bg/wp-content/uploads/2025/10/smartguard-63a-t0-aut0-datasheet-2024.07.pdf",
     "image_url": "https://green-energy.bg/wp-content/uploads/2025/10/smartguard-63a-.jpg",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -8179,7 +8371,8 @@
      585,
      363
     ],
-    "phases": 3
+    "phases": 3,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -8199,7 +8392,8 @@
     "datasheet_url": "https://green-energy.bg/wp-content/uploads/2025/10/datasheet_emma-a02_v07_2024-02_en.pdf",
     "image_url": "https://green-energy.bg/wp-content/uploads/2025/10/emma-002.jpg",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -8255,7 +8449,8 @@
      282
     ],
     "phases": 1,
-    "model": "S6-EH1P12K03"
+    "model": "S6-EH1P12K03",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -8311,7 +8506,8 @@
      282
     ],
     "phases": 1,
-    "model": "S6-EH1P14K03"
+    "model": "S6-EH1P14K03",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -8367,7 +8563,8 @@
      282
     ],
     "phases": 1,
-    "model": "S6-EH1P16K03"
+    "model": "S6-EH1P16K03",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -8400,7 +8597,8 @@
     "ip_rating": "IP20",
     "dod_pct": 90.0,
     "chemistry": "LiFePO4",
-    "voltage_class": "LV"
+    "voltage_class": "LV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -8436,7 +8634,8 @@
      600,
      750,
      200
-    ]
+    ],
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -8472,7 +8671,8 @@
      830,
      235
     ],
-    "ah": 312
+    "ah": 312,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -8512,7 +8712,8 @@
     "height_mm": 1762,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 96
+    "cells": 96,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -8541,7 +8742,8 @@
     "spec_source": "product-page",
     "voltage_class": "LV",
     "nominal_v": 51.2,
-    "ah": 100
+    "ah": 100,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -8580,7 +8782,8 @@
     "width_mm": 1134,
     "thickness_mm": 30,
     "cells": 108,
-    "efficiency": 21.3
+    "efficiency": 21.3,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -8617,7 +8820,8 @@
     "temp_coeff_isc": 0.046,
     "height_mm": 1762,
     "width_mm": 1134,
-    "thickness_mm": 30
+    "thickness_mm": 30,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -8653,7 +8857,8 @@
     "height_mm": 1903,
     "width_mm": 1134,
     "thickness_mm": 32,
-    "cells": 120
+    "cells": 120,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -8717,7 +8922,8 @@
      927,
      314
     ],
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -8781,7 +8987,8 @@
      927,
      314
     ],
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -8846,7 +9053,8 @@
      927,
      314
     ],
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -8866,7 +9074,8 @@
     "datasheet_url": "https://green-energy.bg/wp-content/uploads/2025/06/enerx-introduction_compressed.pdf",
     "image_url": "https://green-energy.bg/wp-content/uploads/2025/06/catl-enerx.webp",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -8886,7 +9095,8 @@
     "datasheet_url": "https://green-energy.bg/wp-content/uploads/2025/06/enerc-306-container-product-specification-v1.1_compressed.pdf",
     "image_url": "https://green-energy.bg/wp-content/uploads/2025/06/catl-enerc.webp",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -8906,7 +9116,8 @@
     "datasheet_url": "https://green-energy.bg/wp-content/uploads/2025/06/catl-enerone-datasheet_compressed.pdf",
     "image_url": "https://green-energy.bg/wp-content/uploads/2025/06/catl-enerone-1.webp",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -8947,7 +9158,8 @@
     "height_mm": 2382,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 144
+    "cells": 144,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -8967,7 +9179,8 @@
     "datasheet_url": "https://green-energy.bg/wp-content/uploads/2025/05/deye_bos-g_pro_series_brochure_compressed.pdf",
     "image_url": "https://green-energy.bg/wp-content/uploads/2025/05/bos-g-pro.jpg",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -8988,7 +9201,8 @@
     "datasheet_url": "https://green-energy.bg/wp-content/uploads/2025/04/deye-rw-f10.2kwh_compressed.pdf",
     "image_url": "https://green-energy.bg/wp-content/uploads/2025/04/deye-rw-f10.2kwh.webp",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -9007,7 +9221,8 @@
     "product_url": "https://green-energy.bg/produkt/bateriya-za-shranenie-na-energiya-k-star-125kw-215kwh/",
     "image_url": "https://green-energy.bg/wp-content/uploads/2025/03/battery-k-star-125kw215kwh.png",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -9026,7 +9241,8 @@
     "product_url": "https://green-energy.bg/produkt/bateriya-za-shranenie-na-energiya-k-star-50kw-197kwh/",
     "image_url": "https://green-energy.bg/wp-content/uploads/2025/03/battery-k-star-50kw197kwh.png",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -9064,7 +9280,8 @@
     "height_mm": 2278,
     "width_mm": 1134,
     "thickness_mm": 35,
-    "cells": 144
+    "cells": 144,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -9085,7 +9302,8 @@
     "datasheet_url": "https://green-energy.bg/wp-content/uploads/2025/08/luna-107_215.pdf",
     "image_url": "https://green-energy.bg/wp-content/uploads/2025/01/huawei-luna2000-215-2s10.png",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -9105,7 +9323,8 @@
     "datasheet_url": "https://green-energy.bg/wp-content/uploads/2025/01/2024-kstar-ci-blue-pulse-100kw-215kwh_compressed.pdf",
     "image_url": "https://green-energy.bg/wp-content/uploads/2025/01/k-star-100kw215kwh.png",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -9144,7 +9363,8 @@
     "temp_coeff_voc": -0.24,
     "height_mm": 2384,
     "width_mm": 1303,
-    "thickness_mm": 30
+    "thickness_mm": 30,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -9184,7 +9404,8 @@
     "cells": 108,
     "height_mm": 1961,
     "width_mm": 1134,
-    "thickness_mm": 30
+    "thickness_mm": 30,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -9224,7 +9445,8 @@
     "cells": 96,
     "height_mm": 1762,
     "width_mm": 1134,
-    "thickness_mm": 30
+    "thickness_mm": 30,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -9289,7 +9511,8 @@
      290
     ],
     "phases": 3,
-    "ip_rating": "IP66"
+    "ip_rating": "IP66",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -9354,7 +9577,8 @@
      290
     ],
     "phases": 3,
-    "ip_rating": "IP66"
+    "ip_rating": "IP66",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -9419,7 +9643,8 @@
      290
     ],
     "phases": 3,
-    "ip_rating": "IP66"
+    "ip_rating": "IP66",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -9440,7 +9665,8 @@
     "datasheet_url": "https://green-energy.bg/wp-content/uploads/2024/11/ge-f60.pdf",
     "image_url": "https://green-energy.bg/wp-content/uploads/2024/11/ge-f60-eu_0.jpg",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -9461,7 +9687,8 @@
     "datasheet_url": "https://green-energy.bg/wp-content/uploads/2024/11/ge-f120.pdf",
     "image_url": "https://green-energy.bg/wp-content/uploads/2024/11/ge-f120-2h2证书正面图-1.jpg",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -9510,7 +9737,8 @@
     "mppt_v_min": 160.0,
     "mppt_v_max": 1000.0,
     "battery_voltage_class": "HV",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -9558,7 +9786,8 @@
     ],
     "phases": 3,
     "battery_voltage_class": "HV",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -9606,7 +9835,8 @@
     ],
     "phases": 3,
     "battery_voltage_class": "HV",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -9654,7 +9884,8 @@
     ],
     "phases": 3,
     "battery_voltage_class": "HV",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -9702,7 +9933,8 @@
     ],
     "phases": 3,
     "battery_voltage_class": "HV",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -9761,7 +9993,8 @@
      560,
      227
     ],
-    "phases": 1
+    "phases": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -9811,7 +10044,8 @@
     "ac_power_kw": 6.0,
     "max_dc_voltage": 500.0,
     "mppt_count": 2,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -9851,7 +10085,8 @@
     "height_mm": 2278,
     "width_mm": 1134,
     "thickness_mm": 35,
-    "cells": 144
+    "cells": 144,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -9881,7 +10116,8 @@
     "height_mm": 1757,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "spec_source": "datasheet-ocr"
+    "spec_source": "datasheet-ocr",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -9939,7 +10175,8 @@
      660,
      295
     ],
-    "phases": 3
+    "phases": 3,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -9997,7 +10234,8 @@
      660,
      295
     ],
-    "phases": 3
+    "phases": 3,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -10055,7 +10293,8 @@
      660,
      295
     ],
-    "phases": 3
+    "phases": 3,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -10114,7 +10353,8 @@
      295
     ],
     "phases": 3,
-    "model": "S6-EH3P8KK02-NV-YD-L"
+    "model": "S6-EH3P8KK02-NV-YD-L",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -10173,7 +10413,8 @@
      560,
      227
     ],
-    "phases": 1
+    "phases": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -10232,7 +10473,8 @@
      560,
      227
     ],
-    "phases": 1
+    "phases": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -10291,7 +10533,8 @@
      560,
      227
     ],
-    "phases": 1
+    "phases": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -10314,7 +10557,8 @@
     "price_bgn": 2284.0,
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -10350,7 +10594,8 @@
     ],
     "ip_rating": "IP66",
     "chemistry": "LiFePO4",
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -10371,7 +10616,8 @@
     "datasheet_url": "https://green-energy.bg/wp-content/uploads/2024/07/battery-se-g5.1-pro-b-datasheet-a-lv-3u.pdf",
     "image_url": "https://green-energy.bg/wp-content/uploads/2024/07/screenshot-2024-07-08-at-17.03.54.png",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -10418,7 +10664,8 @@
     "model": "SUN2000-150K-MG0",
     "mppt_v_min": 200.0,
     "mppt_v_max": 1000.0,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -10466,7 +10713,8 @@
     "phases": 1,
     "mppt_v_min": 40.0,
     "mppt_v_max": 560.0,
-    "battery_voltage_class": "HV"
+    "battery_voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -10515,7 +10763,8 @@
     "model": "SUN2000-8K-LC0",
     "mppt_v_min": 40.0,
     "mppt_v_max": 560.0,
-    "battery_voltage_class": "HV"
+    "battery_voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -10535,7 +10784,8 @@
     "datasheet_url": "https://green-energy.bg/wp-content/uploads/2024/07/evd-80-120-160-200d-x-datasheet-20240218.pdf",
     "image_url": "https://green-energy.bg/wp-content/uploads/2024/07/ates-ev.webp",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -10582,7 +10832,8 @@
     ],
     "phases": 3,
     "mppt_count": 2,
-    "battery_voltage_class": "HV"
+    "battery_voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -10629,7 +10880,8 @@
     ],
     "phases": 3,
     "mppt_count": 2,
-    "battery_voltage_class": "HV"
+    "battery_voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -10676,7 +10928,8 @@
     ],
     "phases": 3,
     "mppt_count": 2,
-    "battery_voltage_class": "HV"
+    "battery_voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -10723,7 +10976,8 @@
     ],
     "phases": 3,
     "mppt_count": 2,
-    "battery_voltage_class": "HV"
+    "battery_voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -10769,7 +11023,8 @@
     "phases": 3,
     "model": "SUN2000-12K-MB0",
     "mppt_count": 2,
-    "battery_voltage_class": "HV"
+    "battery_voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -10809,7 +11064,8 @@
     "cells": 120,
     "height_mm": 1908,
     "width_mm": 1134,
-    "thickness_mm": 35
+    "thickness_mm": 35,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -10848,7 +11104,8 @@
     "temp_coeff_isc": 0.046,
     "height_mm": 2278,
     "width_mm": 1134,
-    "thickness_mm": 35
+    "thickness_mm": 35,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -10886,7 +11143,8 @@
     "temp_coeff_voc": -0.25,
     "height_mm": 2278,
     "width_mm": 1134,
-    "thickness_mm": 30
+    "thickness_mm": 30,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -10916,7 +11174,8 @@
     "height_mm": 2278,
     "width_mm": 1134,
     "thickness_mm": 35,
-    "spec_source": "datasheet-ocr"
+    "spec_source": "datasheet-ocr",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -10959,7 +11218,8 @@
     "height_mm": 1722,
     "width_mm": 1134,
     "thickness_mm": 30,
-    "cells": 108
+    "cells": 108,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -10992,7 +11252,8 @@
     ],
     "ip_rating": "IP55",
     "chemistry": "LiFePO4",
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11025,7 +11286,8 @@
     ],
     "ip_rating": "IP55",
     "chemistry": "LiFePO4",
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11063,7 +11325,8 @@
     "temp_coeff_voc": -0.25,
     "height_mm": 2278,
     "width_mm": 1134,
-    "thickness_mm": 35
+    "thickness_mm": 35,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11103,7 +11366,8 @@
     "hybrid": true,
     "spec_source": "datasheet-auto",
     "phases": 1,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11124,7 +11388,8 @@
     "price_bgn": 10.2,
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11145,7 +11410,8 @@
     "price_bgn": 10.8,
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11167,7 +11433,8 @@
     "price_bgn": 13841.0,
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11191,7 +11458,8 @@
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
     "spec_source": "supplier-listing",
-    "role": "smart_meter"
+    "role": "smart_meter",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11210,7 +11478,8 @@
     "product_url": "https://green-energy.bg/produkt/industrialna-fotovoltaichna-sistema-invertor-deye-50kw-longi-solar-580w-bateriya-dyness-rack-system-hv4-5632kwh/",
     "image_url": "https://green-energy.bg/wp-content/uploads/2023/12/website-product-pictures-7-1.png",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11232,7 +11501,8 @@
     "price_bgn": 29213.0,
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11252,7 +11522,8 @@
     "product_url": "https://green-energy.bg/produkt/industrialna-fotovoltaichna-sistema-invertor-huawei-100kw-panel-longi-solar-580w-bateriya-huawei-luna2000-97kwh-1h1/",
     "image_url": "https://green-energy.bg/wp-content/uploads/2023/12/website-product-pictures-5.png",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11271,7 +11542,8 @@
     "product_url": "https://green-energy.bg/produkt/industrialna-fotovoltaichna-sistema-invertor-huawei-100kw-panel-longi-solar-580w/",
     "image_url": "https://green-energy.bg/wp-content/uploads/2023/12/website-product-pictures-4.png",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11292,7 +11564,8 @@
     "price_bgn": 17250.0,
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11312,7 +11585,8 @@
     "product_url": "https://green-energy.bg/produkt/trifazna-fotovoltaichna-sistema-solis-s6-eh3p10k-h-eu-dyness-tower-panel-longi-425w/",
     "image_url": "https://green-energy.bg/wp-content/uploads/2023/12/website-product-pictures-2.png",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11334,7 +11608,8 @@
     "price_bgn": 12540.0,
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11380,7 +11655,8 @@
     "battery_v_min": 120.0,
     "battery_v_max": 800.0,
     "battery_voltage_class": "HV",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11426,7 +11702,8 @@
     "battery_v_min": 120.0,
     "battery_v_max": 800.0,
     "battery_voltage_class": "HV",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11491,7 +11768,8 @@
      250
     ],
     "phases": 3,
-    "ip_rating": "IP66"
+    "ip_rating": "IP66",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11532,7 +11810,8 @@
     "max_ac_current_a": 400.0,
     "weight_kg": 21.0,
     "ip_rating": "IP66",
-    "phases": 3
+    "phases": 3,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11576,7 +11855,8 @@
     ],
     "phases": 3,
     "spec_source": "product-page",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11620,7 +11900,8 @@
     ],
     "phases": 3,
     "spec_source": "product-page",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11641,7 +11922,8 @@
     "price_bgn": 96.0,
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11662,7 +11944,8 @@
     "price_bgn": 264.0,
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11683,7 +11966,8 @@
     "price_bgn": 228.0,
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11704,7 +11988,8 @@
     "price_bgn": 204.0,
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11726,7 +12011,8 @@
     "price_bgn": 288.0,
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11749,7 +12035,8 @@
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
     "spec_source": "supplier-listing",
-    "role": "smart_meter"
+    "role": "smart_meter",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11772,7 +12059,8 @@
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
     "spec_source": "supplier-listing",
-    "role": "smart_meter"
+    "role": "smart_meter",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11816,7 +12104,8 @@
     ],
     "phases": 3,
     "spec_source": "product-page",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11860,7 +12149,8 @@
     ],
     "phases": 3,
     "spec_source": "product-page",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11904,7 +12194,8 @@
     ],
     "phases": 3,
     "spec_source": "product-page",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11948,7 +12239,8 @@
     ],
     "phases": 3,
     "spec_source": "product-page",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -11992,7 +12284,8 @@
     ],
     "phases": 3,
     "spec_source": "product-page",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -12036,7 +12329,8 @@
     ],
     "phases": 3,
     "spec_source": "product-page",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -12058,7 +12352,8 @@
     "price_bgn": 31700.0,
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -12080,7 +12375,8 @@
     "price_bgn": 21350.0,
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -12102,7 +12398,8 @@
     "price_bgn": 1587.0,
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -12123,7 +12420,8 @@
     "price_bgn": 966.0,
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -12187,7 +12485,8 @@
      500,
      230
     ],
-    "phases": 3
+    "phases": 3,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -12251,7 +12550,8 @@
      500,
      230
     ],
-    "phases": 3
+    "phases": 3,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -12315,7 +12615,8 @@
      500,
      230
     ],
-    "phases": 3
+    "phases": 3,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -12377,7 +12678,8 @@
      363
     ],
     "phases": 3,
-    "max_pv_kw": 120.0
+    "max_pv_kw": 120.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -12440,7 +12742,8 @@
      338
     ],
     "phases": 3,
-    "max_pv_kw": 90.0
+    "max_pv_kw": 90.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -12502,7 +12805,8 @@
     ],
     "phases": 3,
     "model": "S5-GC50K",
-    "max_pv_kw": 75.0
+    "max_pv_kw": 75.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -12561,7 +12865,8 @@
      629,
      252
     ],
-    "phases": 3
+    "phases": 3,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -12620,7 +12925,8 @@
      629,
      252
     ],
-    "phases": 3
+    "phases": 3,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -12644,7 +12950,8 @@
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
     "spec_source": "supplier-listing",
-    "role": "dongle"
+    "role": "dongle",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -12668,7 +12975,8 @@
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
     "spec_source": "supplier-listing",
-    "role": "dongle"
+    "role": "dongle",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -12692,7 +13000,8 @@
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
     "spec_source": "supplier-listing",
-    "role": "dongle"
+    "role": "dongle",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -12718,7 +13027,8 @@
     ],
     "specs_verified": false,
     "wp": 575,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -12740,7 +13050,8 @@
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
     "spec_source": "supplier-listing",
-    "role": "solar_cable"
+    "role": "solar_cable",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -12762,7 +13073,8 @@
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
     "spec_source": "supplier-listing",
-    "role": "solar_cable"
+    "role": "solar_cable",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -12784,7 +13096,8 @@
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
     "spec_source": "supplier-listing",
-    "role": "smart_meter"
+    "role": "smart_meter",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -12806,7 +13119,8 @@
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
     "spec_source": "supplier-listing",
-    "role": "dongle"
+    "role": "dongle",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -12827,7 +13141,8 @@
     "price_bgn": 1683.0,
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -12848,7 +13163,8 @@
     "price_bgn": 1573.0,
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -12870,7 +13186,8 @@
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
     "spec_source": "supplier-listing",
-    "role": "dongle"
+    "role": "dongle",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -12905,7 +13222,8 @@
     "spec_source": "product-page",
     "phases": 3,
     "hybrid": false,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -12949,7 +13267,8 @@
     ],
     "phases": 3,
     "spec_source": "product-page",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -12993,7 +13312,8 @@
     ],
     "phases": 3,
     "spec_source": "product-page",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -13037,7 +13357,8 @@
     ],
     "phases": 3,
     "spec_source": "product-page",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -13081,7 +13402,8 @@
     ],
     "phases": 3,
     "spec_source": "product-page",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -13125,7 +13447,8 @@
     ],
     "phases": 1,
     "spec_source": "product-page",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -13169,7 +13492,8 @@
     ],
     "phases": 1,
     "spec_source": "product-page",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -13213,7 +13537,8 @@
     ],
     "phases": 1,
     "spec_source": "product-page",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -13235,7 +13560,8 @@
     "price_bgn": 105.0,
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -13257,7 +13583,8 @@
     "price_bgn": 103.0,
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -13279,7 +13606,8 @@
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
     "spec_source": "supplier-listing",
-    "role": "dongle"
+    "role": "dongle",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -13309,7 +13637,8 @@
     "ac_power_kw": 330.0,
     "phases": 3,
     "hybrid": false,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -13341,7 +13670,8 @@
     "ac_power_kw": 115.0,
     "phases": 3,
     "hybrid": false,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -13399,7 +13729,8 @@
     ],
     "ip_rating": "IP66",
     "phases": 3,
-    "model": "SUN2000-50KTL-MC0"
+    "model": "SUN2000-50KTL-MC0",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -13438,7 +13769,8 @@
     "max_ac_current_a": 400.0,
     "weight_kg": 21.0,
     "ip_rating": "IP66",
-    "phases": 3
+    "phases": 3,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -13478,7 +13810,8 @@
     "weight_kg": 21.0,
     "ip_rating": "IP66",
     "phases": 3,
-    "model": "SUN2000-12KTL-M5"
+    "model": "SUN2000-12KTL-M5",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -13512,7 +13845,8 @@
     "phases": 3,
     "hybrid": true,
     "battery_voltage_class": "HV",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -13546,7 +13880,8 @@
     "phases": 3,
     "hybrid": true,
     "battery_voltage_class": "HV",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -13580,7 +13915,8 @@
     "phases": 1,
     "hybrid": true,
     "battery_voltage_class": "HV",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -13614,7 +13950,8 @@
     "phases": 1,
     "hybrid": true,
     "battery_voltage_class": "HV",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -13637,7 +13974,8 @@
     "price_bgn": 1587.0,
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -13687,7 +14025,8 @@
     ],
     "ip_rating": "IP66",
     "phases": 3,
-    "model": "SUN2000-215KTL-H3"
+    "model": "SUN2000-215KTL-H3",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -13710,7 +14049,8 @@
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
     "spec_source": "supplier-listing",
-    "role": "dongle"
+    "role": "dongle",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -13733,7 +14073,8 @@
     "price_bgn": 993.0,
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -13754,7 +14095,8 @@
     "price_bgn": 1827.0,
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -13806,7 +14148,8 @@
     "ip_rating": "IP65",
     "phases": 3,
     "model": "GW25K-MT",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -13853,7 +14196,8 @@
     "ip_rating": "IP65",
     "phases": 3,
     "start_voltage": 200.0,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -13900,7 +14244,8 @@
     ],
     "phases": 3,
     "battery_voltage_class": null,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -13948,7 +14293,8 @@
     ],
     "phases": 1,
     "battery_voltage_class": "HV",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -13987,7 +14333,8 @@
     "max_ac_current_a": 400.0,
     "weight_kg": 21.0,
     "ip_rating": "IP66",
-    "phases": 3
+    "phases": 3,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -14024,7 +14371,8 @@
     ],
     "chemistry": "LiFePO4",
     "voltage_class": "LV",
-    "ah": 105
+    "ah": 105,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -14063,7 +14411,8 @@
     "max_ac_current_a": 400.0,
     "weight_kg": 21.0,
     "ip_rating": "IP66",
-    "phases": 3
+    "phases": 3,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -14082,7 +14431,8 @@
     "product_url": "https://green-energy.bg/produkt/konstrukcziya-za-solarni-paneli-sandvi-2/",
     "image_url": "https://green-energy.bg/wp-content/uploads/2023/02/ENG_ISOTRAP_S_page-0001.jpg",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -14101,7 +14451,8 @@
     "product_url": "https://green-energy.bg/produkt/konstrukcziya-za-solarni-paneli-sandvi/",
     "image_url": "https://green-energy.bg/wp-content/uploads/2023/02/ENG_ISOTRAP_Mini_page-0001.jpg",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -14120,7 +14471,8 @@
     "product_url": "https://green-energy.bg/produkt/konstrucziya-za-solarni-paneli-sandvich/",
     "image_url": "https://green-energy.bg/wp-content/uploads/2023/02/ENG_ISOTRAP_XL_page-0001.jpg",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -14139,7 +14491,8 @@
     "product_url": "https://green-energy.bg/produkt/konstrukcziya-za-solarni-paneli-stoyasth-k/",
     "image_url": "https://green-energy.bg/wp-content/uploads/2023/02/ENG2-ISOKEN_page-0001.jpg",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -14158,7 +14511,8 @@
     "product_url": "https://green-energy.bg/produkt/pokrivna-sistema-za-montazh-na-solarni/",
     "image_url": "https://green-energy.bg/wp-content/uploads/2023/02/ENG2-ISOTILE_page-0001.jpg",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -14177,7 +14531,8 @@
     "product_url": "https://green-energy.bg/produkt/fiksirana-sistema-za-zazemen-montazh-n/",
     "image_url": "https://green-energy.bg/wp-content/uploads/2023/02/ISOGROUND_page-0001-scaled-1.jpg",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -14199,7 +14554,8 @@
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
     "spec_source": "supplier-listing",
-    "role": "solar_cable"
+    "role": "solar_cable",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -14221,7 +14577,8 @@
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
     "spec_source": "supplier-listing",
-    "role": "solar_cable"
+    "role": "solar_cable",
+    "stock_status": "instock"
    },
    "unit": "м"
   },
@@ -14245,7 +14602,8 @@
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
     "spec_source": "supplier-listing",
-    "role": "smart_meter"
+    "role": "smart_meter",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -14269,7 +14627,8 @@
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
     "spec_source": "supplier-listing",
-    "role": "smart_meter"
+    "role": "smart_meter",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -14292,7 +14651,8 @@
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
     "spec_source": "supplier-listing",
-    "role": "dongle"
+    "role": "dongle",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -14325,7 +14685,8 @@
     ],
     "spec_source": "datasheet-auto",
     "kwh": 5.0,
-    "voltage_class": "HV"
+    "voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -14373,7 +14734,8 @@
     ],
     "phases": 3,
     "battery_voltage_class": "HV",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -14421,7 +14783,8 @@
     ],
     "phases": 3,
     "battery_voltage_class": "HV",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -14468,7 +14831,8 @@
     ],
     "ip_rating": "IP66",
     "phases": 3,
-    "max_pv_kw": 60.0
+    "max_pv_kw": 60.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -14515,7 +14879,8 @@
     ],
     "ip_rating": "IP66",
     "phases": 3,
-    "max_pv_kw": 54.0
+    "max_pv_kw": 54.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -14561,7 +14926,8 @@
     "ip_rating": "IP66",
     "phases": 3,
     "model": "SUN2000-30KTL-M3",
-    "max_pv_kw": 45.0
+    "max_pv_kw": 45.0,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -14609,7 +14975,8 @@
     ],
     "phases": 3,
     "battery_voltage_class": null,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -14657,7 +15024,8 @@
      156
     ],
     "phases": 1,
-    "battery_voltage_class": "HV"
+    "battery_voltage_class": "HV",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -14688,7 +15056,8 @@
     "phases": 3,
     "hybrid": false,
     "mppt_count": 2,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -14719,7 +15088,8 @@
     "phases": 3,
     "battery_voltage_class": null,
     "mppt_count": 2,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -14765,7 +15135,8 @@
     ],
     "ip_rating": "IP66",
     "phases": 3,
-    "model": "SUN2000-185KTL-H1"
+    "model": "SUN2000-185KTL-H1",
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -14791,7 +15162,8 @@
     "price_bgn": 30240.0,
     "price_source": "green-energy.bg (листова цена)",
     "specs_verified": false,
-    "spec_source": "supplier-listing"
+    "spec_source": "supplier-listing",
+    "stock_status": "backorder"
    },
    "unit": "бр."
   },
@@ -14844,7 +15216,8 @@
     ],
     "ip_rating": "IP66",
     "phases": 3,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -14897,7 +15270,8 @@
     ],
     "ip_rating": "IP66",
     "phases": 3,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -14928,7 +15302,8 @@
     "hybrid": true,
     "battery_voltage_class": "LV",
     "mppt_count": 2,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "backorder"
    },
    "unit": "бр."
   },
@@ -14981,7 +15356,8 @@
     ],
     "ip_rating": "IP65",
     "phases": 1,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -15034,7 +15410,8 @@
     ],
     "ip_rating": "IP66",
     "phases": 3,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -15064,7 +15441,8 @@
     "phases": 1,
     "hybrid": false,
     "mppt_count": 2,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -15113,7 +15491,8 @@
     ],
     "ip_rating": "IP65",
     "phases": 1,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -15162,7 +15541,8 @@
     ],
     "ip_rating": "IP65",
     "phases": 3,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -15211,7 +15591,8 @@
     ],
     "ip_rating": "IP65",
     "phases": 3,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -15261,7 +15642,8 @@
     ],
     "ip_rating": "IP65",
     "phases": 3,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -15310,7 +15692,8 @@
     ],
     "ip_rating": "IP65",
     "phases": 3,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -15359,7 +15742,8 @@
     ],
     "ip_rating": "IP65",
     "phases": 3,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -15418,7 +15802,8 @@
     "ip_rating": "IP66",
     "phases": 3,
     "model": "GW100K-HT",
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -15463,7 +15848,8 @@
     ],
     "ip_rating": "IP65",
     "phases": 3,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -15520,7 +15906,8 @@
     ],
     "ip_rating": "IP65",
     "phases": 3,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   },
@@ -15570,7 +15957,8 @@
     ],
     "ip_rating": "IP65",
     "phases": 3,
-    "strings_per_mppt": 1
+    "strings_per_mppt": 1,
+    "stock_status": "instock"
    },
    "unit": "бр."
   }

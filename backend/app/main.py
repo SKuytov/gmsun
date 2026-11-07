@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import models  # noqa: F401  (register tables)
 from .config import get_settings
-from .db import Base, SessionLocal, engine
+from .db import Base, SessionLocal, engine, ensure_columns
 from .routers import auth, catalog, projects, quotes, settings, sizing
 from .seed import seed
 
@@ -17,6 +17,7 @@ from .seed import seed
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    ensure_columns()
     with SessionLocal() as db:
         seed(db)
     yield

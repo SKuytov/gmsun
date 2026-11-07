@@ -244,7 +244,8 @@ def render_techfile_html(db: Session, quote: Quote) -> str:
         if l.hidden or l.section in ("labor", "other") or (l.meta or {}).get("spare") is None and l.catalog_item_id is None and not (l.meta or {}).get("role"):
             continue
         ci = db.get(CatalogItem, l.catalog_item_id) if l.catalog_item_id else None
-        order.setdefault((ci.manufacturer if ci and ci.manufacturer else "Други / местна доставка"), []).append({"line": l, "item": ci})
+        sup = (l.meta or {}).get("supplier") or (ci.manufacturer if ci and ci.manufacturer else None) or "Неразпределени / местна доставка"
+        order.setdefault(sup, []).append({"line": l, "item": ci})
     kwp = float(info.get("kwp") or 0)
     tilt, az = (project.layouts[0].tilt_deg, project.layouts[0].azimuth_deg) if project.layouts else (roof.default_tilt_deg if roof else 20, 180)
     env = Environment(loader=FileSystemLoader(str(TEMPLATES)), autoescape=select_autoescape(["html"]))
@@ -254,6 +255,7 @@ def render_techfile_html(db: Session, quote: Quote) -> str:
     tpl = env.get_template("techfile.html")
     return tpl.render(
         company=company,
+        doc_kind="техническо досие",
         quote=quote,
         project=project,
         info=info,

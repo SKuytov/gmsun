@@ -3,65 +3,53 @@
 <head>
 <meta charset="utf-8">
 <style>
-  @page { size: A4; margin: 15mm 13mm 17mm 13mm;
-    @bottom-center { content: "{{ company.name }} · Техническо досие · оферта № {{ quote.number }} · стр. " counter(page) " / " counter(pages); font-size: 8pt; color: #777; font-family: 'DejaVu Sans', sans-serif; } }
-  body { font-family: 'DejaVu Sans', 'Liberation Sans', Arial, sans-serif; font-size: 9pt; color: #1b1f24; }
-  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #f0a500; padding-bottom: 8px; margin-bottom: 10px; }
-  .header .co { font-size: 8.5pt; color: #444; line-height: 1.35; }
-  .header .co b { font-size: 11pt; color: #1b1f24; }
-  .logo { max-height: 56px; max-width: 180px; }
-  .qno { text-align: right; font-size: 9pt; color: #444; }
-  .qno .num { font-size: 13pt; font-weight: bold; color: #1b1f24; }
-  h1 { font-size: 15pt; margin: 8px 0 4px; letter-spacing: 1px; }
-  h2 { font-size: 11.5pt; margin: 14px 0 6px; padding-bottom: 3px; border-bottom: 1px solid #f0a500; page-break-after: avoid; }
-  h3 { font-size: 9.5pt; margin: 8px 0 4px; page-break-after: avoid; }
-  .sub { color: #666; font-size: 9pt; margin: 0 0 8px; }
-  table.t { width: 100%; border-collapse: collapse; margin: 4px 0 8px; page-break-inside: auto; }
-  table.t th { background: #1b1f24; color: #fff; font-weight: 600; font-size: 8pt; padding: 4px 5px; text-align: left; }
-  table.t td { padding: 3px 5px; border-bottom: 1px solid #e6e6e6; font-size: 8.5pt; vertical-align: top; }
-  table.t tr.section td { background: #fff4d6; font-weight: bold; border-top: 1px solid #f0a500; }
-  table.t tr.group td { background: #eef2f7; font-weight: bold; }
-  .r { text-align: right; white-space: nowrap; }
-  .c { text-align: center; }
-  .kpi { display: flex; gap: 8px; margin: 8px 0 4px; }
-  .kpi div { flex: 1; background: #f6f7f9; border-radius: 4px; padding: 6px 8px; text-align: center; }
-  .kpi .v { font-weight: bold; font-size: 11pt; white-space: nowrap; }
-  .kpi .l { font-size: 7.5pt; color: #777; text-transform: uppercase; }
-  .grid { display: flex; gap: 12px; }
-  .box { flex: 1 1 0; min-width: 0; overflow: hidden; border: 1px solid #ddd; border-radius: 4px; padding: 6px 9px; font-size: 8.6pt; }
-  .box h3 { margin: 0 0 4px; font-size: 8.5pt; text-transform: uppercase; color: #777; letter-spacing: .5px; }
-  .box table { width: 100%; table-layout: fixed; }
-  .box table td { padding: 1px 6px 1px 0; vertical-align: top; word-wrap: break-word; }
-  .box table td:first-child { width: 40%; }
-  .box table td:first-child { color: #666; }
-  .ok { color: #1e8e3e; font-weight: bold; }
-  .bad { color: #c0392b; font-weight: bold; }
-  .warn { background: #fff4d6; border-left: 3px solid #f0a500; padding: 4px 8px; margin: 3px 0; font-size: 8.5pt; }
-  table.kv { width: 100%; table-layout: fixed; font-size: 8.5pt; margin: 4px 0 6px; border-collapse: collapse; }
-  table.kv td { padding: 2px 6px 2px 0; border-bottom: 1px solid #eee; vertical-align: top; word-wrap: break-word; }
-  table.kv td:first-child { width: 28%; color: #666; }
-  table.kv a { color: #1b4f9c; text-decoration: none; }
-  .fig { border: 1px solid #ddd; border-radius: 4px; padding: 6px; margin: 6px 0; page-break-inside: avoid; }
-  .fig svg { width: 100%; height: auto; display: block; }
-  .fig img { max-width: 100%; max-height: 95mm; display: block; margin: 0 auto; }
-  .cap { font-size: 8pt; color: #666; margin-top: 3px; }
-  .muted { color: #777; font-size: 8pt; }
-  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
-  .pb { page-break-before: always; }
-  ol.rules { margin: 4px 0 0 16px; padding: 0; font-size: 8.5pt; line-height: 1.45; }
+{% include "_doc.css" %}
+  /* technical-file specific */
+  .kpi { display: flex; border-top: 0.75pt solid var(--rule); border-bottom: 0.75pt solid var(--rule); margin: 8pt 0 10pt; }
+  .kpi div { flex: 1 1 0; padding: 6pt 8pt; border-right: 0.5pt solid var(--rule); }
+  .kpi div:last-child { border-right: none; }
+  .kpi .v { font-size: 12pt; font-weight: 600; white-space: nowrap; letter-spacing: -0.01em; }
+  .kpi .l { font-size: 7pt; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-top: 1pt; }
+  .box { flex: 1 1 0; min-width: 0; overflow: hidden; border-top: 1pt solid var(--rule-strong); padding: 5pt 0 2pt; font-size: 8.6pt; }
+  .box h3 { margin: 0 0 3pt; font-size: 7pt; text-transform: uppercase; color: var(--muted); letter-spacing: .1em; font-weight: 600; }
+  .box b { font-weight: 600; }
+  .box table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+  .box table td { padding: 1.5pt 6pt 1.5pt 0; vertical-align: top; word-wrap: break-word; border-bottom: 0.5pt solid var(--rule); }
+  .box table tr:last-child td { border-bottom: none; }
+  .box table td:first-child { width: 42%; color: var(--muted); }
+  .warn { border-left: 2pt solid var(--accent); padding: 3pt 8pt; margin: 3pt 0; font-size: 8.5pt; background: #fffbeb; }
+  .sub { color: var(--muted); font-size: 9pt; margin: 0 0 8pt; }
+  h1 { font-size: 14pt; font-weight: 600; letter-spacing: -0.01em; margin: 4pt 0 2pt; }
+  h2 { margin-top: 14pt; }
+  table.kv td:first-child { width: 28%; }
+  table.kv a { color: #1d4ed8; }
+  .fig { border: 0.5pt solid var(--rule); padding: 6pt; }
+  .fig img { border: none; max-height: 95mm; }
 </style>
 </head>
 <body>
-<div class="header">
-  <div class="co">
-    {% if logo_uri %}<img class="logo" src="{{ logo_uri }}"><br>{% endif %}
-    <b>{{ company.name }}</b><br>{{ company.address }}<br>
-    {% if company.phone %}Тел.: {{ company.phone }} · {% endif %}{{ company.email }}
+<div class="lh">
+  <div class="brand">
+    {% if logo_uri %}<img class="logo" src="{{ logo_uri }}">{% endif %}
+    <div>
+      <div class="co-name">{{ company.name }}</div>
+      <div class="co-sub">{{ company.address }}{% if company.eik %} · ЕИК {{ company.eik }}{% endif %}</div>
+    </div>
   </div>
-  <div class="qno">
-    <div class="num">Техническо досие</div>
-    Оферта № {{ quote.number }}{% if quote.version > 1 %} / rev.{{ quote.version }}{% endif %}<br>
-    Проект {{ project.number }} · {{ date_str }}
+  <div class="contact">
+    {% if company.signatory %}<b>{{ company.signatory }}</b><br>{% endif %}
+    {% if company.phone %}{{ company.phone }}<br>{% endif %}
+    {{ company.email }}
+  </div>
+</div>
+<div class="dochead">
+  <div>
+    <div class="kind">Техническо досие</div>
+    <div class="no">Оферта № {{ quote.number }}{% if quote.version > 1 %} <span class="muted" style="font-size:11pt;font-weight:500">ревизия {{ quote.version }}</span>{% endif %}</div>
+  </div>
+  <div class="meta">
+    <div><div class="k">Дата</div><div class="v">{{ date_str }}</div></div>
+    <div><div class="k">Проект</div><div class="v">{{ project.number }}</div></div>
   </div>
 </div>
 
@@ -245,11 +233,13 @@
 
 <h2>7. Списък за поръчка по доставчик</h2>
 {% for mf, rows in order.items() %}
+<div class="avoid">
 <table class="t">
-  <tr class="group"><td colspan="5">{{ mf }} — {{ rows | length }} позиции</td></tr>
-  <tr><th>Код</th><th>Наименование</th><th class="c">Мярка</th><th class="r">Количество</th><th class="r">Доставна цена</th></tr>
-  {% for r in rows %}<tr><td class="muted">{{ r.item.sku if r.item and r.item.sku else '—' }}</td><td>{{ r.item.name if r.item else r.line.name }}</td><td class="c">{{ r.line.unit }}</td><td class="r"><b>{{ r.line.qty | num }}</b></td><td class="r">{% if r.line.purchase_price %}{{ r.line.purchase_price | money }}{% else %}—{% endif %}</td></tr>{% endfor %}
+  <tr class="group"><td colspan="6">{{ mf }} — {{ rows | length }} позиции</td></tr>
+  <tr><th>Код</th><th>Наименование</th><th class="c">Мярка</th><th class="r">Количество</th><th class="r">Доставна цена</th><th class="r">Срок, дни</th></tr>
+  {% for r in rows %}<tr><td class="muted">{{ r.item.supplier_sku or r.item.sku if r.item and (r.item.supplier_sku or r.item.sku) else '—' }}</td><td>{{ r.item.name if r.item else r.line.name }}</td><td class="c">{{ r.line.unit }}</td><td class="r"><b>{{ r.line.qty | num }}</b></td><td class="r">{% if r.line.purchase_price %}{{ r.line.purchase_price | money }}{% else %}—{% endif %}</td><td class="r">{{ r.line.meta.get('lead_time_days') if r.line.meta and r.line.meta.get('lead_time_days') is not none else '—' }}</td></tr>{% endfor %}
 </table>
+</div>
 {% endfor %}
 
 <h2>8. Приложими стандарти и бележки</h2>

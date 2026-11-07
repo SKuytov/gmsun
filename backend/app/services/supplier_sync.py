@@ -341,6 +341,7 @@ def build_items(
             "datasheet_url": urls[0] if urls else None,
             "datasheet_urls": urls if len(urls) > 1 else None,
             "image_url": image,
+            "stock_status": "backorder" if p.get("is_on_backorder") else ("instock" if p.get("is_in_stock") else "outofstock"),
             "price_bgn": price_bgn or None,
             "price_source": f"{SUPPLIER} (листова цена)" if eur else None,
             "tags": [t.get("name") for t in p.get("tags") or []] or None,
@@ -640,6 +641,7 @@ def upsert_items(db: Any, items: list[dict[str, Any]], *, overwrite_prices: bool
                 category=it["category"], name=it["name"], sku=it.get("sku"), manufacturer=it.get("manufacturer"),
                 description=it.get("description"), unit=it.get("unit") or "бр.", purchase_price=float(it.get("purchase_price") or 0),
                 currency=it.get("currency") or "EUR", warranty=it.get("warranty"), active=True, specs=sp,
+                supplier=SUPPLIER, supplier_sku=str(sp.get("supplier_product_id") or "") or None,
             )
             db.add(row)
             by_name[it["name"]] = row
@@ -649,7 +651,10 @@ def upsert_items(db: Any, items: list[dict[str, Any]], *, overwrite_prices: bool
             continue
         changed = False
         cur = dict(row.specs or {})
-        for k in ("product_url", "datasheet_url", "datasheet_urls", "image_url", "supplier", "supplier_product_id", "tags", "price_bgn"):
+        if not row.supplier:
+            row.supplier = SUPPLIER
+            changed = True
+        for k in ("product_url", "datasheet_url", "datasheet_urls", "image_url", "supplier", "supplier_product_id", "tags", "price_bgn", "stock_status"):
             if sp.get(k) is not None and cur.get(k) != sp.get(k):
                 cur[k] = sp[k]
                 changed = True

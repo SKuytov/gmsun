@@ -1,14 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Save, Upload } from 'lucide-react'
+import { Plus, Save, Trash2, Upload } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Badge, ErrorBox, Field, Input, Loading, Modal, NumInput, Select, Textarea, Toggle, cx, useToast } from '@/components/ui'
 import { api, errMsg, fileUrl, get, getServerUrl, patch, post, put, setServerUrl } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import { useT } from '@/lib/i18n'
-import type { CompanySettings, PricingSettings, TextsSettings, User } from '@/lib/types'
+import type { CompanySettings, PricingSettings, ProcurementSettings, SupplierCfg, SuppliersSettings, TextsSettings, User } from '@/lib/types'
 
-const TABS = ['company', 'pricing', 'texts', 'users', 'server'] as const
+const TABS = ['company', 'pricing', 'suppliers', 'texts', 'users', 'server'] as const
 type Tab = (typeof TABS)[number]
 
 export default function SettingsPage() {
@@ -26,13 +26,14 @@ export default function SettingsPage() {
         <div className="inline-flex flex-wrap gap-1 rounded-md bg-surface-2 p-1">
           {tabs.map((x) => (
             <button key={x} type="button" onClick={() => nav(`/settings/${x}`)} className={cx('h-9 rounded px-3 text-sm font-medium', tab === x ? 'bg-surface shadow-card' : 'text-ink-2')} data-testid={`tab-settings-${x}`}>
-              {{ company: t('company'), pricing: t('pricing'), texts: t('texts'), users: admin ? t('users') : t('change_password'), server: t('server') }[x]}
+              {{ company: t('company'), pricing: t('pricing'), suppliers: t('suppliers_tab'), texts: t('texts'), users: admin ? t('users') : t('change_password'), server: t('server') }[x]}
             </button>
           ))}
         </div>
       </div>
       {tab === 'company' && <CompanyTab />}
       {tab === 'pricing' && <PricingTab />}
+      {tab === 'suppliers' && <SuppliersTab />}
       {tab === 'texts' && <TextsTab />}
       {tab === 'users' && <UsersTab admin={admin} />}
       {tab === 'server' && <ServerTab />}
@@ -239,12 +240,153 @@ function TextsTab() {
     <div className="flex flex-col gap-4">
       <div className="card flex flex-col gap-3 p-4">
         {area('quote_title', bg ? 'Заглавие на офертата' : 'Quote title', 2)}
+        {area('intro', bg ? 'Уводен текст към клиента (първа страница)' : 'Introduction to the client (first page)', 3)}
         {area('warranty', bg ? 'Гаранционни условия' : 'Warranty terms')}
         {area('payment', bg ? 'Условия на плащане' : 'Payment terms')}
         {area('notes', bg ? 'Забележки' : 'Notes')}
+        {area('closing', bg ? 'Заключителен текст' : 'Closing text', 2)}
+        {area('rfq_note', bg ? 'Текст в запитванията към доставчици' : 'Text in supplier requests', 2)}
         <p className="text-xs text-ink-3">{bg ? 'Всеки ред се показва като отделен абзац в PDF.' : 'Each line becomes a separate paragraph in the PDF.'}</p>
       </div>
       <SaveBar dirty={dirty} busy={save.isPending} onSave={() => save.mutate(draft)} />
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------- suppliers / procurement
+function SuppliersTab() {
+  const { t, lang } = useT()
+  const bg = lang === 'bg'
+  const sup = useSetting<SuppliersSettings>('suppliers')
+  const proc = useSetting<ProcurementSettings>('procurement')
+  if (!sup.draft || !proc.draft) return sup.q.isError ? <ErrorBox>{errMsg(sup.q.error)}</ErrorBox> : <Loading />
+  const d = sup.draft
+  const pd = proc.draft
+  const setRow = (i: number, patch: Partial<SupplierCfg>) => sup.setDraft({ ...d, list: d.list.map((r, j) => (j === i ? { ...r, ...patch } : r)) })
+  const listArea = (key: 'premium' | 'economy', label: string) => (
+    <Field label={label} hint={bg ? 'по един производител на ред или през запетая' : 'one brand per line or comma-separated'}>
+      <Textarea
+        rows={4}
+        value={pd.brand_tiers[key].join(', ')}
+        onChange={(e) =>
+          proc.setDraft({
+            ...pd,
+            brand_tiers: {
+              ...pd.brand_tiers,
+              [key]: e.target.value
+                .split(/[,\n]/)
+                .map((x) => x.trim())
+                .filter(Boolean),
+            },
+          })
+        }
+      />
+    </Field>
+  )
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="card flex flex-col gap-3 p-4" data-testid="suppliers-card">
+        <div>
+          <h2>{t('suppliers_tab')}</h2>
+          <p className="text-sm text-ink-2">{bg ? 'Срокът на доставка на артикул = срок на артикула (ако е зададен) → срок на доставчика → общ срок по подразбиране. Срокът на цялата оферта е най-дългият срок сред позициите ѝ.' : 'Item lead time = item override → supplier default → global default. The quote lead time is the longest among its lines.'}</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>{t('supplier')}</th>
+                <th>{bg ? 'Контакт' : 'Contact'}</th>
+                <th>E-mail</th>
+                <th>{bg ? 'Телефон' : 'Phone'}</th>
+                <th className="w-28 text-right">{t('lead_time_days')}</th>
+                <th>{t('notes')}</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {d.list.map((r, i) => (
+                <tr key={i}>
+                  <td>
+                    <Input className="input-sm" value={r.name} onChange={(e) => setRow(i, { name: e.target.value })} data-testid={`input-supplier-name-${i}`} />
+                  </td>
+                  <td>
+                    <Input className="input-sm" value={r.contact || ''} onChange={(e) => setRow(i, { contact: e.target.value })} />
+                  </td>
+                  <td>
+                    <Input className="input-sm" value={r.email || ''} onChange={(e) => setRow(i, { email: e.target.value })} />
+                  </td>
+                  <td>
+                    <Input className="input-sm" value={r.phone || ''} onChange={(e) => setRow(i, { phone: e.target.value })} />
+                  </td>
+                  <td>
+                    <NumInput className="input-sm" value={r.lead_time_days ?? null} min={0} onChange={(v) => setRow(i, { lead_time_days: v == null ? null : Math.round(v) })} />
+                  </td>
+                  <td>
+                    <Input className="input-sm" value={r.notes || ''} onChange={(e) => setRow(i, { notes: e.target.value })} />
+                  </td>
+                  <td className="text-right">
+                    <button type="button" className="btn-quiet btn-sm" onClick={() => sup.setDraft({ ...d, list: d.list.filter((_, j) => j !== i) })} aria-label={t('delete')}>
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <button type="button" className="btn-ghost btn-sm" onClick={() => sup.setDraft({ ...d, list: [...d.list, { name: '', lead_time_days: d.default_lead_time_days }] })} data-testid="button-add-supplier">
+            <Plus className="h-4 w-4" /> {t('add')}
+          </button>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <Field label={bg ? 'Срок по подразбиране (раб. дни)' : 'Default lead time (working days)'}>
+            <NumInput value={d.default_lead_time_days} min={0} onChange={(v) => sup.setDraft({ ...d, default_lead_time_days: Math.round(v || 0) })} />
+          </Field>
+          <Field label={bg ? 'Срок при „по поръчка“ (раб. дни)' : 'Back-order lead time (working days)'}>
+            <NumInput value={d.backorder_lead_time_days} min={0} onChange={(v) => sup.setDraft({ ...d, backorder_lead_time_days: Math.round(v || 0) })} />
+          </Field>
+          <Field label={bg ? 'Адрес за доставка (в запитванията)' : 'Delivery address (in RFQs)'} hint={bg ? 'празно = адрес на фирмата' : 'empty = company address'}>
+            <Input value={d.delivery_address || ''} onChange={(e) => sup.setDraft({ ...d, delivery_address: e.target.value })} />
+          </Field>
+        </div>
+        <SaveBar dirty={sup.dirty} busy={sup.save.isPending} onSave={() => sup.save.mutate(d)} />
+      </div>
+
+      <div className="card flex flex-col gap-3 p-4">
+        <div>
+          <h2>{bg ? 'Класове и автоматични предложения' : 'Tiers and automatic proposals'}</h2>
+          <p className="text-sm text-ink-2">{bg ? 'Класът на артикул (икономичен / стандартен / премиум) се определя автоматично от цената за единица (€/Wp, €/kW, €/kWh), марката и качествени показатели (КПД, гаранция, цикли). Ръчно зададен клас в Каталог има предимство.' : 'Item tier (economy / standard / premium) is derived from unit price (€/Wp, €/kW, €/kWh), brand and quality signals (efficiency, warranty, cycles). A manual tier in the Catalog wins.'}</p>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {listArea('premium', bg ? 'Премиум марки' : 'Premium brands')}
+          {listArea('economy', bg ? 'Икономични марки' : 'Economy brands')}
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Field label={bg ? 'Тежест цена' : 'Weight: price'}>
+            <NumInput value={pd.tier_weights.price} min={0} onChange={(v) => proc.setDraft({ ...pd, tier_weights: { ...pd.tier_weights, price: v || 0 } })} />
+          </Field>
+          <Field label={bg ? 'Тежест марка' : 'Weight: brand'}>
+            <NumInput value={pd.tier_weights.brand} min={0} onChange={(v) => proc.setDraft({ ...pd, tier_weights: { ...pd.tier_weights, brand: v || 0 } })} />
+          </Field>
+          <Field label={bg ? 'Тежест качество' : 'Weight: quality'}>
+            <NumInput value={pd.tier_weights.quality} min={0} onChange={(v) => proc.setDraft({ ...pd, tier_weights: { ...pd.tier_weights, quality: v || 0 } })} />
+          </Field>
+          <Field label={bg ? '„Балансиран“: € за ден доставка' : 'Balanced: € per delivery day'} hint={bg ? 'колко струва един ден чакане при сравнение' : 'cost of one waiting day when ranking'}>
+            <NumInput value={pd.balanced_eur_per_day} min={0} onChange={(v) => proc.setDraft({ ...pd, balanced_eur_per_day: v || 0 })} />
+          </Field>
+          <Field label={bg ? 'Кандидати: модули' : 'Candidates: modules'}>
+            <NumInput value={pd.candidate_panels} min={1} onChange={(v) => proc.setDraft({ ...pd, candidate_panels: Math.round(v || 1) })} />
+          </Field>
+          <Field label={bg ? 'Кандидати: инвертори' : 'Candidates: inverters'}>
+            <NumInput value={pd.candidate_inverters} min={1} onChange={(v) => proc.setDraft({ ...pd, candidate_inverters: Math.round(v || 1) })} />
+          </Field>
+          <Field label={bg ? 'Кандидати: батерии' : 'Candidates: batteries'}>
+            <NumInput value={pd.candidate_batteries} min={1} onChange={(v) => proc.setDraft({ ...pd, candidate_batteries: Math.round(v || 1) })} />
+          </Field>
+        </div>
+        <SaveBar dirty={proc.dirty} busy={proc.save.isPending} onSave={() => proc.save.mutate(pd)} />
+      </div>
     </div>
   )
 }

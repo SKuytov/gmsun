@@ -6,6 +6,7 @@ import { downloadFile, errMsg, get } from '@/lib/api'
 import { fmtMoney, fmtNum, useT } from '@/lib/i18n'
 import type { BatterySuggestion, CatalogItem, InverterSuggestion } from '@/lib/types'
 import type { StepCtx } from '../Project'
+import { Proposals } from './Proposals'
 
 /** Datasheet / supplier page links + unverified-specs hint for a catalog item. */
 function ItemLinks({ item }: { item: CatalogItem | undefined }) {
@@ -100,6 +101,9 @@ export function EquipmentStep({ ctx }: { ctx: StepCtx }) {
 
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+      <div className="lg:col-span-2">
+        <Proposals ctx={ctx} />
+      </div>
       {/* panels */}
       <div className="card p-4 lg:col-span-2">
         <h2 className="mb-3">{t('section_modules')}</h2>

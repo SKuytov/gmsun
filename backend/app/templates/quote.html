@@ -3,161 +3,185 @@
 <head>
 <meta charset="utf-8">
 <style>
-  @page { size: A4; margin: 16mm 14mm 18mm 14mm;
-    @bottom-center { content: "{{ company.name }} · Оферта № {{ quote.number }} · стр. " counter(page) " / " counter(pages); font-size: 8pt; color: #777; font-family: 'DejaVu Sans', sans-serif; } }
-  body { font-family: 'DejaVu Sans', 'Liberation Sans', Arial, sans-serif; font-size: 9.5pt; color: #1b1f24; }
-  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #f0a500; padding-bottom: 8px; margin-bottom: 12px; }
-  .header .co { font-size: 8.5pt; color: #444; line-height: 1.35; }
-  .header .co b { font-size: 11pt; color: #1b1f24; }
-  .logo { max-height: 56px; max-width: 180px; }
-  .qno { text-align: right; font-size: 9pt; color: #444; }
-  .qno .num { font-size: 13pt; font-weight: bold; color: #1b1f24; }
-  h1 { text-align: center; letter-spacing: 6px; font-size: 16pt; margin: 10px 0 6px; }
-  .title { text-align: center; font-weight: bold; font-size: 10pt; margin: 0 0 12px; text-transform: uppercase; line-height: 1.4; }
-  .grid { display: flex; gap: 14px; margin-bottom: 12px; }
-  .box { flex: 1; border: 1px solid #ddd; border-radius: 4px; padding: 7px 9px; font-size: 8.8pt; }
-  .box h3 { margin: 0 0 4px; font-size: 8.5pt; text-transform: uppercase; color: #777; letter-spacing: .5px; }
-  .box table td { padding: 1px 6px 1px 0; vertical-align: top; }
-  .box table td:first-child { color: #666; white-space: nowrap; }
-  table.lines { width: 100%; border-collapse: collapse; margin-top: 6px; }
-  table.lines th { background: #1b1f24; color: #fff; font-weight: 600; font-size: 8.5pt; padding: 5px 6px; text-align: left; }
-  table.lines td { padding: 4px 6px; border-bottom: 1px solid #e6e6e6; font-size: 9pt; }
-  table.lines tr.section td { background: #fff4d6; font-weight: bold; border-top: 1px solid #f0a500; }
-  table.lines .r { text-align: right; white-space: nowrap; }
-  table.lines .c { text-align: center; }
-  .totals { width: 55%; margin-left: auto; margin-top: 10px; border-collapse: collapse; page-break-inside: avoid; }
-  .totals td { padding: 4px 8px; font-size: 9.5pt; }
-  .totals td.r { text-align: right; white-space: nowrap; }
-  .totals tr.grand td { font-weight: bold; font-size: 11.5pt; border-top: 2px solid #1b1f24; padding-top: 6px; }
-  .section { margin-top: 12px; page-break-inside: avoid; }
-  .section h3 { font-size: 9.5pt; margin: 0 0 3px; color: #1b1f24; }
-  .section p { margin: 0; white-space: pre-line; font-size: 8.8pt; line-height: 1.45; }
-  .pay { display: flex; gap: 10px; margin-top: 10px; }
-  .pay .card { flex: 1; border: 1px solid #f0a500; border-radius: 4px; padding: 6px 10px; }
-  .pay .card .lbl { font-size: 8pt; color: #777; text-transform: uppercase; }
-  .pay .card .val { font-size: 11.5pt; font-weight: bold; }
-  .sign { display: flex; justify-content: space-between; margin-top: 26px; font-size: 9pt; }
-  .sign .s { width: 45%; border-top: 1px solid #999; padding-top: 4px; text-align: center; }
-  .layout-img { max-width: 100%; max-height: 95mm; display: block; margin: 6px auto; border: 1px solid #ddd; }
-  .kpi { display: flex; gap: 8px; margin: 8px 0 4px; }
-  .kpi div { flex: 1; background: #f6f7f9; border-radius: 4px; padding: 6px 8px; text-align: center; }
-  .kpi .v { font-weight: bold; font-size: 11pt; white-space: nowrap; }
-  .kpi .l { font-size: 7.5pt; color: #777; text-transform: uppercase; }
-  .muted { color: #777; font-size: 8pt; }
+{% include "_doc.css" %}
 </style>
 </head>
 <body>
-<div class="header">
-  <div class="co">
-    {% if logo_uri %}<img class="logo" src="{{ logo_uri }}"><br>{% endif %}
-    <b>{{ company.name }}</b><br>
-    {{ company.address }}<br>
-    {% if company.eik %}ЕИК: {{ company.eik }}{% endif %}{% if company.vat_no %} · ДДС №: {{ company.vat_no }}{% endif %}<br>
-    {% if company.phone %}Тел.: {{ company.phone }} · {% endif %}{{ company.email }}{% if company.website %} · {{ company.website }}{% endif %}
-  </div>
-  <div class="qno">
-    <div class="num">№ {{ quote.number }}{% if quote.version > 1 %} / rev.{{ quote.version }}{% endif %}</div>
-    Дата: {{ date_str }}<br>
-    Валидност: {{ quote.valid_days }} дни (до {{ valid_until }})<br>
-    Проект: {{ project.number }}
-  </div>
-</div>
 
-<h1>О Ф Е Р Т А</h1>
-<div class="title">{{ title }}</div>
-
-<div class="grid">
-  <div class="box">
-    <h3>Клиент</h3>
-    <table>
-      <tr><td>Име:</td><td><b>{{ project.client_name }}</b>{% if project.client_company %} — {{ project.client_company }}{% endif %}</td></tr>
-      {% if project.client_eik %}<tr><td>ЕИК:</td><td>{{ project.client_eik }}</td></tr>{% endif %}
-      {% if project.client_phone %}<tr><td>Тел.:</td><td>{{ project.client_phone }}</td></tr>{% endif %}
-      {% if project.client_email %}<tr><td>E-mail:</td><td>{{ project.client_email }}</td></tr>{% endif %}
-      {% if project.client_address %}<tr><td>Адрес:</td><td>{{ project.client_address }}</td></tr>{% endif %}
-    </table>
+{# ------------------------------------------------------------------ letterhead #}
+<div class="lh">
+  <div class="brand">
+    {% if logo_uri %}<img class="logo" src="{{ logo_uri }}">{% endif %}
+    <div>
+      <div class="co-name">{{ company.name }}</div>
+      <div class="co-sub">{{ company.address }}{% if company.eik %} · ЕИК {{ company.eik }}{% endif %}{% if company.vat_no %} · ДДС № {{ company.vat_no }}{% endif %}</div>
+    </div>
   </div>
-  <div class="box">
-    <h3>Обект</h3>
-    <table>
-      <tr><td>Адрес:</td><td>{{ project.site_address or "—" }}</td></tr>
-      <tr><td>Предназначение:</td><td>{{ purpose_label }}</td></tr>
-      <tr><td>Инсталация:</td><td>{{ "Монофазна" if project.phase == 1 else "Трифазна" }}, присъединена мощност {{ project.connected_power_kw|num }} kW</td></tr>
-      <tr><td>Покрив:</td><td>{{ roof_label }}</td></tr>
-    </table>
+  <div class="contact">
+    {% if company.signatory %}<b>{{ company.signatory }}</b><br>{% endif %}
+    {% if company.phone %}{{ company.phone }}<br>{% endif %}
+    {{ company.email }}{% if company.website %}<br>{{ company.website }}{% endif %}
   </div>
 </div>
 
-<div class="kpi">
-  <div><div class="v">{{ info.get('kwp', 0)|num }} kWp</div><div class="l">Инсталирана мощност</div></div>
-  <div><div class="v">{{ info.get('panel_qty', 0) }} бр.</div><div class="l">Фотоволтаични модули</div></div>
-  <div><div class="v">{{ (info.get('storage_kwh') or 0)|num }} kWh</div><div class="l">Батерийно съхранение</div></div>
-  <div><div class="v">{{ annual_yield|int|thousands }} kWh</div><div class="l">Очакван годишен добив*</div></div>
-  <div><div class="v">{{ quote.execution_days or "—" }} {% if quote.execution_days %}{{ "ден" if quote.execution_days == 1 else "дни" }}{% endif %}</div><div class="l">Срок за изпълнение</div></div>
-</div>
+{# ------------------------------------------------------------------ document head #}
+<div class="dochead">
+  <div>
+    <div class="kind">{{ "Вътрешна калкулация" if internal else "Оферта" }}</div>
+    <div class="no">№ {{ quote.number }}{% if quote.version > 1 %} <span class="muted" style="font-size:11pt;font-weight:500">ревизия {{ quote.version }}</span>{% endif %}</div>
+  </div>
+  <div class="meta">
+    <div><div class="k">Дата</div><div class="v">{{ date_str }}</div></div>
+    <div><div class="k">Валидност</div><div class="v">до {{ valid_until }}</div></div>
+    <div><div class="k">Проект</div><div class="v">{{ project.number }}</div></div>
+  </div>
 </div>
 
-<table class="lines">
+<div class="cols">
+  <div>
+    <div class="lbl">До</div>
+    <div class="addr">
+      <b>{{ project.client_company or project.client_name }}</b><br>
+      {% if project.client_company %}{{ project.client_name }}<br>{% endif %}
+      {% if project.client_eik %}<span class="d">ЕИК {{ project.client_eik }}{% if project.client_vat %} · ДДС № {{ project.client_vat }}{% endif %}</span><br>{% endif %}
+      {% if project.client_address %}<span class="d">{{ project.client_address }}</span><br>{% endif %}
+      {% if project.client_phone %}<span class="d">{{ project.client_phone }}</span>{% endif %}{% if project.client_email %}<span class="d">{% if project.client_phone %} · {% endif %}{{ project.client_email }}</span>{% endif %}
+    </div>
+  </div>
+  <div>
+    <div class="lbl">Обект</div>
+    <div class="addr">
+      <b>{{ project.site_address or "—" }}</b><br>
+      <span class="d">{{ roof_label }} · {{ "монофазно" if project.phase == 1 else "трифазно" }} присъединяване{% if project.connected_power_kw %} {{ project.connected_power_kw|num }} kW{% endif %}</span><br>
+      <span class="d">{{ purpose_label }}</span>
+    </div>
+  </div>
+</div>
+
+<h1 class="title">{{ title }}</h1>
+<div class="accent"></div>
+{% if texts.intro and not internal %}<p class="lead">{{ texts.intro }}</p>{% endif %}
+
+{# ------------------------------------------------------------------ facts #}
+<div class="facts">
+  <div><div class="v">{{ info.get('kwp', 0)|num }}<small>kWp</small></div><div class="k">Инсталирана мощност</div></div>
+  <div><div class="v">{{ info.get('panel_qty', 0) }}<small>бр.</small></div><div class="k">Фотоволтаични модула</div></div>
+  <div><div class="v">{% if info.get('storage_kwh') %}{{ info.get('storage_kwh')|num }}<small>kWh</small>{% else %}—{% endif %}</div><div class="k">Батерийно съхранение</div></div>
+  <div><div class="v">≈ {{ annual_yield|int|thousands }}<small>kWh/г.</small></div><div class="k">Очакван добив*</div></div>
+  <div><div class="v">{% if quote.execution_days %}{{ quote.execution_days }}<small>{{ "ден" if quote.execution_days == 1 else "дни" }}</small>{% else %}—{% endif %}</div><div class="k">Монтаж на обекта</div></div>
+</div>
+
+{# ------------------------------------------------------------------ solution #}
+<h2>Предложено решение</h2>
+<table class="kv">
+  {% for row in solution %}
+  <tr><td>{{ row.k }}</td><td><b>{{ row.v }}</b>{% if row.sub %}<br><span class="small">{{ row.sub }}</span>{% endif %}</td></tr>
+  {% endfor %}
+</table>
+
+{# ------------------------------------------------------------------ price #}
+<div class="pricebox">
+  <div class="big">
+    <div class="k">Обща стойност с ДДС</div>
+    <div class="v">{{ quote.total|money }}<small>{{ quote.currency }}</small></div>
+  </div>
+  <div class="side">
+    {% if quote.discount_amount %}Стойност преди отстъпка <b>{{ quote.subtotal|money }} {{ quote.currency }}</b> · отстъпка {{ quote.discount_pct|num }} % <b>− {{ quote.discount_amount|money }}</b><br>{% endif %}
+    Стойност без ДДС <b>{{ quote.net_total|money }} {{ quote.currency }}</b><br>
+    ДДС {{ quote.vat_pct|num }} % <b>{{ quote.vat_amount|money }} {{ quote.currency }}</b>
+  </div>
+</div>
+{% if not internal %}
+<div class="pay">
+  <div><div class="k">Аванс {{ quote.advance_pct|num }} % при договор</div><div class="v">{{ quote.advance_amount|money }} {{ quote.currency }} <span class="small">{{ "без ДДС" if advance_basis == "net" else "с ДДС" }}</span></div></div>
+  <div><div class="k">Остатък след монтаж и пуск</div><div class="v">{{ quote.balance_amount|money }} {{ quote.currency }} <span class="small">{{ "без ДДС" if advance_basis == "net" else "с ДДС" }}</span></div></div>
+  {% if info.get('lead_time_days') %}<div><div class="k">Доставка на оборудването</div><div class="v">до {{ info.get('lead_time_days') }} работни дни <span class="small">след аванс</span></div></div>{% endif %}
+</div>
+{% endif %}
+
+{% if internal %}
+<h2 style="margin-top:8pt">Вътрешни показатели</h2>
+<div class="facts">
+  <div><div class="v">{{ cost_total|money }}<small>{{ quote.currency }}</small></div><div class="k">Доставна стойност</div></div>
+  <div><div class="v">{{ margin|money }}<small>{{ quote.currency }}</small></div><div class="k">Марж</div></div>
+  <div><div class="v">{{ margin_pct|num }}<small>%</small></div><div class="k">Марж / без ДДС</div></div>
+  <div><div class="v">{{ (quote.net_total / (info.get("kwp") or 1) / 1000)|money }}<small>{{ quote.currency }}/Wp</small></div><div class="k">Цена за ват</div></div>
+  <div><div class="v">{% if info.get('lead_time_days') %}{{ info.get('lead_time_days') }}<small>раб. дни</small>{% else %}—{% endif %}</div><div class="k">Срок на доставка</div></div>
+</div>
+{% if info.get('lead_bottleneck') %}<p class="small" style="margin-top:4pt">Най-бавна позиция: {{ info.get('lead_bottleneck') }}{% if suppliers %} · Доставчици: {% for s, d in suppliers %}{{ s }} ({{ d }} дни){% if not loop.last %}, {% endif %}{% endfor %}{% endif %}</p>{% endif %}
+{% endif %}
+
+{% if texts.closing and not internal %}<p class="lead" style="margin-top:8pt">{{ texts.closing }}</p>{% endif %}
+{% if not internal %}<p class="lead" style="margin-top:6pt">С уважение,<br><b>{{ company.signatory }}</b>, {{ company.name }}</p>{% endif %}
+
+{# ================================================================== page 2: specification #}
+<div class="pb"></div>
+<h2><span class="n">Приложение 1</span>Спецификация на оборудването, материалите и дейностите</h2>
+<p class="small">Всички цени са в {{ quote.currency }}{{ " без ДДС" }}. Количествата са определени по инженерен разчет за обекта и могат да бъдат уточнени при оглед.</p>
+<table class="lines{{ " dense" if internal else "" }}">
   <thead>
     <tr>
-      <th style="width:6%">№</th>
+      <th style="width:4%">№</th>
       <th>Наименование</th>
-      <th class="c" style="width:9%">Мярка</th>
-      <th class="r" style="width:11%">Количество</th>
-      {% if show_unit_prices %}<th class="r" style="width:13%">Ед. цена</th>{% endif %}
-      <th class="r" style="width:14%">Общо, {{ quote.currency }}</th>
+      <th class="c" style="width:7%">Мярка</th>
+      <th class="r" style="width:7%">Кол.</th>
+      {% if show_unit_prices %}<th class="r" style="width:{{ 10 if internal else 12 }}%">Ед. цена</th>{% endif %}
+      <th class="r" style="width:{{ 11 if internal else 14 }}%">Стойност</th>
+      {% if internal %}<th class="r" style="width:11%">Доставна</th><th class="r" style="width:9%">Марж</th><th class="c" style="width:6%">Срок</th>{% endif %}
     </tr>
   </thead>
   <tbody>
   {% for sec in sections %}
-    <tr class="section"><td>{{ sec.roman }}</td><td colspan="{{ 4 if show_unit_prices else 3 }}">{{ sec.title }}</td><td class="r">{{ sec.total|money }}</td></tr>
+    <tr class="section">
+      <td class="roman">{{ sec.roman }}</td>
+      <td colspan="{{ 3 if show_unit_prices else 2 }}">{{ sec.title }}</td>
+      <td class="r">{{ sec.total|money }}</td>
+      {% if internal %}<td class="r">{{ sec.cost|money }}</td><td class="r">{{ (sec.total - sec.cost)|money }}</td><td></td>{% endif %}
+    </tr>
     {% for ln in sec.lines %}
     <tr>
-      <td>{{ loop.index }}</td>
-      <td>{{ ln.name }}</td>
+      <td class="idx">{{ loop.index }}</td>
+      <td>{{ ln.name }}{% if internal and ln.supplier %}<span class="sub">{{ ln.supplier }}{% if ln.sku %} · {{ ln.sku }}{% endif %}</span>{% endif %}</td>
       <td class="c">{{ ln.unit }}</td>
       <td class="r">{{ ln.qty|num }}</td>
       {% if show_unit_prices %}<td class="r">{{ ln.unit_price|money }}</td>{% endif %}
       <td class="r">{% if show_unit_prices %}{{ ln.total|money }}{% endif %}</td>
+      {% if internal %}<td class="r">{{ ln.cost|money }}</td><td class="r">{{ (ln.total - ln.cost)|money }}</td><td class="c">{{ ln.lead if ln.lead is not none else "" }}</td>{% endif %}
     </tr>
     {% endfor %}
   {% endfor %}
   </tbody>
 </table>
 
-<div style="page-break-inside: avoid;">
+<div class="totals-wrap">
 <table class="totals">
   {% if quote.discount_amount %}
-  <tr><td>Сума:</td><td class="r">{{ quote.subtotal|money }} {{ quote.currency }}</td></tr>
-  <tr><td>Отстъпка {{ quote.discount_pct|num }} %:</td><td class="r">− {{ quote.discount_amount|money }} {{ quote.currency }}</td></tr>
+  <tr class="sub"><td>Сума</td><td class="r">{{ quote.subtotal|money }} {{ quote.currency }}</td></tr>
+  <tr class="sub"><td>Отстъпка {{ quote.discount_pct|num }} %</td><td class="r">− {{ quote.discount_amount|money }} {{ quote.currency }}</td></tr>
   {% endif %}
-  <tr><td>Общо без ДДС:</td><td class="r">{{ quote.net_total|money }} {{ quote.currency }}</td></tr>
-  <tr><td>ДДС {{ quote.vat_pct|num }} %:</td><td class="r">{{ quote.vat_amount|money }} {{ quote.currency }}</td></tr>
-  <tr class="grand"><td>Общо с ДДС:</td><td class="r">{{ quote.total|money }} {{ quote.currency }}</td></tr>
+  <tr class="sub"><td>Общо без ДДС</td><td class="r">{{ quote.net_total|money }} {{ quote.currency }}</td></tr>
+  <tr class="sub"><td>ДДС {{ quote.vat_pct|num }} %</td><td class="r">{{ quote.vat_amount|money }} {{ quote.currency }}</td></tr>
+  <tr class="grand"><td>Общо с ДДС</td><td class="r">{{ quote.total|money }} {{ quote.currency }}</td></tr>
 </table>
-
-<div class="pay">
-  <div class="card"><div class="lbl">Аванс {{ quote.advance_pct|num }} %</div><div class="val">{{ quote.advance_amount|money }} {{ quote.currency }}</div><div class="muted">{{ "без ДДС" if advance_basis == "net" else "с ДДС" }}</div></div>
-  <div class="card"><div class="lbl">Остатък след монтаж</div><div class="val">{{ quote.balance_amount|money }} {{ quote.currency }}</div><div class="muted">{{ "без ДДС" if advance_basis == "net" else "с ДДС" }}</div></div>
-  <div class="card"><div class="lbl">Срок за изпълнение</div><div class="val">{% if quote.execution_days %}{{ quote.execution_days }} {{ "работен ден" if quote.execution_days == 1 else "работни дни" }}{% else %}по договаряне{% endif %}</div><div class="muted">{% if quote.workers %}{{ quote.workers }} монтажници{% endif %}</div></div>
 </div>
 
 {% if layout_images %}
-<div class="section">
-  <h3>Разположение на модулите</h3>
-  {% for im in layout_images %}<img class="layout-img" src="{{ im }}">{% endfor %}
-</div>
+<h2><span class="n">Приложение 2</span>Разположение на модулите</h2>
+{% for im in layout_images %}<div class="fig"><img src="{{ im }}"></div>{% endfor %}
 {% endif %}
 
-{% if texts.payment %}<div class="section"><h3>Условия на плащане:</h3><p>{{ texts.payment }}</p></div>{% endif %}
-{% if texts.warranty %}<div class="section"><h3>Гаранционни условия:</h3><p>{{ texts.warranty }}</p></div>{% endif %}
-{% if texts.notes %}<div class="section"><h3>Забележки:</h3><p>{{ texts.notes }}</p></div>{% endif %}
-{% if quote.notes %}<div class="section"><h3>Допълнително:</h3><p>{{ quote.notes }}</p></div>{% endif %}
-<p class="muted">* Ориентировъчен добив при специфичен добив {{ specific_yield }} kWh/kWp годишно и зададена ориентация; реалният добив зависи от засенчване и метеорологичните условия.</p>
+<h2><span class="n">{{ "Приложение 3" if layout_images else "Приложение 2" }}</span>Условия</h2>
+<div class="grid">
+  {% if texts.payment %}<div class="terms"><h3>Плащане</h3><p>{{ texts.payment }}</p></div>{% endif %}
+  {% if texts.warranty %}<div class="terms"><h3>Гаранции</h3><p>{{ texts.warranty }}</p></div>{% endif %}
+</div>
+{% if texts.notes %}<div class="terms" style="margin-top:8pt"><h3>Забележки</h3><p>{{ texts.notes }}</p></div>{% endif %}
+{% if quote.notes %}<div class="terms" style="margin-top:8pt"><h3>Допълнително</h3><p>{{ quote.notes }}</p></div>{% endif %}
+<p class="note">* Ориентировъчен годишен добив при специфичен добив {{ specific_yield }} kWh/kWp и зададената ориентация на модулите. Реалният добив зависи от засенчване, метеорологични условия и профил на потребление.</p>
 
 <div class="sign">
-  <div class="s">Дата: {{ date_str }}</div>
-  <div class="s">Съставил офертата: {{ company.signatory }}</div>
+  <div>За изпълнителя<b>{{ company.signatory }}</b>{{ company.name }}</div>
+  <div>За възложителя<b>{{ project.client_name }}</b>{{ project.client_company or "" }}</div>
 </div>
 </body>
 </html>

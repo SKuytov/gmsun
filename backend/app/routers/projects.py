@@ -8,6 +8,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import Response
+from pydantic import BaseModel
 from PIL import Image, ImageOps
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -18,6 +19,7 @@ from ..db import get_db
 from ..models import CatalogItem, Layout, Project, Quote, RoofTypeConfig, User
 from ..schemas import LayoutIn, LayoutOut, ProjectCreate, ProjectListItem, ProjectOut, ProjectUpdate, RoofDetectOut
 from ..services import layout_engine as le
+from ..services import proposals
 from ..services.pricing import active_layout_summary
 from ..services.roof_detect import detect_obstacles, detect_roof
 
@@ -85,6 +87,37 @@ def update_project(pid: int, body: ProjectUpdate, db: Session = Depends(get_db),
     p = _get(db, pid)
     for k, v in body.model_dump(exclude_unset=True).items():
         setattr(p, k, v)
+    db.commit()
+    db.refresh(p)
+    return _project_out(db, p)
+
+
+class ProposalsIn(BaseModel):
+    strategies: list[str] | None = None
+    selections: dict[str, Any] | None = None  # base selections (defaults to project.params.selections)
+
+
+class ProposalApplyIn(BaseModel):
+    selections: dict[str, Any]
+    strategy: str | None = None
+
+
+@router.post("/{pid}/proposals")
+def project_proposals(pid: int, body: ProposalsIn | None = None, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    """Build and rank complete configurations (Economy / Balanced / Premium / Fastest delivery) for the project."""
+    p = _get(db, pid)
+    body = body or ProposalsIn()
+    return proposals.generate(db, p, body.strategies, body.selections)
+
+
+@router.post("/{pid}/proposals/apply", response_model=ProjectOut)
+def apply_proposal(pid: int, body: ProposalApplyIn, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    """Store a proposal's selections as the project's working selections (the Equipment/Materials/Quote steps use them)."""
+    p = _get(db, pid)
+    sel = {k: v for k, v in body.selections.items() if not k.startswith("_")}
+    if body.strategy:
+        sel["strategy"] = body.strategy
+    p.params = {**(p.params or {}), "selections": sel}
     db.commit()
     db.refresh(p)
     return _project_out(db, p)

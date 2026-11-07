@@ -297,6 +297,14 @@ def seed(db: Session) -> None:
     if supplier_items:
         upsert_items(db, supplier_items, overwrite_prices=False, overwrite_specs=False)
     by_name = {c.name: c for c in db.query(CatalogItem).all()}
+    # Procurement backfill: derive the supplier for items that have none (supplier snapshot / Aerocompact).
+    from .services.procurement import supplier_of
+
+    for c in by_name.values():
+        if not c.supplier:
+            sup = supplier_of(c)
+            if sup:
+                c.supplier = sup
     for r in db.query(MountingRule).filter(MountingRule.active.is_(True)).all():
         if (r.roof_type, r.name) in RETIRED_RULES:
             r.active = False

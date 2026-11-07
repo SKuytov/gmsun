@@ -53,6 +53,7 @@ def render_quote_html(db: Session, quote: Quote, mode: str = "client") -> str:
     show_unit = mode == "internal" or bool(pricing.get("show_unit_prices_client", False))
 
     roof = db.get(RoofTypeConfig, project.roof_type)
+    internal = mode == "internal"
     collapse = mode == "client" and bool(pricing.get("client_pdf_collapse_construction", True))
     sections = []
     idx = 0
@@ -61,12 +62,25 @@ def render_quote_html(db: Session, quote: Quote, mode: str = "client") -> str:
         if not lns:
             continue
         total = sum(l.total for l in lns)
+        cost = sum(float(l.purchase_price or 0) * float(l.qty or 0) for l in lns)
+        rows = [_line_view(l) for l in lns]
         if code == "construction" and collapse and len(lns) > 1:
-            roof_name = roof.label_bg.lower() if roof else project.roof_type
-            lns = [SimpleNamespace(name=f"Модулна алуминиева конструкция за закрепване на фотоволтаични модули — {roof_name}", unit="компл.", qty=1, unit_price=total, total=total)]
-            title_bg = "Част конструкция (алуминиева модулна)"
-        sections.append({"roman": ROMAN[idx], "title": title_bg, "total": total, "lines": lns})
+            roof_name = roof_short(roof, project)
+            rows = [SimpleNamespace(name=f"Монтажна система Aerocompact за {roof_name[0].lower() + roof_name[1:]} — алуминиеви профили, скоби и крепежни елементи, комплект", unit="компл.", qty=1, unit_price=total, total=total, cost=cost, lead=None, supplier=None, sku=None)]
+            title_bg = "Монтажна конструкция"
+        sections.append({"roman": ROMAN[idx], "title": title_bg, "total": total, "cost": cost, "lines": rows})
         idx += 1
+    cost_total = sum(s["cost"] for s in sections)
+    margin = float(quote.net_total or 0) - cost_total
+    margin_pct = (margin / float(quote.net_total) * 100) if quote.net_total else 0.0
+    sup_days: dict[str, int] = {}
+    for l in quote.lines:
+        if l.hidden:
+            continue
+        m = l.meta or {}
+        if m.get("supplier"):
+            sup_days[m["supplier"]] = max(sup_days.get(m["supplier"], 0), int(m.get("lead_time_days") or 0))
+    suppliers = sorted(sup_days.items(), key=lambda kv: -kv[1])
 
     logo_uri = None
     if company.get("logo_path"):
@@ -81,6 +95,7 @@ def render_quote_html(db: Session, quote: Quote, mode: str = "client") -> str:
         tilt, az = lay.tilt_deg, lay.azimuth_deg
     kwp = float(info.get("kwp") or 0)
     annual_yield = estimate_yield(kwp, float(pricing.get("specific_yield_kwh_per_kwp", 1250)), az, tilt)
+    solution = _solution_rows(db, quote, info, roof, annual_yield, project)
     created = quote.created_at.date() if quote.created_at else date.today()
 
     env = Environment(loader=FileSystemLoader(str(TEMPLATES)), autoescape=select_autoescape(["html"]))
@@ -102,23 +117,103 @@ def render_quote_html(db: Session, quote: Quote, mode: str = "client") -> str:
         date_str=created.strftime("%d.%m.%Y г."),
         valid_until=(created + timedelta(days=quote.valid_days or 10)).strftime("%d.%m.%Y"),
         purpose_label=PURPOSE.get(project.purpose, project.purpose),
-        roof_label=roof.label_bg if roof else project.roof_type,
+        roof_label=roof_short(roof, project),
         title=title,
         annual_yield=annual_yield,
         specific_yield=pricing.get("specific_yield_kwh_per_kwp", 1250),
         advance_basis=(quote.selections or {}).get("advance_basis", "net"),
+        internal=internal,
+        doc_kind="вътрешна калкулация" if internal else "оферта",
+        solution=solution,
+        cost_total=cost_total,
+        margin=margin,
+        margin_pct=margin_pct,
+        suppliers=suppliers,
     )
 
 
+def roof_short(roof, project) -> str:
+    """Short roof label: 'LT ламарина — CompactMETAL TL25/TL38 ...' -> 'LT ламарина'."""
+    lab = roof.label_bg if roof else str(project.roof_type)
+    return lab.split(" — ")[0].split(" (")[0].strip()
+
+
+def _line_view(l) -> SimpleNamespace:
+    m = l.meta or {}
+    return SimpleNamespace(
+        name=l.name, unit=l.unit, qty=l.qty, unit_price=l.unit_price, total=l.total,
+        cost=float(l.purchase_price or 0) * float(l.qty or 0),
+        lead=m.get("lead_time_days"), supplier=m.get("supplier"), sku=m.get("supplier_sku"),
+    )
+
+
+def _fmt_specs(it, keys: list[tuple[str, str, str]]) -> str:
+    sp = it.specs or {}
+    parts = []
+    for key, label, unit in keys:
+        v = sp.get(key)
+        if v in (None, "", 0):
+            continue
+        parts.append(f"{label} {_num(v) if isinstance(v, (int, float)) else v}{unit}")
+    return " · ".join(parts)
+
+
+def _solution_rows(db: Session, quote: Quote, info: dict, roof, annual_yield: float, project) -> list[dict]:
+    """Human-readable summary of the offered system for page one of the quote."""
+    from ..models import CatalogItem
+
+    sel = quote.selections or {}
+    rows: list[dict] = []
+
+    def item(iid):
+        return db.get(CatalogItem, int(iid)) if iid else None
+
+    def label(it) -> str:
+        man = (it.manufacturer or "").strip()
+        if man and not it.name.lower().startswith(man.lower()):
+            return f"{man} {it.name}"
+        return it.name
+
+    panel = item(sel.get("panel_item_id"))
+    qty = int(info.get("panel_qty") or 0)
+    if panel:
+        wp = (panel.specs or {}).get("wp")
+        rows.append({"k": "Фотоволтаични модули", "v": f"{qty} × {label(panel)}",
+                     "sub": _fmt_specs(panel, [("wp", "", " Wp"), ("efficiency", "КПД", " %"), ("bifaciality", "бифациалност", " %")]) + (f" · гаранция {panel.warranty}" if panel.warranty else "")})
+    inv = item(sel.get("inverter_item_id"))
+    if inv:
+        iq = int(sel.get("inverter_qty") or 1)
+        sp = inv.specs or {}
+        kind = "Хибриден инвертор" if sp.get("hybrid") else "Мрежов инвертор"
+        rows.append({"k": kind, "v": (f"{iq} × " if iq > 1 else "") + label(inv),
+                     "sub": _fmt_specs(inv, [("ac_power_kw", "", " kW AC"), ("phases", "", " фази"), ("mppt_count", "", " MPPT"), ("max_pv_kw", "макс. PV", " kWp")]) + (f" · гаранция {inv.warranty}" if inv.warranty else "")})
+    bat = item(sel.get("battery_item_id"))
+    bq = int(sel.get("battery_qty") or 0)
+    if bat and bq:
+        sp = bat.specs or {}
+        rows.append({"k": "Батерийно съхранение", "v": f"{bq} × {label(bat)}" + (f" — общо {_num(info.get('storage_kwh'))} kWh" if info.get("storage_kwh") else ""),
+                     "sub": _fmt_specs(bat, [("kwh", "", " kWh/модул"), ("chemistry", "", ""), ("cycles", "", " цикъла")]) + (f" · гаранция {bat.warranty}" if bat.warranty else "")})
+    else:
+        rows.append({"k": "Батерийно съхранение", "v": "Не е включено", "sub": "Възможно е добавяне на по-късен етап при хибриден инвертор." if (inv and (inv.specs or {}).get("hybrid")) else ""})
+    ms = info.get("mounting_stats") or {}
+    systems = sorted({str((l.catalog_item.specs or {}).get("system")) for l in quote.lines if l.section == "construction" and l.catalog_item and (l.catalog_item.specs or {}).get("system")})
+    mount_v = "Aerocompact " + ", ".join(systems) if systems else "Алуминиева модулна конструкция"
+    rows.append({"k": "Монтажна система", "v": mount_v,
+                 "sub": roof_short(roof, project) + (f" · {ms.get('rows')} реда" if ms.get("rows") else "") + (f" · наклон {_num(ms.get('tilt_deg'))}°" if ms.get("tilt_deg") else "")})
+    st = info.get("strings") or {}
+    if st.get("strings"):
+        rows.append({"k": "Електрическа част", "v": f"{st['strings']} стринга × {st.get('modules_per_string')} модула на {st.get('mppts') or '—'} MPPT", "sub": "DC/AC защити, кабели и заземяване — подробно в спецификацията"})
+    return rows
+
+
 def _default_title(info: dict, project) -> str:
-    kw = float(info.get("kwp") or 0) * 1000
+    kwp = float(info.get("kwp") or 0)
     storage = float(info.get("storage_kwh") or 0)
-    t = f"ДОСТАВКА И МОНТАЖ НА ОБОРУДВАНЕ ЗА 1 БРОЙ ФвЕЦ {kw:,.0f} W".replace(",", " ")
-    t += ", НА ПОКРИВ НА СЪЩЕСТВУВАЩА СГРАДА" if not str(project.roof_type).startswith("ground") else ", НАЗЕМНА"
+    where = "наземна" if str(project.roof_type).startswith("ground") else "покривна"
+    t = f"Фотоволтаична централа {_num(round(kwp, 2))} kWp, {where}"
     if storage:
-        t += f" И БАТЕРИЙНА СИСТЕМА ЗА СЪХРАНЕНИЕ С КАПАЦИТЕТ {storage:g} kWh"
-    if project.site_address:
-        t += f", {project.site_address}"
+        t += f", с батерийно съхранение {_num(storage)} kWh"
+    t += " — доставка, монтаж и пускане в експлоатация"
     return t
 
 

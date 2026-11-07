@@ -11,6 +11,7 @@ from ..models import Project, Quote, QuoteLine, User
 from ..schemas import QuoteCreate, QuoteLineIn, QuoteLineUpdate, QuoteOut, QuoteUpdate
 from ..services import pricing
 from ..services.pdf import render_quote_html, render_quote_pdf
+from ..services import procurement, workbooks
 from ..services.settings import get_setting
 
 router = APIRouter(tags=["quotes"])
@@ -225,75 +226,46 @@ def quote_techfile_html(qid: int, db: Session = Depends(get_db), _: User = Depen
     return render_techfile_html(db, _quote(db, qid))
 
 
+XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
 @router.get("/quotes/{qid}/xlsx")
-def quote_xlsx(qid: int, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
-    """KSS-style Excel export (same structure as the original quote workbook)."""
-    import io
-
-    from openpyxl import Workbook
-    from openpyxl.styles import Alignment, Font
-
+def quote_xlsx(qid: int, internal: bool = False, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    """КСС workbook. ``internal=true`` adds purchase/margin columns plus the purchase list and supplier plan sheets."""
     q = _quote(db, qid)
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "KSS"
-    ws["F1"] = f"№ {q.number}"
-    ws["A2"] = "О Ф Е Р Т А"
-    ws["A2"].font = Font(bold=True, size=14)
-    ws["A4"] = q.title or ""
-    ws.append([])
-    ws.append([])
-    ws.append([])
-    ws.append(["№", "Наименование", "Мярка", "Количество", "Ед. цена", "Общо"])
-    for c in ws[8]:
-        c.font = Font(bold=True)
-    roman = ["I", "II", "III", "IV", "V", "VI"]
-    i = 0
-    for code, title, _ in pricing.SECTIONS:
-        lns = [l for l in q.lines if l.section == code and not l.hidden]
-        if not lns:
-            continue
-        ws.append([roman[i], title, None, None, None, round(sum(l.total for l in lns), 2)])
-        ws[ws.max_row][1].font = Font(bold=True)
-        for j, l in enumerate(lns, 1):
-            ws.append([j, l.name, l.unit, l.qty, l.unit_price, l.total])
-        i += 1
-    ws.append([])
-    ws.append([None, None, None, None, "Общо без ДДС:", q.net_total])
-    ws.append([None, None, None, None, f"ДДС {q.vat_pct:g}%:", q.vat_amount])
-    ws.append([None, None, None, None, "Общо с ДДС:", q.total])
-    ws.append([])
-    ws.append([None, "Условия на плащане:"])
-    ws.append([None, f"1. Аванс {q.advance_pct:g}%: {q.advance_amount:,.2f} € без ДДС"])
-    ws.append([None, f"2. След монтаж: {q.balance_amount:,.2f} € без ДДС"])
-    ws.column_dimensions["B"].width = 70
-    for col in "CDEF":
-        ws.column_dimensions[col].width = 14
-    ws["A4"].alignment = Alignment(wrap_text=True)
-    # ---- ordering sheet: material lines grouped by manufacturer with SKU and purchase price
-    wo = wb.create_sheet("Поръчка")
-    wo.append(["Доставчик / производител", "Код", "Наименование", "Мярка", "Количество", "Доставна цена", "Общо доставна", "Раздел", "Правило"])
-    for c in wo[1]:
-        c.font = Font(bold=True)
-    rows = []
-    for l in q.lines:
-        if l.hidden or l.section in ("labor", "other") or (l.catalog_item_id is None and not (l.meta or {}).get("role")):
-            continue
-        ci = l.catalog_item
-        mf = (ci.manufacturer if ci and ci.manufacturer else "Други / местна доставка")
-        meta = l.meta or {}
-        rule = f"{meta.get('basis')} × {meta.get('factor')}" if meta.get("basis") else (meta.get("role") or ("ръчно" if l.locked else ""))
-        rows.append([mf, ci.sku if ci and ci.sku else "", ci.name if ci else l.name, l.unit, l.qty, l.purchase_price or 0, round(l.qty * (l.purchase_price or 0), 2), l.section, rule])
-    for r in sorted(rows, key=lambda r: (r[0], r[7], r[2])):
-        wo.append(r)
-    wo.column_dimensions["A"].width = 26
-    wo.column_dimensions["C"].width = 70
-    for col in "BDEFGHI":
-        wo.column_dimensions[col].width = 14
-    buf = io.BytesIO()
-    wb.save(buf)
-    return Response(
-        buf.getvalue(),
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename=KSS_{q.number}_v{q.version}.xlsx"},
-    )
+    data = workbooks.quote_workbook(db, q, internal=internal)
+    name = f"{'KSS_vatreshna' if internal else 'KSS'}_{q.number}_v{q.version}.xlsx"
+    return Response(data, media_type=XLSX_MIME, headers={"Content-Disposition": f"attachment; filename={name}"})
+
+
+@router.get("/quotes/{qid}/rfq")
+def quote_rfq_summary(qid: int, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    """Suppliers involved in the quote with line counts, value and lead time (for the UI)."""
+    q = _quote(db, qid)
+    scfg = get_setting(db, "suppliers")
+    smap = procurement.supplier_map(scfg)
+    out = []
+    for sup, rows in workbooks.rfq_groups(db, q).items():
+        s = smap.get(sup.lower(), {})
+        out.append({
+            "supplier": sup, "lines": len(rows), "value": round(sum(r["qty"] * r["price"] for r in rows), 2),
+            "lead_time_days": max((r["lead"] or 0) for r in rows), "email": s.get("email"), "contact": s.get("contact"),
+            "unpriced": sum(1 for r in rows if not r["price"]),
+        })
+    return sorted(out, key=lambda x: -x["lead_time_days"])
+
+
+@router.get("/quotes/{qid}/rfq.xlsx")
+def quote_rfq_xlsx(qid: int, supplier: str | None = None, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    """Request-for-quotation workbook: summary sheet + one sheet per supplier (or a single supplier)."""
+    q = _quote(db, qid)
+    data = workbooks.rfq_workbook(db, q, supplier)
+    suffix = f"_{workbooks._safe(supplier)}" if supplier else ""
+    return Response(data, media_type=XLSX_MIME, headers={"Content-Disposition": f"attachment; filename=Zapitvane_{q.number}{suffix}.xlsx"})
+
+
+@router.get("/quotes/{qid}/rfq.zip")
+def quote_rfq_zip(qid: int, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    """One RFQ workbook per supplier, zipped – ready to attach to separate e-mails."""
+    q = _quote(db, qid)
+    return Response(workbooks.rfq_zip(db, q), media_type="application/zip", headers={"Content-Disposition": f"attachment; filename=Zapitvania_{q.number}.zip"})

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from ..auth import get_current_user, require_admin
 from ..db import get_db
-from ..models import CATEGORIES, MOUNTING_BASES, CatalogItem, LaborOption, MountingRule, RoofTypeConfig, User
+from ..models import CATEGORIES, MOUNTING_BASES, CatalogItem, LaborOption, MountingRule, RoofTypeConfig, User, TIERS
 from ..schemas import (
     CatalogItemCreate,
     CatalogItemOut,
@@ -19,21 +19,35 @@ from ..schemas import (
     RoofTypeOut,
 )
 from ..services.excel import export_catalog_xlsx, import_catalog_xlsx
+from ..services import procurement
 from ..services.settings import get_setting
 
 router = APIRouter(prefix="/catalog", tags=["catalog"])
 
 
 def _out(db: Session, it: CatalogItem) -> CatalogItemOut:
+    return _outs(db, [it])[0]
+
+
+def _outs(db: Session, items: list[CatalogItem]) -> list[CatalogItemOut]:
     markup = float(get_setting(db, "pricing").get("default_markup_pct", 0))
-    o = CatalogItemOut.model_validate(it)
-    o.effective_price = it.price_for(markup)
-    return o
+    eff = procurement.effective(db, items)
+    out: list[CatalogItemOut] = []
+    for it in items:
+        o = CatalogItemOut.model_validate(it)
+        o.effective_price = it.price_for(markup)
+        e = eff.get(it.id, {})
+        o.effective_lead_time_days = e.get("lead_time_days")
+        o.effective_tier = e.get("tier")
+        if not o.supplier:
+            o.supplier = e.get("supplier")
+        out.append(o)
+    return out
 
 
 @router.get("/meta")
 def meta():
-    return {"categories": CATEGORIES, "mounting_bases": MOUNTING_BASES}
+    return {"categories": CATEGORIES, "mounting_bases": MOUNTING_BASES, "tiers": list(TIERS)}
 
 
 @router.get("/items", response_model=list[CatalogItemOut])
@@ -52,13 +66,15 @@ def list_items(
     if q:
         qry = qry.filter(CatalogItem.name.ilike(f"%{q}%"))
     items = qry.order_by(CatalogItem.category, CatalogItem.sort_order, CatalogItem.name).all()
-    return [_out(db, i) for i in items]
+    return _outs(db, items)
 
 
 @router.post("/items", response_model=CatalogItemOut, status_code=201)
 def create_item(body: CatalogItemCreate, db: Session = Depends(get_db), _: User = Depends(require_admin)):
     if body.category not in CATEGORIES:
         raise HTTPException(400, "Unknown category")
+    if body.tier and body.tier not in TIERS:
+        raise HTTPException(400, "Unknown tier")
     it = CatalogItem(**body.model_dump())
     db.add(it)
     db.commit()
@@ -79,7 +95,10 @@ def update_item(item_id: int, body: CatalogItemUpdate, db: Session = Depends(get
     it = db.get(CatalogItem, item_id)
     if not it:
         raise HTTPException(404)
-    for k, v in body.model_dump(exclude_unset=True).items():
+    data = body.model_dump(exclude_unset=True)
+    if data.get("tier") and data["tier"] not in TIERS:
+        raise HTTPException(400, "Unknown tier")
+    for k, v in data.items():
         setattr(it, k, v)
     db.commit()
     db.refresh(it)
