@@ -34,8 +34,12 @@ def inverters(
     _: User = Depends(get_current_user),
 ):
     pr = get_setting(db, "pricing")
-    res = sizing.suggest_inverters(db, phase, connected_kw, pv_kwp, voltage_class, hybrid, float(pr.get("default_markup_pct", 0)), float(pr.get("dc_ac_ratio_max", 1.35)))
-    return [InverterSuggestion(item=_item_out(db, r["item"]), score=r["score"], reasons=r["reasons"], warnings=r["warnings"]) for r in res]
+    proc = get_setting(db, "procurement")
+    res = sizing.suggest_inverters(
+        db, phase, connected_kw, pv_kwp, voltage_class, hybrid, float(pr.get("default_markup_pct", 0)), float(pr.get("dc_ac_ratio_max", 1.35)),
+        max_units=int(proc.get("max_parallel_inverters", 6) or 6), min_parallel_unit_kw=float(proc.get("min_parallel_unit_kw", 8) or 8),
+    )
+    return [InverterSuggestion(item=_item_out(db, r["item"]), qty=r["qty"], ac_total_kw=r["ac_total_kw"], ratio=r["ratio"], score=r["score"], reasons=r["reasons"], warnings=r["warnings"]) for r in res]
 
 
 @router.get("/batteries", response_model=list[BatterySuggestion])
@@ -53,13 +57,14 @@ def batteries(
 
 
 @router.get("/strings")
-def strings(panel_id: int, inverter_id: int, n_panels: int, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
-    """Quick string check (single plane) using the temperature-corrected engine."""
+def strings(panel_id: int, inverter_id: int, n_panels: int, n_inverters: int = 1, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    """Quick string check (single plane) using the temperature-corrected engine; ``n_inverters`` splits the array over
+    identical inverters in parallel."""
     from ..services import engineering
 
     pr = get_setting(db, "pricing")
-    sd = engineering.string_design(db.get(CatalogItem, panel_id), db.get(CatalogItem, inverter_id), [{"name": "", "modules": n_panels}], {"design_tmin_c": pr.get("design_tmin_c", -20), "design_tcell_max_c": pr.get("design_tcell_max_c", 70)})
-    return {"strings": sd.get("count", 0), "modules_per_string": sd.get("modules_per_string", 0), "mppts": sd.get("mppts", 0), "warnings": sd.get("warnings", []), "detail": sd}
+    sd = engineering.string_design(db.get(CatalogItem, panel_id), db.get(CatalogItem, inverter_id), [{"name": "", "modules": n_panels}], {"design_tmin_c": pr.get("design_tmin_c", -20), "design_tcell_max_c": pr.get("design_tcell_max_c", 70), "voc_margin": pr.get("voc_margin", engineering.VOC_MARGIN)}, n_inverters=max(1, n_inverters))
+    return {"strings": sd.get("count", 0), "modules_per_string": sd.get("modules_per_string", 0), "mppts": sd.get("mppts", 0), "inverters": sd.get("inverters", 1), "per_inverter": sd.get("per_inverter") or [], "warnings": sd.get("warnings", []), "detail": sd}
 
 
 @router.post("/projects/{pid}/design")
@@ -79,10 +84,14 @@ def project_design(pid: int, body: dict[str, Any] | None = None, db: Session = D
     panel_qty = int(sel.get("panel_qty") or 0)
     if sel.get("use_layout", True) and layout_sum["count"] > 0:
         panel_qty = layout_sum["count"]
+        limit = int(sel.get("panel_limit") or 0)
+        if 0 < limit < panel_qty:
+            panel_qty = limit
     inverter = pricing_svc._item(db, sel.get("inverter_item_id"))
     battery = pricing_svc._item(db, sel.get("battery_item_id"))
     bq = int(sel.get("battery_qty") or 1) if battery else 0
-    d = pricing_svc._design(db, project, sel, pr, panel, inverter, battery, bq, panel_qty, layout_sum)
+    inv_qty = max(1, int(sel.get("inverter_qty") or 1)) if inverter else 1
+    d = pricing_svc._design(db, project, sel, pr, panel, inverter, battery, bq, panel_qty, layout_sum, inverter_qty=inv_qty)
     # resolve catalog items for the preview
     from ..services import engineering
 

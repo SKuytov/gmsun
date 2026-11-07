@@ -125,6 +125,8 @@ def layout_svg(lay: Any, strings: list[dict[str, Any]], roof: RoofTypeConfig | N
 def sld_svg(design: dict[str, Any], inverter: CatalogItem | None, battery: CatalogItem | None, phase: int) -> str:
     strings = (design.get("strings") or {}).get("strings") or []
     dc, ac, bat = design.get("dc") or {}, design.get("ac") or {}, design.get("battery") or {}
+    if int(design.get("inverters") or 1) > 1:
+        return _sld_multi(design, inverter, battery, phase)
     n = max(len(strings), 1)
     row_h = 44
     top = 30
@@ -193,6 +195,83 @@ def sld_svg(design: dict[str, Any], inverter: CatalogItem | None, battery: Catal
     gy = h - 28
     o.append(f'<line x1="{x_inv + 20}" y1="{gy}" x2="{x_ac + 130}" y2="{gy}" stroke="#27ae60" stroke-width="1.6" stroke-dasharray="5 3"/>')
     o.append(f'<text x="{x_inv + 20}" y="{gy - 5}" font-size="8.5" fill="#27ae60">PE / изравняване на потенциалите — конструкция 6 mm², инвертор {_esc((design.get("grounding") or {}).get("pe_mm2", ""))} mm²</text>')
+    o.append("</svg>")
+    return "".join(o)
+
+
+def _sld_multi(design: dict[str, Any], inverter: CatalogItem | None, battery: CatalogItem | None, phase: int) -> str:
+    """Single-line diagram for N parallel inverters: strings → inverter k → AC combiner → main board → grid."""
+    strings = (design.get("strings") or {}).get("strings") or []
+    dc, ac, bat = design.get("dc") or {}, design.get("ac") or {}, design.get("battery") or {}
+    n_inv = int(design.get("inverters") or 1)
+    groups: dict[int, list[dict[str, Any]]] = {}
+    for st in strings:
+        groups.setdefault(int(st.get("inverter") or 1), []).append(st)
+    row_h, top, W = 40, 30, 900
+    n_rows = max(len(strings), n_inv)
+    h = max(top + n_rows * row_h + 150, 360)
+    o: list[str] = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{h}" viewBox="0 0 {W} {h}" font-family="DejaVu Sans, sans-serif" font-size="10">', f'<rect width="{W}" height="{h}" fill="#fff"/>']
+
+    def box(x: float, y: float, w: float, hh: float, title: str, lines: list[str], stroke: str = "#1b1f24") -> None:
+        o.append(f'<rect x="{x}" y="{y}" width="{w}" height="{hh}" rx="4" fill="#f6f7f9" stroke="{stroke}" stroke-width="1.2"/>')
+        o.append(f'<text x="{x + w / 2}" y="{y + 13}" text-anchor="middle" font-weight="bold" font-size="9.5">{_esc(title)}</text>')
+        for i, t in enumerate(lines):
+            o.append(f'<text x="{x + w / 2}" y="{y + 26 + i * 11}" text-anchor="middle" font-size="8" fill="#333">{_esc(t)}</text>')
+
+    def wire(x1: float, y1: float, x2: float, y2: float, color: str = "#1b1f24") -> None:
+        o.append(f'<path d="M{x1},{y1} H{(x1 + x2) / 2} V{y2} H{x2}" fill="none" stroke="{color}" stroke-width="1.6"/>')
+
+    x_str, x_inv, inv_w, inv_h = 20, 400, 150, 62
+    row = 0
+    centers: list[float] = []
+    for k in range(1, n_inv + 1):
+        grp = groups.get(k, [])
+        y0 = top + row * row_h
+        rows_k = max(len(grp), 1)
+        for st in grp:
+            y = top + row * row_h
+            for m in range(min(int(st.get("modules") or 1), 6)):
+                o.append(f'<rect x="{x_str + m * 14}" y="{y + 6}" width="10" height="18" fill="{STRING_COLORS[(int(st["id"][1:]) - 1) % len(STRING_COLORS)]}" fill-opacity="0.6" stroke="#1b1f24" stroke-width="0.7"/>')
+            o.append(f'<text x="{x_str + 92}" y="{y + 19}" font-size="8.5">{_esc(st["id"])}: {st["modules"]} мод. · {st.get("vmp_stc_v", 0):g} V</text>')
+            row += 1
+        if not grp:
+            row += 1
+        cy = y0 + rows_k * row_h / 2
+        centers.append(cy)
+        iy = cy - inv_h / 2
+        box(x_inv, iy, inv_w, inv_h, f"Инвертор {k}", [_short(inverter.name) if inverter else "—", f"{_esc(ac.get('i_max_a', ''))} A AC · {phase} ф. · SPD T2" + (" · DC табло" if dc.get("box") else "")])
+        for j, st in enumerate(grp):
+            wire(x_str + 250, top + (row - len(grp) + j) * row_h + 15, x_inv, iy + 14 + j * min(14, (inv_h - 20) / max(len(grp), 1)), "#c0392b")
+    mid = (centers[0] + centers[-1]) / 2 if centers else top + 60
+    # AC combiner
+    x_cmb, cmb_w, cmb_h = 600, 130, 92
+    cy0 = mid - cmb_h / 2
+    box(x_cmb, cy0, cmb_w, cmb_h, "Табло AC (паралел)", [f"{n_inv} × {ac.get('breaker_poles', '')} {ac.get('breaker_a', '')} A C", f"{n_inv} × ДТЗ {ac.get('rcd_a', '')} A / {ac.get('rcd_ma', 300)} mA A", f"Главен {ac.get('breaker_poles', '')} {ac.get('main_breaker_a', '')} A", f"SPD T2 {'3P+N' if phase == 3 else '1P+N'} · CAN паралел"], "#2f80ed")
+    for k, cy in enumerate(centers):
+        wire(x_inv + inv_w, cy, x_cmb, cy0 + 16 + k * ((cmb_h - 24) / max(n_inv - 1, 1)) if n_inv > 1 else cy0 + cmb_h / 2, "#2f80ed")
+    o.append(f'<text x="{(x_inv + inv_w + x_cmb) / 2}" y="{top - 16 if top > 20 else 12}" text-anchor="middle" font-size="8" fill="#2f80ed">{n_inv} × СВТ {ac.get("cores", "")}×{_esc(ac.get("cable_mm2", ""))} mm²</text>')
+    # main board
+    x_ac, ac_w = 770, 115
+    board_lines = [f"Вход {ac.get('breaker_poles', '')} {ac.get('main_breaker_a', '')} A", f"PE {_esc((design.get('grounding') or {}).get('pe_mm2', ''))} mm²", f"Σ {ac.get('i_total_a', '')} A · {ac.get('p_total_kw', '')} kW"]
+    box(x_ac, mid - 40, ac_w, 80, "ГРТ (главно табло)", board_lines, "#2f80ed")
+    wire(x_cmb + cmb_w, mid, x_ac, mid, "#2f80ed")
+    o.append(f'<text x="{(x_cmb + cmb_w + x_ac) / 2}" y="{cy0 - 6}" text-anchor="middle" font-size="8" fill="#2f80ed">СВТ {ac.get("cores", "")}×{_esc(ac.get("main_cable_mm2", ""))} mm² · {ac.get("main_cable_m", "")} m</text>')
+    # battery (shared bank, split over the inverters)
+    if bat and battery:
+        by = top + n_rows * row_h + 18
+        box(x_inv, by, inv_w, 50, "Батерии", [_short(battery.name), f"{bat.get('qty')} × {_esc((battery.specs or {}).get('kwh', ''))} kWh = {bat.get('kwh')} kWh" + (f" ({bat.get('per_inverter')}/инв.)" if bat.get("per_inverter") else "")])
+        o.append(f'<line x1="{x_inv + inv_w / 2}" y1="{centers[-1] + inv_h / 2}" x2="{x_inv + inv_w / 2}" y2="{by}" stroke="#1b1f24" stroke-width="1.6" stroke-dasharray="4 3"/>')
+        o.append(f'<text x="{x_inv + inv_w / 2 + 5}" y="{by - 6}" font-size="7.5" fill="#555">DC {bat.get("breaker_a")} A × {n_inv}</text>')
+    # grid + meter
+    gx = x_ac + ac_w / 2
+    o.append(f'<circle cx="{gx}" cy="{mid + 72}" r="14" fill="#fff" stroke="#1b1f24" stroke-width="1.2"/>')
+    o.append(f'<text x="{gx}" y="{mid + 76}" text-anchor="middle" font-size="9">kWh</text>')
+    o.append(f'<line x1="{gx}" y1="{mid + 40}" x2="{gx}" y2="{mid + 58}" stroke="#1b1f24" stroke-width="1.6"/>')
+    o.append(f'<line x1="{gx}" y1="{mid + 86}" x2="{gx}" y2="{mid + 104}" stroke="#1b1f24" stroke-width="1.6"/>')
+    o.append(f'<text x="{gx}" y="{mid + 118}" text-anchor="middle" font-size="9" font-weight="bold">Мрежа {"3×400 V" if phase == 3 else "230 V"}</text>')
+    gy = h - 24
+    o.append(f'<line x1="{x_inv}" y1="{gy}" x2="{x_ac + ac_w}" y2="{gy}" stroke="#27ae60" stroke-width="1.6" stroke-dasharray="5 3"/>')
+    o.append(f'<text x="{x_inv}" y="{gy - 5}" font-size="8.5" fill="#27ae60">PE / изравняване на потенциалите — конструкция 6 mm², инвертори {_esc((design.get("grounding") or {}).get("pe_mm2", ""))} mm²</text>')
     o.append("</svg>")
     return "".join(o)
 

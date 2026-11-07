@@ -185,8 +185,10 @@ def _solution_rows(db: Session, quote: Quote, info: dict, roof, annual_yield: fl
         iq = int(sel.get("inverter_qty") or 1)
         sp = inv.specs or {}
         kind = "Хибриден инвертор" if sp.get("hybrid") else "Мрежов инвертор"
+        kind = kind + (f" — {iq} бр. в паралел" if iq > 1 else "")
+        tot = f"общо {_num(float(sp.get('ac_power_kw') or 0) * iq)} kW AC · " if iq > 1 and sp.get("ac_power_kw") else ""
         rows.append({"k": kind, "v": (f"{iq} × " if iq > 1 else "") + label(inv),
-                     "sub": _fmt_specs(inv, [("ac_power_kw", "", " kW AC"), ("phases", "", " фази"), ("mppt_count", "", " MPPT"), ("max_pv_kw", "макс. PV", " kWp")]) + (f" · гаранция {inv.warranty}" if inv.warranty else "")})
+                     "sub": tot + _fmt_specs(inv, [("ac_power_kw", "", " kW AC"), ("phases", "", " фази"), ("mppt_count", "", " MPPT"), ("max_pv_kw", "макс. PV", " kWp")]) + (f" · гаранция {inv.warranty}" if inv.warranty else "")})
     bat = item(sel.get("battery_item_id"))
     bq = int(sel.get("battery_qty") or 0)
     if bat and bq:
@@ -202,7 +204,17 @@ def _solution_rows(db: Session, quote: Quote, info: dict, roof, annual_yield: fl
                  "sub": roof_short(roof, project) + (f" · {ms.get('rows')} реда" if ms.get("rows") else "") + (f" · наклон {_num(ms.get('tilt_deg'))}°" if ms.get("tilt_deg") else "")})
     st = info.get("strings") or {}
     if st.get("strings"):
-        rows.append({"k": "Електрическа част", "v": f"{st['strings']} стринга × {st.get('modules_per_string')} модула на {st.get('mppts') or '—'} MPPT", "sub": "DC/AC защити, кабели и заземяване — подробно в спецификацията"})
+        n_inv = int(st.get("inverters") or 1)
+        if n_inv > 1:
+            per = st.get("per_inverter") or []
+            lens = sorted({int(x) for p in per for x in [p.get("modules_per_string") or 0] if x})
+            mps = f"{lens[0]}–{lens[-1]}" if len(lens) > 1 else (str(lens[0]) if lens else str(st.get("modules_per_string")))
+            v = f"{st['strings']} стринга (до {mps} модула) на {n_inv} инвертора × {st.get('mppts') or '—'} MPPT"
+            sub = "Инверторите работят в паралел през общо AC табло с главен прекъсвач · DC/AC защити, кабели и заземяване — подробно в спецификацията"
+        else:
+            v = f"{st['strings']} стринга × {st.get('modules_per_string')} модула на {st.get('mppts') or '—'} MPPT"
+            sub = "DC/AC защити, кабели и заземяване — подробно в спецификацията"
+        rows.append({"k": "Електрическа част", "v": v, "sub": sub})
     return rows
 
 

@@ -95,6 +95,7 @@ def update_project(pid: int, body: ProjectUpdate, db: Session = Depends(get_db),
 class ProposalsIn(BaseModel):
     strategies: list[str] | None = None
     selections: dict[str, Any] | None = None  # base selections (defaults to project.params.selections)
+    scope: str = "auto"  # auto | target (client's demand) | roof (every module of the layout, multi-inverter)
 
 
 class ProposalApplyIn(BaseModel):
@@ -107,7 +108,7 @@ def project_proposals(pid: int, body: ProposalsIn | None = None, db: Session = D
     """Build and rank complete configurations (Economy / Balanced / Premium / Fastest delivery) for the project."""
     p = _get(db, pid)
     body = body or ProposalsIn()
-    return proposals.generate(db, p, body.strategies, body.selections)
+    return proposals.generate(db, p, body.strategies, body.selections, body.scope)
 
 
 @router.post("/{pid}/proposals/apply", response_model=ProjectOut)

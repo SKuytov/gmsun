@@ -85,15 +85,13 @@ class Ctx:
 
 
 # ----------------------------------------------------------------------------- target sizing
-def target_kwp(ctx: Ctx, base_sel: dict[str, Any]) -> tuple[float, str]:
+def demand_kwp(ctx: Ctx) -> tuple[float, str]:
+    """How much PV the client *needs* (independent of the roof): explicit target → consumption → connected power."""
     p = ctx.project
-    lay = pricing.active_layout_summary(p)
-    panel = ctx.by_id.get(int(base_sel.get("panel_item_id") or 0))
-    if base_sel.get("use_layout", True) and lay.get("count"):
-        wp = _f(panel.specs if panel else None, "wp", 0) or (_f(ctx.by_id.get(p.layouts[0].panel_item_id).specs, "wp") if p.layouts and p.layouts[0].panel_item_id in ctx.by_id else 0)
-        return round(lay["count"] * wp / 1000, 3), "layout"
-    if base_sel.get("panel_qty") and panel:
-        return round(int(base_sel["panel_qty"]) * _f(panel.specs, "wp") / 1000, 3), "selection"
+    params = p.params or {}
+    explicit = _f(params, "target_kwp", 0)
+    if explicit > 0:
+        return round(explicit, 2), "target"
     sy = float(ctx.pricing.get("specific_yield", 1250) or 1250)
     if p.annual_consumption_kwh and p.annual_consumption_kwh > 0:
         kwp = p.annual_consumption_kwh / sy
@@ -102,7 +100,44 @@ def target_kwp(ctx: Ctx, base_sel: dict[str, Any]) -> tuple[float, str]:
         return round(max(kwp, 2.0), 2), "consumption"
     if p.connected_power_kw > 0:
         return round(p.connected_power_kw * 1.2, 2), "connected_power"
-    return 10.0, "default"
+    return 0.0, "none"
+
+
+def roof_kwp(ctx: Ctx, base_sel: dict[str, Any]) -> tuple[float, int, float]:
+    """(kWp, module count, Wp) the active layout can hold, 0 when there is no layout."""
+    p = ctx.project
+    lay = pricing.active_layout_summary(p)
+    if not (base_sel.get("use_layout", True) and lay.get("count")):
+        return 0.0, 0, 0.0
+    panel = ctx.by_id.get(int(base_sel.get("panel_item_id") or 0))
+    wp = _f(panel.specs if panel else None, "wp", 0) or (_f(ctx.by_id.get(p.layouts[0].panel_item_id).specs, "wp") if p.layouts and p.layouts[0].panel_item_id in ctx.by_id else 0)
+    return round(int(lay["count"]) * wp / 1000, 3), int(lay["count"]), wp
+
+
+def target_kwp(ctx: Ctx, base_sel: dict[str, Any], scope: str = "auto") -> tuple[float, str, dict[str, Any]]:
+    """Decide the plant size the proposals are built for.
+
+    ``scope``: ``roof`` – fill the whole layout; ``target`` – the client's demand (explicit target kWp, consumption or
+    connected power) even if the roof has room for more; ``auto`` – demand when the roof exceeds it by > 15 %,
+    otherwise the roof.  Returns (kWp, basis, meta) where meta describes both options for the UI."""
+    need, need_basis = demand_kwp(ctx)
+    rk, rcount, wp = roof_kwp(ctx, base_sel)
+    panel = ctx.by_id.get(int(base_sel.get("panel_item_id") or 0))
+    meta: dict[str, Any] = {"demand_kwp": need, "demand_basis": need_basis, "roof_kwp": rk, "roof_panel_qty": rcount}
+    if rk > 0:
+        if scope == "roof" or need <= 0 or (scope == "auto" and rk <= need * 1.15):
+            meta["scope"] = "roof"
+            return rk, "layout", meta
+        # demand-based size on a roof with more room: quote a part of the layout, the rest stays as an option
+        meta["scope"] = "target"
+        meta["limited"] = rk > need * 1.15
+        return min(need, rk), need_basis, meta
+    meta["scope"] = "target"
+    if base_sel.get("panel_qty") and panel:
+        return round(int(base_sel["panel_qty"]) * _f(panel.specs, "wp") / 1000, 3), "selection", meta
+    if need > 0:
+        return need, need_basis, meta
+    return 10.0, "default", meta
 
 
 # ----------------------------------------------------------------------------- evaluation
@@ -162,7 +197,7 @@ def _labor_for(ctx: Ctx, base_sel: dict[str, Any], kwp: float) -> dict[str, Any]
 
 def _key_items(ctx: Ctx, sel: dict[str, Any], ev: dict[str, Any]) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
-    roles = [("panel", "Модули", sel.get("panel_item_id"), ev["info"].get("panel_qty")), ("inverter", "Инвертор", sel.get("inverter_item_id"), sel.get("inverter_qty") or 1), ("battery", "Батерия", sel.get("battery_item_id"), sel.get("battery_qty") or 0)]
+    roles = [("panel", "Модули", sel.get("panel_item_id"), ev["info"].get("panel_qty")), ("inverter", "Инвертори" if int(sel.get("inverter_qty") or 1) > 1 else "Инвертор", sel.get("inverter_item_id"), int(sel.get("inverter_qty") or 1)), ("battery", "Батерия", sel.get("battery_item_id"), sel.get("battery_qty") or 0)]
     for role, label, iid, qty in roles:
         it = ctx.by_id.get(int(iid or 0))
         if not it:
@@ -183,16 +218,32 @@ def _key_items(ctx: Ctx, sel: dict[str, Any], ev: dict[str, Any]) -> list[dict[s
 
 
 # ----------------------------------------------------------------------------- generation
-def generate(db: Session, project: Project, strategies: list[str] | None = None, base_sel: dict[str, Any] | None = None) -> dict[str, Any]:
+def generate(db: Session, project: Project, strategies: list[str] | None = None, base_sel: dict[str, Any] | None = None, scope: str = "auto") -> dict[str, Any]:
+    """Build ranked proposals.
+
+    ``scope``: ``auto`` (default), ``target`` (size for the client's demand even if the roof holds more) or ``roof``
+    (use every module of the layout – inverters are then multiplied as needed, e.g. 4 × 20 kW for 83 kWp)."""
     ctx = Ctx(db, project)
     base = dict(base_sel if base_sel is not None else (project.params or {}).get("selections") or {})
-    for k in ("_info", "_warnings"):
+    for k in ("_info", "_warnings", "panel_limit"):
         base.pop(k, None)
     strategies = [s for s in (strategies or list(STRATEGIES)) if s in STRATEGIES]
-    kwp_target, basis = target_kwp(ctx, base)
+    scope = scope if scope in ("auto", "target", "roof") else "auto"
+    kwp_target, basis, tmeta = target_kwp(ctx, base, scope)
     lay = pricing.active_layout_summary(project)
     layout_fixed = bool(base.get("use_layout", True) and lay.get("count"))
+    limited = bool(layout_fixed and tmeta.get("scope") == "target")
     n_p, n_i, n_b = int(ctx.proc.get("candidate_panels", 6)), int(ctx.proc.get("candidate_inverters", 4)), int(ctx.proc.get("candidate_batteries", 3))
+    dc_ac_max = float(ctx.pricing.get("dc_ac_ratio_max", 1.35))
+    max_units = int(ctx.proc.get("max_parallel_inverters", 6) or 6)
+    min_unit_kw = float(ctx.proc.get("min_parallel_unit_kw", 8) or 8)
+    notes: list[str] = []
+    if limited:
+        notes.append(f"Покривът побира {tmeta['roof_kwp']:g} kWp ({tmeta['roof_panel_qty']} модула), а необходимата мощност е {kwp_target:g} kWp — предложенията са за необходимата мощност. Изберете „целия покрив“, за да оразмерите всички модули (с няколко инвертора в паралел).")
+    elif layout_fixed and tmeta.get("demand_kwp", 0) > 0 and kwp_target > tmeta["demand_kwp"] * 1.15:
+        notes.append(f"Оразмерено за целия покрив ({kwp_target:g} kWp) — необходимата мощност е {tmeta['demand_kwp']:g} kWp. Изберете „по необходимост“, за да офертирате само нужната част.")
+    if layout_fixed and project.connected_power_kw > 0 and kwp_target > project.connected_power_kw * dc_ac_max:
+        notes.append(f"{kwp_target:g} kWp надвишава присъединената мощност {project.connected_power_kw:g} kW × {dc_ac_max:g} — ще е нужно увеличение на присъединената мощност или ограничител на отдаваната мощност (export limit).")
 
     panels_all = [i for i in ctx.items if i.category == "panel" and _f(i.specs, "wp") > 0]
     priced = [i for i in panels_all if _has_price(i)]
@@ -206,6 +257,11 @@ def generate(db: Session, project: Project, strategies: list[str] | None = None,
     if target_kwh <= 0 and base.get("battery_item_id") and int(base["battery_item_id"]) in ctx.by_id:
         target_kwh = _f(ctx.by_id[int(base["battery_item_id"])].specs, "kwh") * int(base.get("battery_qty") or 1)
 
+    if not base.get("switchboard_item_id"):
+        boards = [i for i in ctx.items if i.category == "switchboard" and int(_f(i.specs, "phases", project.phase)) == project.phase]
+        if boards:
+            base["switchboard_item_id"] = min(boards, key=lambda i: (not _has_price(i), i.price_for(ctx.markup))).id
+
     variants: list[dict[str, Any]] = []
     for strat in strategies:
         cand_panels = ctx.rank(strat, panel_pool, lambda it: it.price_for(ctx.markup) / max(1.0, _f(it.specs, "wp")))[:n_p]
@@ -213,30 +269,38 @@ def generate(db: Session, project: Project, strategies: list[str] | None = None,
         evaluated = 0
         for panel in cand_panels:
             wp = _f(panel.specs, "wp")
-            if layout_fixed:
+            panel_limit = 0
+            if layout_fixed and not limited:
                 panel_qty = int(lay["count"])
+            elif layout_fixed:
+                panel_limit = min(int(lay["count"]), max(1, round(kwp_target * 1000 / wp)))
+                panel_qty = panel_limit
             else:
                 panel_qty = max(1, round(kwp_target * 1000 / wp))
             kwp = panel_qty * wp / 1000
-            inv_rows = sizing.suggest_inverters(ctx.db, project.phase, project.connected_power_kw, kwp, project.voltage_class if want_battery else None, True if want_battery else None, ctx.markup, float(ctx.pricing.get("dc_ac_ratio_max", 1.35)))
-            dc_ac_max = float(ctx.pricing.get("dc_ac_ratio_max", 1.35))
+            inv_rows = sizing.suggest_inverters(ctx.db, project.phase, project.connected_power_kw, kwp, project.voltage_class if want_battery else None, True if want_battery else None, ctx.markup, dc_ac_max, max_units=max_units, min_parallel_unit_kw=min_unit_kw)
+            qty_of = {r["item"].id: int(r.get("qty") or 1) for r in inv_rows}
 
-            def fits(it: CatalogItem) -> bool:
+            def fits(r: dict[str, Any]) -> bool:
+                """Technically sound: per-unit PV within the input limit, total DC/AC between ~0.75 and the max ratio."""
+                it = r["item"]
                 ac = _f(it.specs, "ac_power_kw")
-                if ac <= 0:
+                n = int(r.get("qty") or 1)
+                if ac <= 0 or n <= 0:
                     return False
                 max_pv = _f(it.specs, "max_pv_kw") or ac * dc_ac_max
-                if kwp > max_pv * 1.02 or ac < kwp / dc_ac_max * 0.98:
+                if kwp / n > max_pv * 1.02 or ac * n < kwp / dc_ac_max * 0.98:
                     return False
-                if project.connected_power_kw > 0 and ac > project.connected_power_kw * 1.1:
-                    return False
-                return ac <= max(kwp * 1.6, kwp + 3)  # not absurdly oversized
+                return ac * n <= max(kwp * 1.25, kwp + 3)  # not oversized (DC/AC ≥ 0.8)
 
-            ok_rows = [r for r in inv_rows if fits(r["item"]) and not any("надвишава" in w for w in r["warnings"])]
-            inv_rows = ok_rows or [r for r in inv_rows if r["score"] > 0][: n_i * 2] or inv_rows[:n_i]
+            tech_ok = [r for r in inv_rows if fits(r)]
+            grid_ok = [r for r in tech_ok if not (project.connected_power_kw > 0 and _f(r["item"].specs, "ac_power_kw") * int(r["qty"]) > project.connected_power_kw * 1.1)]
+            inv_rows = grid_ok or tech_ok or [r for r in inv_rows if r["score"] > 0][: n_i * 2] or inv_rows[:n_i]
             inv_items = [r["item"] for r in inv_rows if _has_price(r["item"])] or [r["item"] for r in inv_rows]
-            inv_cands = ctx.rank(strat, inv_items, lambda it: it.price_for(ctx.markup) / max(0.5, _f(it.specs, "ac_power_kw", 1)))[:n_i]
+            # rank by the cost of the whole inverter pack per kW AC (+ a small premium per extra unit for wiring/commissioning)
+            inv_cands = ctx.rank(strat, inv_items, lambda it: (it.price_for(ctx.markup) * qty_of.get(it.id, 1) * (1 + 0.03 * (qty_of.get(it.id, 1) - 1))) / max(0.5, _f(it.specs, "ac_power_kw", 1) * qty_of.get(it.id, 1)))[:n_i]
             for inv in inv_cands:
+                inv_qty = qty_of.get(inv.id, 1)
                 bat_opts: list[tuple[CatalogItem | None, int, list[dict[str, Any]]]] = [(None, 0, [])]
                 if want_battery and target_kwh > 0:
                     rows = sizing.suggest_batteries(ctx.db, inv, target_kwh, project.voltage_class, ctx.markup)
@@ -247,13 +311,15 @@ def generate(db: Session, project: Project, strategies: list[str] | None = None,
                 for bat, bq, acc in bat_opts:
                     sel = dict(base)
                     sel.update({
-                        "panel_item_id": panel.id, "panel_qty": panel_qty, "inverter_item_id": inv.id, "inverter_qty": 1,
+                        "panel_item_id": panel.id, "panel_qty": panel_qty, "inverter_item_id": inv.id, "inverter_qty": inv_qty,
                         "battery_item_id": bat.id if bat else None, "battery_qty": bq if bat else 0,
                         "battery_accessories": [{"item_id": a.get("item_id"), "qty": a.get("qty")} for a in acc] if bat else [],
                         "strategy": strat,
                     })
                     if not layout_fixed:
                         sel["use_layout"] = False
+                    if panel_limit:
+                        sel["panel_limit"] = panel_limit
                     sel.update(_labor_for(ctx, base, kwp))
                     ev = evaluate(ctx, sel)
                     evaluated += 1
@@ -267,7 +333,8 @@ def generate(db: Session, project: Project, strategies: list[str] | None = None,
         variants.append({
             "strategy": strat, "label_bg": bg, "label_en": en,
             "selections": best["sel"],
-            "kwp": ev["info"].get("kwp"), "panel_qty": ev["info"].get("panel_qty"),
+            "kwp": ev["info"].get("kwp"), "panel_qty": ev["info"].get("panel_qty"), "inverter_qty": int(best["sel"].get("inverter_qty") or 1),
+            "ac_kw": ev["info"].get("ac_kw"), "roof_panel_qty": ev["info"].get("roof_panel_qty"),
             "battery_kwh": round(_f(best["bat"].specs, "kwh") * int(best["sel"].get("battery_qty") or 0), 1) if best["bat"] else 0,
             "subtotal": ev["subtotal"], "vat": ev["vat"], "total": ev["total"], "cost": ev["cost"], "margin": ev["margin"],
             "lead_time_days": ev["lead_time_days"], "lead_bottleneck": ev["lead_bottleneck"], "suppliers": ev["suppliers"],
@@ -287,10 +354,14 @@ def generate(db: Session, project: Project, strategies: list[str] | None = None,
         for v in variants:
             v["delta_total"] = round(v["total"] - cheapest, 2)
             v["delta_days"] = v["lead_time_days"] - fastest
-            sig = (v["selections"].get("panel_item_id"), v["selections"].get("panel_qty"), v["selections"].get("inverter_item_id"), v["selections"].get("battery_item_id"), v["selections"].get("battery_qty"), v["total"])
+            sig = (v["selections"].get("panel_item_id"), v["selections"].get("panel_qty"), v["selections"].get("inverter_item_id"), v["selections"].get("inverter_qty"), v["selections"].get("battery_item_id"), v["selections"].get("battery_qty"), v["total"])
             v["same_as"] = seen.get(sig)
             seen.setdefault(sig, v["strategy"])
-    return {"target_kwp": kwp_target, "target_basis": basis, "layout_fixed": layout_fixed, "target_kwh": target_kwh, "variants": variants}
+    return {
+        "target_kwp": kwp_target, "target_basis": basis, "layout_fixed": layout_fixed, "target_kwh": target_kwh, "variants": variants,
+        "scope": tmeta.get("scope", "target"), "scope_requested": scope, "demand_kwp": tmeta.get("demand_kwp", 0), "demand_basis": tmeta.get("demand_basis"),
+        "roof_kwp": tmeta.get("roof_kwp", 0), "roof_panel_qty": tmeta.get("roof_panel_qty", 0), "notes": notes,
+    }
 
 
 def _quality(ctx: Ctx, sel: dict[str, Any]) -> float:
@@ -313,6 +384,9 @@ def _score(ctx: Ctx, strat: str, sel: dict[str, Any], ev: dict[str, Any]) -> flo
     if ev["missing_price"]:
         penalty += 1e6  # configurations with unpriced items are last resort
     penalty += 2000.0 * sum(1 for w in ev["warnings"] if "надвишава" in w or "извън" in w)
+    # MPPT current / voltage violations and missing roles are hard technical failures – rank such configurations last
+    penalty += 1e5 * sum(1 for w in ev["warnings"] if ("Isc" in w and "надвишава" in w) or "под MPPT минимума" in w or "стринга надвишават входовете" in w or ("Voc при" in w and "надвишава" in w))
+    penalty += 2e4 * sum(1 for w in ev["warnings"] if "работен ток" in w and "надвишава" in w)
     if strat == "economy":
         return total + penalty
     if strat == "premium":

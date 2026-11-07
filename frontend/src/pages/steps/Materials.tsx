@@ -39,7 +39,7 @@ function DesignPanel({ ctx }: { ctx: StepCtx }) {
   )
   const missing = d.roles.filter((r) => !r.item_id)
   const sorted = [...d.roles].sort((a, b) => SECTION_ORDER.indexOf(a.section) - SECTION_ORDER.indexOf(b.section))
-  const warnings = [...(d.warnings || []), ...(d.strings?.warnings || [])]
+  const warnings = Array.from(new Set([...(d.warnings || []), ...(d.strings?.warnings || [])]))
   return (
     <div className="flex flex-col gap-3">
       {warnings.length > 0 && (
@@ -66,6 +66,7 @@ function DesignPanel({ ctx }: { ctx: StepCtx }) {
             <thead>
               <tr>
                 <th>{t('strings')}</th>
+                {(d.inverters || 1) > 1 && <th className="text-center">{lang === 'bg' ? 'Инв.' : 'Inv.'}</th>}
                 <th>{lang === 'bg' ? 'Равнина' : 'Plane'}</th>
                 <th className="text-right">{t('modules')}</th>
                 <th className="text-right">Voc (min T)</th>
@@ -78,6 +79,7 @@ function DesignPanel({ ctx }: { ctx: StepCtx }) {
               {d.strings.strings.map((s) => (
                 <tr key={s.id}>
                   <td className="font-medium">{s.id}</td>
+                  {(d.inverters || 1) > 1 && <td className="text-center">{s.inverter}</td>}
                   <td>{s.plane}</td>
                   <td className="num text-right">{s.modules}</td>
                   <td className="num text-right">{n(s.voc_cold_v)} V</td>
@@ -103,11 +105,23 @@ function DesignPanel({ ctx }: { ctx: StepCtx }) {
         </div>
         <div className="rounded-md bg-surface-2 p-3">
           <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-3">{t('design_ac')}</h3>
-          <Row k={lang === 'bg' ? 'Макс. ток' : 'Max. current'} v={`${n(d.ac.i_max_a, 1)} A`} />
-          <Row k={lang === 'bg' ? 'Прекъсвач' : 'Breaker'} v={`${d.ac.breaker_poles ?? ''} ${n(d.ac.breaker_a)} A`} />
-          <Row k={lang === 'bg' ? 'Дефектнотокова' : 'RCD'} v={d.ac.rcd_a ? `${n(d.ac.rcd_a)} A / ${n(d.ac.rcd_ma)} mA` : '—'} />
-          <Row k={lang === 'bg' ? 'Кабел' : 'Cable'} v={d.ac.cable_mm2 ? `${n(d.ac.cores)}×${n(d.ac.cable_mm2)} mm² · ${n(d.ac.cable_m)} m` : '—'} />
-          <Row k={lang === 'bg' ? 'Пад' : 'Drop'} v={`${n(d.ac.vdrop_pct, 2)} %`} />
+          {d.ac.combiner ? (
+            <>
+              <Row k={lang === 'bg' ? 'Инвертори' : 'Inverters'} v={`${n(d.ac.inverters)} × ${n(d.ac.i_max_a, 1)} A = ${n(d.ac.i_total_a, 1)} A · ${n(d.ac.p_total_kw, 1)} kW`} />
+              <Row k={lang === 'bg' ? 'Защита на инвертор' : 'Per-inverter protection'} v={`${d.ac.breaker_poles ?? ''} ${n(d.ac.breaker_a)} A + RCD ${n(d.ac.rcd_a)} A / ${n(d.ac.rcd_ma)} mA`} />
+              <Row k={lang === 'bg' ? 'Кабел → табло AC' : 'Cable → AC combiner'} v={`${n(d.ac.cores)}×${n(d.ac.cable_mm2)} mm² · ${n(d.ac.cable_m)} m`} />
+              <Row k={lang === 'bg' ? 'Главен прекъсвач' : 'Main breaker'} v={`${d.ac.breaker_poles ?? ''} ${n(d.ac.main_breaker_a)} A`} />
+              <Row k={lang === 'bg' ? 'Кабел табло AC → ГРТ' : 'Combiner → main board'} v={`${n(d.ac.cores)}×${n(d.ac.main_cable_mm2)} mm² · ${n(d.ac.main_cable_m)} m · ΔU ${n(d.ac.main_vdrop_pct, 2)} %`} />
+            </>
+          ) : (
+            <>
+              <Row k={lang === 'bg' ? 'Макс. ток' : 'Max. current'} v={`${n(d.ac.i_max_a, 1)} A`} />
+              <Row k={lang === 'bg' ? 'Прекъсвач' : 'Breaker'} v={`${d.ac.breaker_poles ?? ''} ${n(d.ac.breaker_a)} A`} />
+              <Row k={lang === 'bg' ? 'Дефектнотокова' : 'RCD'} v={d.ac.rcd_a ? `${n(d.ac.rcd_a)} A / ${n(d.ac.rcd_ma)} mA` : '—'} />
+              <Row k={lang === 'bg' ? 'Кабел' : 'Cable'} v={d.ac.cable_mm2 ? `${n(d.ac.cores)}×${n(d.ac.cable_mm2)} mm² · ${n(d.ac.cable_m)} m` : '—'} />
+              <Row k={lang === 'bg' ? 'Пад' : 'Drop'} v={`${n(d.ac.vdrop_pct, 2)} %`} />
+            </>
+          )}
         </div>
         <div className="rounded-md bg-surface-2 p-3">
           <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-3">{t('design_battery')}</h3>

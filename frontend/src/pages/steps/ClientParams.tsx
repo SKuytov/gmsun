@@ -87,6 +87,9 @@ export function ParamsStep({ ctx }: { ctx: StepCtx }) {
           <Field label={t('connected_power')}>
             <NumInput value={p.connected_power_kw} onChange={(v) => ctx.update({ connected_power_kw: v })} min={0} data-testid="input-connected-power" />
           </Field>
+          <Field label={t('target_kwp')} hint={t('target_kwp_hint')}>
+            <NumInput value={Number((p.params as Record<string, unknown>)?.target_kwp || 0) || null} onChange={(v) => ctx.update({ params: { ...(p.params || {}), target_kwp: v } })} min={0} data-testid="input-target-kwp" />
+          </Field>
           <Field label={t('roof_type')}>
             <Select value={p.roof_type} onChange={(e) => ctx.update({ roof_type: e.target.value })} data-testid="select-roof-type">
               {ctx.roofTypes.map((r) => (

@@ -1,10 +1,10 @@
 import { useMutation } from '@tanstack/react-query'
 import { Check, Clock, Coins, Gem, RefreshCw, Scale, Sparkles } from 'lucide-react'
 import { useState } from 'react'
-import { Spinner, Warn, cx, useToast } from '@/components/ui'
+import { Segmented, Spinner, Warn, cx, useToast } from '@/components/ui'
 import { errMsg, post } from '@/lib/api'
 import { fmtMoney, fmtNum, useT, type Key } from '@/lib/i18n'
-import type { ProposalVariant, ProposalsResult, Strategy } from '@/lib/types'
+import type { ProposalScope, ProposalVariant, ProposalsResult, Strategy } from '@/lib/types'
 import { TierBadge } from '../Catalog'
 import type { StepCtx } from '../Project'
 
@@ -17,11 +17,17 @@ export function Proposals({ ctx }: { ctx: StepCtx }) {
   const toast = useToast()
   const { project: p, sel, setSel } = ctx
   const [res, setRes] = useState<ProposalsResult | null>(null)
+  const [scope, setScope] = useState<ProposalScope>('auto')
   const gen = useMutation({
-    mutationFn: () => post<ProposalsResult>(`/api/projects/${p.id}/proposals`, { selections: sel }),
+    mutationFn: (sc: ProposalScope) => post<ProposalsResult>(`/api/projects/${p.id}/proposals`, { selections: sel, scope: sc }),
     onSuccess: setRes,
     onError: (e) => toast.push(errMsg(e), 'bad'),
   })
+  const layoutCount = p.layouts.reduce((s, l) => s + (l.summary?.count || 0), 0)
+  const changeScope = (sc: ProposalScope) => {
+    setScope(sc)
+    gen.mutate(sc)
+  }
   const apply = (v: ProposalVariant) => {
     setSel({ ...v.selections, strategy: v.strategy })
     toast.push(t('proposals_applied'), 'ok')
@@ -30,7 +36,7 @@ export function Proposals({ ctx }: { ctx: StepCtx }) {
   const cheapest = variants.length ? Math.min(...variants.map((v) => v.total)) : 0
   const fastest = variants.length ? Math.min(...variants.map((v) => v.lead_time_days)) : 0
   const isCurrent = (v: ProposalVariant) =>
-    sel.panel_item_id === v.selections.panel_item_id && sel.inverter_item_id === v.selections.inverter_item_id && (sel.battery_item_id || null) === (v.selections.battery_item_id || null) && (sel.battery_qty || 0) === (v.selections.battery_qty || 0) && (sel.panel_qty || 0) === (v.selections.panel_qty || 0)
+    sel.panel_item_id === v.selections.panel_item_id && sel.inverter_item_id === v.selections.inverter_item_id && (sel.battery_item_id || null) === (v.selections.battery_item_id || null) && (sel.battery_qty || 0) === (v.selections.battery_qty || 0) && (sel.panel_qty || 0) === (v.selections.panel_qty || 0) && (sel.inverter_qty || 1) === (v.selections.inverter_qty || 1) && (sel.panel_limit || 0) === (v.selections.panel_limit || 0)
 
   return (
     <div className="card p-4" data-testid="proposals-card">
@@ -49,13 +55,43 @@ export function Proposals({ ctx }: { ctx: StepCtx }) {
                   · {t('battery')}: <span className="num font-medium text-ink-2">{fmtNum(res.target_kwh, 1)} kWh</span>
                 </>
               )}
+              {res.roof_kwp > 0 && res.demand_kwp > 0 && (
+                <>
+                  {' '}
+                  · {t('proposals_roof')}: <span className="num font-medium text-ink-2">{fmtNum(res.roof_kwp, 2)} kWp</span> ({res.roof_panel_qty} {t('modules_short')}) · {t('proposals_demand')}:{' '}
+                  <span className="num font-medium text-ink-2">{fmtNum(res.demand_kwp, 2)} kWp</span> ({t(`proposals_basis_${res.demand_basis}` as Key)})
+                </>
+              )}
             </p>
           )}
         </div>
-        <button type="button" className={cx(res ? 'btn-ghost' : 'btn-primary')} onClick={() => gen.mutate()} disabled={gen.isPending} data-testid="button-proposals">
-          {gen.isPending ? <Spinner /> : <RefreshCw className="h-4 w-4" />} {res ? t('proposals_regenerate') : t('proposals_generate')}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {layoutCount > 0 && (
+            <div data-testid="proposals-scope">
+              <Segmented<ProposalScope>
+                size="sm"
+                value={scope}
+                onChange={changeScope}
+                options={[
+                  { value: 'auto', label: t('scope_auto') },
+                  { value: 'target', label: t('scope_target') },
+                  { value: 'roof', label: `${t('scope_roof')}${res?.roof_kwp ? ` (${fmtNum(res.roof_kwp, 1)} kWp)` : ''}` },
+                ]}
+              />
+            </div>
+          )}
+          <button type="button" className={cx(res ? 'btn-ghost' : 'btn-primary')} onClick={() => gen.mutate(scope)} disabled={gen.isPending} data-testid="button-proposals">
+            {gen.isPending ? <Spinner /> : <RefreshCw className="h-4 w-4" />} {res ? t('proposals_regenerate') : t('proposals_generate')}
+          </button>
+        </div>
       </div>
+      {res && res.notes.length > 0 && (
+        <div className="mt-3 flex flex-col gap-1.5" data-testid="proposals-notes">
+          {res.notes.map((n) => (
+            <Warn key={n}>{n}</Warn>
+          ))}
+        </div>
+      )}
 
       {res && variants.length === 0 && <Warn>{lang === 'bg' ? 'Няма подходящи комбинации в каталога за тези параметри (проверете цени и характеристики).' : 'No suitable combinations in the catalog for these parameters (check prices and specs).'}</Warn>}
 
@@ -88,13 +124,16 @@ export function Proposals({ ctx }: { ctx: StepCtx }) {
                   {v.delta_total > 0 && <span className="ml-1 text-warn">(+{fmtMoney(v.delta_total)})</span>}
                 </div>
                 <div className="mt-2 grid grid-cols-3 gap-1 text-center text-xs">
-                  <div className="rounded bg-surface-2 p-1.5">
+                  <div className="rounded bg-surface-2 p-1.5" title={v.roof_panel_qty ? `${t('proposals_roof')}: ${v.roof_panel_qty} ${t('modules_short')}` : undefined}>
                     <div className="num font-semibold">{fmtNum(v.kwp, 2)}</div>
-                    <div className="text-ink-3">kWp · {v.panel_qty}</div>
+                    <div className="text-ink-3">
+                      kWp · {v.panel_qty}
+                      {v.roof_panel_qty ? `/${v.roof_panel_qty}` : ''}
+                    </div>
                   </div>
                   <div className="rounded bg-surface-2 p-1.5">
-                    <div className="num font-semibold">{v.battery_kwh ? fmtNum(v.battery_kwh, 1) : '—'}</div>
-                    <div className="text-ink-3">kWh</div>
+                    <div className="num font-semibold">{v.ac_kw ? fmtNum(v.ac_kw, 1) : '—'}</div>
+                    <div className="text-ink-3">kW AC{v.inverter_qty > 1 ? ` · ${v.inverter_qty}×` : ''}</div>
                   </div>
                   <div className="rounded bg-surface-2 p-1.5" title={v.lead_bottleneck ? `${t('bottleneck')}: ${v.lead_bottleneck}` : undefined}>
                     <div className="num font-semibold">{v.lead_time_days}</div>

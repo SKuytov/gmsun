@@ -209,6 +209,7 @@ function PricingTab() {
           {num('module_spare_pct', t('module_spare_pct'), bg ? '0 = без резервни' : '0 = no spares')}
           {num('design_tmin_c', t('design_tmin_c'), bg ? 'за Voc на стринга' : 'for string Voc')}
           {num('design_tcell_max_c', t('design_tcell_max_c'), bg ? 'за Vmp на стринга' : 'for string Vmp')}
+          {num('voc_margin', t('voc_margin'), bg ? '0,97 = 3 % резерв под макс. DC' : '0.97 = 3 % below max DC', 0.01)}
           {num('dc_vdrop_max_pct', t('dc_vdrop_max_pct'), undefined, 0.1)}
           {num('ac_vdrop_max_pct', t('ac_vdrop_max_pct'), undefined, 0.1)}
           {num('dc_run_default_m', t('dc_run_default_m'))}

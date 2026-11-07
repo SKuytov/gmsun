@@ -17,6 +17,20 @@ def _f(d: dict[str, Any], k: str, default: float = 0.0) -> float:
         return default
 
 
+def inverter_count(ac_kw: float, pv_kwp: float, max_pv_kw: float = 0.0, dc_ac_max: float = 1.35, max_units: int = 10) -> int:
+    """How many identical ``ac_kw`` inverters a ``pv_kwp`` array needs.
+
+    Rules: per-unit PV ≤ max PV input (or ``ac·dc_ac_max``), and a preferred DC/AC ratio ≤ ~1.25 when that costs
+    at most one extra unit. Returns 0 when more than ``max_units`` would be needed (model too small)."""
+    if ac_kw <= 0 or pv_kwp <= 0:
+        return 1
+    cap = min(max_pv_kw, ac_kw * dc_ac_max) if max_pv_kw and max_pv_kw > 0 else ac_kw * dc_ac_max
+    n = max(1, math.ceil(pv_kwp / cap - 1e-9))
+    if pv_kwp / (n * ac_kw) > 1.25 and pv_kwp / ((n + 1) * ac_kw) >= 0.85:
+        n += 1
+    return n if n <= max_units else 0
+
+
 def suggest_inverters(
     db: Session,
     phase: int,
@@ -26,7 +40,14 @@ def suggest_inverters(
     hybrid: bool | None,
     default_markup: float,
     dc_ac_max: float = 1.35,
+    max_units: int = 10,
+    min_parallel_unit_kw: float = 8.0,
 ) -> list[dict[str, Any]]:
+    """Rank catalogue inverters for the project. Every row carries ``qty`` – the number of identical units needed for
+    ``pv_kwp`` (1 for a single-inverter plant, N for parallel operation), ``ac_total_kw`` and the DC/AC ``ratio``.
+
+    Parallel operation is only proposed with units of at least ``min_parallel_unit_kw`` – paralleling several small
+    residential inverters is never the sound answer for a larger array."""
     items = db.query(CatalogItem).filter(CatalogItem.category == "inverter", CatalogItem.active.is_(True)).all()
     out: list[dict[str, Any]] = []
     for it in items:
@@ -46,24 +67,37 @@ def suggest_inverters(
         if hybrid is not None and bool(sp.get("hybrid", True)) != hybrid:
             continue
         max_pv = _f(sp, "max_pv_kw") or (ac * dc_ac_max if ac else 0)
-        # connected power: inverter AC should not exceed grid connection (with 10% tolerance)
+        unit_cap = int(_f(sp, "max_parallel", 0)) or max_units
+        qty = inverter_count(ac, pv_kwp, max_pv, dc_ac_max, max_units=max(1, min(unit_cap, max_units)))
+        if qty == 0:
+            continue  # would need too many units of this model
+        if qty > 1 and ac < min_parallel_unit_kw:
+            continue  # too small to make sense in parallel
+        ac_tot = ac * qty
+        ratio = (pv_kwp / ac_tot) if (pv_kwp > 0 and ac_tot > 0) else 0.0
+        if qty > 1:
+            reasons.append(f"{qty} × {ac:g} kW = {ac_tot:g} kW AC в паралел")
+            score -= 1.2 * (qty - 1)  # more units = more wiring, commissioning and points of failure
+            if not sp.get("parallel_capable", True):
+                warnings.append("моделът няма потвърдена паралелна работа — проверете datasheet")
+        # connected power: total inverter AC should not exceed grid connection (with 10% tolerance)
         if connected_kw > 0 and ac > 0:
-            if ac > connected_kw * 1.1:
-                score -= (ac - connected_kw) * 2
-                warnings.append(f"AC {ac:g} kW надвишава присъединената мощност {connected_kw:g} kW")
+            if ac_tot > connected_kw * 1.1:
+                score -= (ac_tot - connected_kw) * 2
+                warnings.append(f"AC {ac_tot:g} kW надвишава присъединената мощност {connected_kw:g} kW")
             else:
-                score += 10 - abs(connected_kw - ac)
-                reasons.append(f"AC {ac:g} kW ≤ присъединена {connected_kw:g} kW")
+                score += 10 - abs(connected_kw - ac_tot)
+                reasons.append(f"AC {ac_tot:g} kW ≤ присъединена {connected_kw:g} kW")
         if pv_kwp > 0 and ac > 0:
-            ratio = pv_kwp / ac
-            if max_pv and pv_kwp > max_pv:
-                score -= (pv_kwp - max_pv) * 3
-                warnings.append(f"PV {pv_kwp:g} kWp надвишава макс. вход {max_pv:g} kW")
+            per_unit = pv_kwp / qty
+            if max_pv and per_unit > max_pv + 1e-9:
+                score -= (per_unit - max_pv) * 3
+                warnings.append(f"PV {per_unit:g} kWp на инвертор надвишава макс. вход {max_pv:g} kW")
             elif 0.8 <= ratio <= dc_ac_max:
-                score += 8 - abs(ratio - 1.1) * 2
+                score += 8 - abs(ratio - 1.15) * 2
                 reasons.append(f"DC/AC {ratio:.2f} — оптимално")
             elif ratio < 0.8:
-                score += 3
+                score += 3 - (0.8 - ratio) * 4
                 reasons.append(f"инверторът е с резерв (DC/AC {ratio:.2f})")
             else:
                 score += 5
@@ -77,12 +111,15 @@ def suggest_inverters(
         out.append(
             {
                 "item": it,
+                "qty": qty,
+                "ac_total_kw": round(ac_tot, 2),
+                "ratio": round(ratio, 2),
                 "score": round(score, 2),
                 "reasons": reasons,
                 "warnings": warnings,
             }
         )
-    out.sort(key=lambda r: (-r["score"], _f(r["item"].specs or {}, "ac_power_kw")))
+    out.sort(key=lambda r: (-r["score"], r["qty"], _f(r["item"].specs or {}, "ac_power_kw")))
     return out
 
 

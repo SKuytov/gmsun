@@ -11,8 +11,9 @@ file (`/api/quotes/{id}/techfile.pdf`).
 | --- | --- | --- |
 | Voc at design minimum temperature | `Voc(T) = Voc·(1 + |βVoc|·(25 − Tmin))`, must be ≤ inverter max DC voltage | `design_tmin_c` (−20 °C) |
 | Vmp at hot cell | `Vmp(T) = Vmp·(1 − |βPmax|·(Tcell − 25))`, must be ≥ MPPT minimum | `design_tcell_max_c` (70 °C) |
-| Modules per string | `ns_min = ceil(MPPT_min / Vmp_hot)`, `ns_max = floor(min(Vdc_max / Voc_cold, MPPT_max / Vmp_cold))` | — |
-| Strings per roof plane | equal strings per plane; distributed over MPPTs (`mppt_count`, `strings_per_mppt`); current per MPPT ≤ `max_input_current_a`, Isc ≤ `max_isc_a` | — |
+| Modules per string | `ns_min = ceil(MPPT_min / Vmp_hot)`, `ns_max = floor(min(0.97·Vdc_max / Voc_cold, MPPT_max / Vmp_cold))` (3 % headroom on the inverter's max DC voltage; falls back to the hard limit if nothing fits) | `voc_margin` (0.97) |
+| Strings per roof plane | equal strings per plane (an extra string is used when it makes the lengths equal and still fits the plane's MPPT); each plane on its own MPPT, parallel strings of one plane share a tracker, planes are only mixed when every tracker is taken (warning); current per MPPT ≤ `max_input_current_a`, Isc ≤ `max_isc_a` | — |
+| Several inverters (`n_inverters` > 1) | the array is split per inverter (`split_planes`: each plane divided into N near‑equal parts, remainder to the first units), every inverter gets its own string design (ids S1…Sn, `inverter` k), per‑inverter warnings are prefixed “Инвертор k:” and common ones emitted once | `inverter_qty` in the selections |
 | String fuses | required only if `(Ns − 1)·Isc·1.25 > module max series fuse`; fuse `1.5·Isc ≤ In ≤ 2.4·Isc`, ≤ module max fuse (gPV, 10×38, 1000 V DC) | `dc_box_fuses` forces them |
 | PV cable design current | `1.25·Isc`; H1Z2Z2‑K 6 mm² default (Iz ≈ 43 A), increased when the DC voltage drop exceeds the limit | `dc_vdrop_max_pct` (1 %) |
 | DC SPD at the array | when array‑to‑inverter run > 10 m (IEC 61643‑32), a DC combiner box with SPD T2 (and DC isolator) is added | `dc_box_distance_m`, `dc_box` auto/yes/no |
@@ -29,6 +30,16 @@ file (`/api/quotes/{id}/techfile.pdf`).
 | Backup output | optional second MCB + cable to the backup loads board |
 | Metering | 3 CTs (bundled, 4 m leads; CT extension cable when the run is longer) or a Modbus smart meter + RS485 cable |
 | Enclosures | AC board for MCB + RCD (+ SPD T2 3P+N when the inverter has no integrated AC SPD) |
+| N inverters in parallel | per inverter: MCB + RCD + 5 m feeder to the combiner; `ac_combiner` board by input count (2–4 / 5–8) and bus rating; main breaker `1.25·N·I_max` rounded to the MCB/MCCB series (… 125/160/250/400 A); main cable from the combiner to the main board sized for the total current (Iz table) and the AC voltage drop over `ac_run`; lugs by cross‑section; `parallel_cable` (N − 1) for CAN/RS485 master–slave; PE and conduit lengths scaled; one AC SPD |
+
+### Inverter count (`sizing.inverter_count`, `proposals.generate`)
+
+`n = ceil(kWp / min(max_pv_kw, ac·dc_ac_max))`; one more unit when the DC/AC ratio would exceed 1.25 and still stays
+≥ 0.85. Models needing more than `procurement.max_parallel_inverters` (6) or smaller than
+`procurement.min_parallel_unit_kw` (8 kW) are not proposed in parallel. The proposal engine ranks packs by cost per kW
+AC (+3 % per extra unit) and penalises hard string warnings (Voc / MPPT minimum / inputs / Isc) so a 1 × 60 kW string
+inverter and 4 × 20 kW hybrids compete fairly; whether the whole roof or only the demanded power is sized is the
+`scope` (auto / target / roof, `target_kwp(ctx)`).
 
 ## Battery (Deye LV: RW‑F16, RW‑M6.1‑B, SE‑G5.1 Pro‑B)
 

@@ -108,8 +108,131 @@ def battery_compatibility(inverter: CatalogItem | None, battery: CatalogItem | N
     return w
 
 
-def string_design(panel: CatalogItem | None, inverter: CatalogItem | None, planes: list[dict[str, Any]], design: dict[str, Any]) -> dict[str, Any]:
-    """planes: [{name, modules, span_m, azimuth, tilt}] -> string table + checks."""
+def split_planes(planes: list[dict[str, Any]], n_inverters: int) -> list[list[dict[str, Any]]]:
+    """Distribute roof planes over ``n_inverters`` inverters.
+
+    Whole planes are assigned to the least-loaded inverter when there are at least as many planes as inverters
+    (one orientation per inverter where possible); otherwise every plane is split evenly, so each inverter gets
+    the same module count ±1."""
+    n_inverters = max(1, int(n_inverters))
+    active = [p for p in planes if int(p.get("modules") or 0) > 0]
+    if n_inverters == 1:
+        return [active]
+    groups: list[list[dict[str, Any]]] = [[] for _ in range(n_inverters)]
+    loads = [0] * n_inverters
+    if len(active) >= n_inverters:
+        for p in sorted(active, key=lambda x: -int(x["modules"])):
+            k = loads.index(min(loads))
+            groups[k].append(dict(p))
+            loads[k] += int(p["modules"])
+        # a very unbalanced split (one inverter > 1.6× the average) is worse than splitting planes – fall through
+        avg = sum(loads) / n_inverters
+        if max(loads) <= avg * 1.6 and min(loads) > 0:
+            return groups
+        groups = [[] for _ in range(n_inverters)]
+    for p in active:
+        n = int(p["modules"])
+        base, rem = divmod(n, n_inverters)
+        for k in range(n_inverters):
+            cnt = base + (1 if k < rem else 0)
+            if cnt > 0:
+                groups[k].append({**p, "modules": cnt, "name": f"{p.get('name') or 'Плоскост'}" + (f" ({k + 1}/{n_inverters})" if n_inverters > 1 else "")})
+    return groups
+
+
+def string_design(panel: CatalogItem | None, inverter: CatalogItem | None, planes: list[dict[str, Any]], design: dict[str, Any], n_inverters: int = 1) -> dict[str, Any]:
+    """planes: [{name, modules, span_m, azimuth, tilt}] -> string table + checks.
+
+    With ``n_inverters`` > 1 the array is split over identical inverters (see ``split_planes``); every inverter is
+    designed on its own and the tables are merged (``strings[i]["inverter"]`` = 1..N, ``per_inverter`` summaries)."""
+    n_inverters = max(1, int(n_inverters or 1))
+    if n_inverters == 1:
+        out = _string_design_single(panel, inverter, planes, design)
+        for st in out.get("strings") or []:
+            st["inverter"] = 1
+        out["inverters"] = 1
+        return out
+    groups = split_planes(planes, n_inverters)
+    merged: dict[str, Any] = {"strings": [], "warnings": [], "checks": [], "per_inverter": [], "inverters": n_inverters}
+    fuses_required = False
+    parts_w: list[list[str]] = []
+    parts_c: list[list[dict[str, Any]]] = []
+    for k, grp in enumerate(groups, 1):
+        part = _string_design_single(panel, inverter, grp, design)
+        if k == 1:
+            for key in ("voc_stc", "vmp_stc", "isc", "imp", "voc_cold", "vmp_cold", "vmp_hot", "tmin_c", "tcell_max_c", "ns_max", "ns_min", "mppts", "strings_per_mppt",
+                        "inv_max_dc_v", "inv_mppt_min", "inv_mppt_max", "inv_i_op", "inv_i_sc", "fuse_a", "fuse_rule", "max_series_fuse_a"):
+                if key in part:
+                    merged[key] = part[key]
+            merged["inputs_per_inverter"] = part.get("inputs", 0)
+        offset = len(merged["strings"])
+        for st in part.get("strings") or []:
+            st["inverter"] = k
+            st["id"] = f"S{offset + int(st['id'][1:])}" if str(st.get("id", "")).startswith("S") else st.get("id")
+            st["id_local"] = f"И{k}-{st['id']}"
+            merged["strings"].append(st)
+        parts_w.append(list(part.get("warnings") or []))
+        parts_c.append(list(part.get("checks") or []))
+        fuses_required = fuses_required or bool(part.get("fuses_required"))
+        merged["per_inverter"].append({"inverter": k, "modules": sum(int(p.get("modules") or 0) for p in grp), "strings": part.get("count", 0),
+                                       "modules_per_string": part.get("modules_per_string", 0), "planes": [p.get("name") for p in grp],
+                                       "kwp": round(sum(float(st.get("kwp") or 0) for st in part.get("strings") or []), 3)})
+    # warnings/checks identical for every inverter are reported once, the rest with the inverter number
+    common_w = set(parts_w[0]).intersection(*parts_w[1:]) if parts_w else set()
+    merged["warnings"].extend(w for w in parts_w[0] if w in common_w) if parts_w else None
+    for k, ws in enumerate(parts_w, 1):
+        merged["warnings"].extend(f"Инвертор {k}: {w}" for w in ws if w not in common_w)
+    common_c = {(c["text"], bool(c.get("ok"))) for c in parts_c[0]} if parts_c else set()
+    for cs in parts_c[1:]:
+        common_c &= {(c["text"], bool(c.get("ok"))) for c in cs}
+    merged["checks"].extend(c for c in parts_c[0] if (c["text"], bool(c.get("ok"))) in common_c) if parts_c else None
+    for k, cs in enumerate(parts_c, 1):
+        merged["checks"].extend({**c, "text": f"Инвертор {k}: {c['text']}"} for c in cs if (c["text"], bool(c.get("ok"))) not in common_c)
+    merged["count"] = len(merged["strings"])
+    merged["modules_per_string"] = max((s["modules"] for s in merged["strings"]), default=0)
+    merged["inputs"] = merged.get("inputs_per_inverter", 0) * n_inverters
+    merged["fuses_required"] = fuses_required
+    return merged
+
+
+VOC_MARGIN = 0.97  # Voc(cold) design headroom against the inverter's max DC voltage
+
+
+def _assign_mppts(strings: list[dict[str, Any]], mppts: int, spm: int) -> None:
+    """Assign strings to MPPT trackers/inputs in place.
+
+    Rules (in order): strings of the same plane share an MPPT (same orientation in parallel), different planes get
+    separate MPPTs while any are free, a plane with more strings than `spm` spills over to the next free MPPT, and
+    only when every MPPT is used do planes get mixed (the caller warns about that). Each MPPT takes at most `spm`
+    strings; anything beyond the hardware inputs is still numbered so the warning can be shown.
+    """
+    free = {m: spm for m in range(1, mppts + 1)}
+    by_plane: dict[int, list[dict[str, Any]]] = {}
+    for st in strings:
+        by_plane.setdefault(int(st.get("plane_index") or 0), []).append(st)
+    # largest planes first so they get whole trackers
+    for _pi, sts in sorted(by_plane.items(), key=lambda kv: -len(kv[1])):
+        pending = list(sts)
+        while pending:
+            # a fully free tracker first, then the one with the most free inputs
+            m = next((k for k, v in free.items() if v == spm), None)
+            if m is None:
+                m = max(free, key=lambda k: free[k]) if free else None
+            if m is None or free[m] <= 0:
+                break
+            take = pending[: free[m]]
+            pending = pending[free[m]:]
+            for st in take:
+                st["mppt"] = m
+                st["input"] = spm - free[m] + 1
+                free[m] -= 1
+        # hardware exhausted: number the rest round-robin so the UI can show them
+        for j, st in enumerate(pending):
+            st["mppt"] = (j % mppts) + 1
+            st["input"] = spm + 1 + j // mppts
+
+
+def _string_design_single(panel: CatalogItem | None, inverter: CatalogItem | None, planes: list[dict[str, Any]], design: dict[str, Any]) -> dict[str, Any]:
     out: dict[str, Any] = {"strings": [], "warnings": [], "checks": []}
     n_total = sum(int(p.get("modules") or 0) for p in planes)
     if not panel or not inverter or n_total <= 0:
@@ -141,7 +264,12 @@ def string_design(panel: CatalogItem | None, inverter: CatalogItem | None, plane
     voc_cold = voc * (1 + b_voc * (25 - tmin))
     vmp_cold = vmp * (1 + b_pmax * (25 - tmin))
     vmp_hot = vmp * (1 - b_pmax * (tmax - 25))
-    ns_max = int(min(math.floor(max_dc_v / voc_cold) if voc_cold else 99, math.floor(mppt_max / vmp_cold) if vmp_cold else 99))
+    # design headroom: keep Voc(cold) <= VOC_MARGIN x Vdc,max (datasheet tolerance, colder-than-record mornings)
+    voc_margin = float(design.get("voc_margin") or VOC_MARGIN)
+    ns_max = int(min(math.floor(max_dc_v * voc_margin / voc_cold) if voc_cold else 99, math.floor(mppt_max / vmp_cold) if vmp_cold else 99))
+    ns_max_abs = int(math.floor(max_dc_v / voc_cold)) if voc_cold else 99
+    if ns_max < 1 <= ns_max_abs:
+        ns_max = ns_max_abs
     ns_min = int(math.ceil(max(mppt_min, start_v) / vmp_hot)) if vmp_hot else 1
     out.update(
         {
@@ -159,6 +287,7 @@ def string_design(panel: CatalogItem | None, inverter: CatalogItem | None, plane
     # ---- allocate strings per plane
     strings: list[dict[str, Any]] = []
     active_planes = [p for p in planes if int(p.get("modules") or 0) > 0]
+    inputs = mppts * spm
     for pi, pl in enumerate(planes):
         n = int(pl.get("modules") or 0)
         if n <= 0:
@@ -168,18 +297,21 @@ def string_design(panel: CatalogItem | None, inverter: CatalogItem | None, plane
         # single plane: use every MPPT when the strings stay >= ns_min (better MPP tracking, lower current per input)
         if len(active_planes) == 1 and s < mppts and n // mppts >= ns_min:
             s = mppts
+        # prefer a string count that divides the plane evenly (equal lengths in parallel) when an input is spare
+        # (only when the extra string still fits on the plane's own MPPT – mixing planes on one tracker is worse)
+        room = inputs if len(active_planes) == 1 else spm
+        if n % s and s + 1 <= room and n % (s + 1) == 0 and n // (s + 1) >= ns_min:
+            s += 1
         base, rem = divmod(n, s)
         for k in range(s):
             cnt = base + (1 if k < rem else 0)
             strings.append({"plane": pl.get("name") or f"Плоскост {pi + 1}", "plane_index": pi, "modules": cnt, "span_m": round(cnt * _f(pl, "module_w_m", 1.134) + (cnt - 1) * 0.02, 2), "azimuth": pl.get("azimuth"), "tilt": pl.get("tilt")})
-    # ---- assign to MPPT inputs: one string per MPPT first, then second strings
-    inputs = mppts * spm
+    # ---- assign to MPPT inputs: keep each plane on its own MPPT(s); parallel strings of one plane share an MPPT
     if len(strings) > inputs:
         out["warnings"].append(f"{len(strings)} стринга надвишават входовете на инвертора ({mppts} MPPT × {spm}). Намалете стринговете или изберете по-голям инвертор.")
+    _assign_mppts(strings, mppts, spm)
     for i, st in enumerate(strings):
         st["id"] = f"S{i + 1}"
-        st["mppt"] = (i % mppts) + 1
-        st["input"] = (i // mppts) + 1
         st["voc_cold_v"] = round(st["modules"] * voc_cold, 1)
         st["vmp_stc_v"] = round(st["modules"] * vmp, 1)
         st["vmp_hot_v"] = round(st["modules"] * vmp_hot, 1)
@@ -238,11 +370,14 @@ def full_design(
     row_length_m: float,
     sel: dict[str, Any],
     pricing: dict[str, Any],
+    inverter_qty: int = 1,
 ) -> dict[str, Any]:
     params = project.params or {}
+    n_inv = max(1, int(inverter_qty or 1)) if inverter else 1
     design = {
         "design_tmin_c": _f(params, "design_tmin_c", _f(pricing, "design_tmin_c", -20)),
         "design_tcell_max_c": _f(pricing, "design_tcell_max_c", 70),
+        "voc_margin": _f(pricing, "voc_margin", VOC_MARGIN),
     }
     cable_margin = _f(pricing, "cable_margin_pct", 15) / 100.0
     fast_margin = _f(pricing, "fastener_margin_pct", 10) / 100.0
@@ -261,7 +396,7 @@ def full_design(
     inv = (inverter.specs if inverter else {}) or {}
     ps = (panel.specs if panel else {}) or {}
     bs = (battery.specs if battery else {}) or {}
-    sd = string_design(panel, inverter, planes, design)
+    sd = string_design(panel, inverter, planes, design, n_inverters=n_inv)
     strings = sd.get("strings") or []
     n_str = len(strings)
     warnings: list[str] = list(sd.get("warnings") or [])
@@ -350,19 +485,45 @@ def full_design(
             mm2 = _std(mm2 + 0.1, CABLE_STD)
             vd = vdrop(mm2)
         cores = 5 if phase == 3 else 3
-        ac_len_raw = ac_run + 3  # inverter + board terminations
+        combiner_run = 3.0  # inverters are mounted next to the AC combiner board when several run in parallel
+        ac_len_raw = (ac_run + 3) if n_inv == 1 else (combiner_run + 2)  # per-inverter feeder incl. terminations
         ac.update(
             {
-                "i_max_a": round(i_max, 1), "breaker_a": brk, "breaker_poles": poles, "rcd_a": rcd, "rcd_ma": int(_f(inv, "rcd_ma", 300)), "rcd_type": "A",
-                "cable_mm2": mm2, "cores": cores, "cable_m_raw": ac_len_raw, "cable_m": _round_up(ac_len_raw * (1 + cable_margin), 1), "vdrop_pct": round(vd, 2), "vdrop_limit_pct": ac_vdrop_max,
-                "spd_integrated": bool(inv.get("integrated_spd", True)),
+                "inverters": n_inv, "i_max_a": round(i_max, 1), "breaker_a": brk, "breaker_poles": poles, "rcd_a": rcd, "rcd_ma": int(_f(inv, "rcd_ma", 300)), "rcd_type": "A",
+                "cable_mm2": mm2, "cores": cores, "cable_m_raw": ac_len_raw * n_inv, "cable_m": _round_up(ac_len_raw * n_inv * (1 + cable_margin), 1), "vdrop_pct": round(vd, 2), "vdrop_limit_pct": ac_vdrop_max,
+                "spd_integrated": bool(inv.get("integrated_spd", True)), "p_total_kw": round(p_kw * n_inv, 2),
             }
         )
-        role("ac_mcb", f"Автоматичен прекъсвач {poles} {brk} A, крива C, 6 kA (вход мрежа)", 1, rating_a=brk, poles=poles)
-        role("ac_rcd", f"Дефектнотокова защита {poles} {rcd} A / 300 mA тип A", 1, rating_a=rcd, poles=poles)
+        per_inv = f" ×{n_inv} инвертора" if n_inv > 1 else ""
+        role("ac_mcb", f"Автоматичен прекъсвач {poles} {brk} A, крива C, 6 kA (изход инвертор{per_inv})" if n_inv > 1 else f"Автоматичен прекъсвач {poles} {brk} A, крива C, 6 kA (вход мрежа)", n_inv, rating_a=brk, poles=poles)
+        role("ac_rcd", f"Дефектнотокова защита {poles} {rcd} A / 300 mA тип A" + (" (на инвертор)" if n_inv > 1 else ""), n_inv, rating_a=rcd, poles=poles)
+        role("ac_cable", f"Кабел СВТ {cores}×{mm2:g} mm² (инвертор → {'табло AC комбиниране' if n_inv > 1 else 'ГРТ'})", ac["cable_m"], unit="м", cross_section_mm2=mm2, cores=cores)
+        role("ac_lug", f"Кабелен накрайник / накрайник за жило {mm2:g} mm²", 2 * cores * n_inv, cross_section_mm2=mm2)
+        if n_inv > 1:
+            # AC combiner: one main breaker for the sum of the inverters + feeder to the main board sized for the total current
+            i_tot = i_max * n_inv
+            brk_main = int(_std(1.25 * i_tot, MCB_STD)) if 1.25 * i_tot <= MCB_STD[-1] else int(math.ceil(1.25 * i_tot / 50) * 50)
+            mm2_main = next((c for c in CABLE_STD if CABLE_IZ[c] >= brk_main), CABLE_STD[-1])
+
+            def vdrop_main(a: float) -> float:
+                if phase == 3:
+                    return (math.sqrt(3) * ac_run * i_tot * pf) / (SIGMA_CU * a * u) * 100
+                return (2 * ac_run * i_tot * pf) / (SIGMA_CU * a * u) * 100
+
+            vdm = vdrop_main(mm2_main)
+            while vdm > ac_vdrop_max and mm2_main < CABLE_STD[-1]:
+                mm2_main = _std(mm2_main + 0.1, CABLE_STD)
+                vdm = vdrop_main(mm2_main)
+            main_len = _round_up((ac_run + 3) * (1 + cable_margin), 1)
+            ac.update({"combiner": True, "i_total_a": round(i_tot, 1), "main_breaker_a": brk_main, "main_cable_mm2": mm2_main, "main_cable_m": main_len, "main_vdrop_pct": round(vdm, 2)})
+            role("ac_combiner", f"Табло AC за паралелни инвертори ({n_inv} входа, главен прекъсвач {brk_main} A) IP65", 1, inverters=n_inv, rating_a=brk_main)
+            role("ac_mcb", f"Главен прекъсвач {poles} {brk_main} A (табло AC → ГРТ)", 1, rating_a=brk_main, poles=poles)
+            role("ac_cable", f"Кабел СВТ {cores}×{mm2_main:g} mm² (табло AC комбиниране → ГРТ)", main_len, unit="м", cross_section_mm2=mm2_main, cores=cores)
+            role("ac_lug", f"Кабелна обувка {mm2_main:g} mm² (табло AC → ГРТ)", 2 * cores, cross_section_mm2=mm2_main)
+            role("parallel_cable", "Кабел за паралелна комуникация между инвертори (CAN/RS485, RJ45 екраниран)", n_inv - 1)
+            if brk_main > 160:
+                warnings.append(f"Общ AC ток {i_tot:.0f} A — главното табло/присъединяването трябва да бъдат проверени от проектант (NN ≥ {brk_main} A).")
         role("ac_spd", f"Катоден отводител AC тип 2, {'3P+N' if phase == 3 else '1P+N'} 275 V", 1, phases=phase)
-        role("ac_cable", f"Кабел СВТ {cores}×{mm2:g} mm² (инвертор → ГРТ)", ac["cable_m"], unit="м", cross_section_mm2=mm2, cores=cores)
-        role("ac_lug", f"Кабелен накрайник / накрайник за жило {mm2:g} mm²", 2 * cores)
         # backup (load) output — optional sub-board
         if sel.get("backup_output"):
             role("ac_mcb", f"Автоматичен прекъсвач {poles} {brk} A, крива C (изход резервирани товари)", 1, rating_a=brk, poles=poles)
@@ -382,7 +543,7 @@ def full_design(
     # --------------------------------------------------------------- battery
     bat: dict[str, Any] = {}
     if battery and battery_qty > 0 and inverter:
-        inputs = int(_f(inv, "battery_inputs", 1))
+        inputs = int(_f(inv, "battery_inputs", 1)) * n_inv
         brk_a = int(_f(inv, "battery_breaker_a") or _std(_f(inv, "max_charge_a", 100) * 1.25, DC_BREAKER_STD))
         mm2 = _f(inv, "battery_cable_mm2") or next((c for c in CABLE_STD if CABLE_IZ[c] >= _f(inv, "max_charge_a", 100) * 1.25), 70)
         kwh = _f(bs, "kwh")
@@ -402,15 +563,20 @@ def full_design(
         if parallel:
             role("battery_busbar", f"Шинен разпределител DC {_std(brk_a * 1.2, DC_BREAKER_STD)} A (+/−) за паралелни батерии", 1, section="inverter")
         role("comm_cable", "Комуникационен кабел CAN/RS485 RJ45 (батерия ↔ инвертор/батерия)", battery_qty, section="inverter")
-        if battery_qty > int(_f(bs, "max_parallel", 16)):
-            warnings.append(f"Батерии в паралел ({battery_qty}) надвишават допустимото за модела ({int(_f(bs, 'max_parallel'))}).")
+        if n_inv > 1:
+            bat["per_inverter"] = round(battery_qty / n_inv, 2)
+            if battery_qty % n_inv:
+                warnings.append(f"{battery_qty} батерии не се делят поравно на {n_inv} инвертора — при отделни батерийни банки изравнете броя (напр. {math.ceil(battery_qty / n_inv) * n_inv}).")
+        if battery_qty > int(_f(bs, "max_parallel", 16)) * n_inv:
+            warnings.append(f"Батерии в паралел ({battery_qty}) надвишават допустимото за модела ({int(_f(bs, 'max_parallel'))} на инвертор).")
         warnings.extend(battery_compatibility(inverter, battery, battery_qty))
     # -------------------------------------------------------------- earthing
     grd: dict[str, Any] = {}
     if panel_qty:
         pe_mm2 = _f(inv, "pe_cable_mm2", 16) if inverter else 16
         bonding_m = row_length_m + dc_run + 5
-        grd.update({"pe_mm2": pe_mm2, "pe_m": _round_up((ac_run + 2) * (1 + cable_margin), 1), "bonding_mm2": 6, "bonding_m_raw": round(bonding_m, 1), "bonding_m": _round_up(bonding_m * (1 + cable_margin), 5), "bonding_clamps": rail_lines})
+        pe_len = (ac_run + 2) if n_inv == 1 else (3 + 2) * n_inv + (ac_run + 2)
+        grd.update({"pe_mm2": pe_mm2, "pe_m": _round_up(pe_len * (1 + cable_margin), 1), "bonding_mm2": 6, "bonding_m_raw": round(bonding_m, 1), "bonding_m": _round_up(bonding_m * (1 + cable_margin), 5), "bonding_clamps": rail_lines})
         role("pe_cable", f"Заземителен проводник ПВ-А1 {pe_mm2:g} mm² жълто-зелен (инвертор → заземителна шина)", grd["pe_m"], unit="м", cross_section_mm2=pe_mm2)
         role("bonding_cable", "Заземителен проводник 6 mm² жълто-зелен (изравняване на потенциалите на конструкцията)", grd["bonding_m"], unit="м", cross_section_mm2=6)
         role("bonding_clamp", "Клема за заземяване на шина (WCL8-10 / еквивалент)", int(math.ceil(rail_lines * (1 + fast_margin))), section="construction")
@@ -424,7 +590,7 @@ def full_design(
     if panel_qty and n_str:
         ties = int(math.ceil((4 * panel_qty + 2 * rail_lines + 10 * n_str) * (1 + fast_margin)))
         conduit_dc = _round_up(dc_run * math.ceil(2 * n_str / 4) * (1 + cable_margin), 1)  # ≤4 PV cables per ф32 conduit
-        conduit_ac = _round_up((ac_run + (batt_run if bat else 0)) * (1 + cable_margin), 1)
+        conduit_ac = _round_up((ac_run + (batt_run if bat else 0) + (3 * n_inv if n_inv > 1 else 0)) * (1 + cable_margin), 1)
         clips = int(math.ceil((conduit_dc + conduit_ac) * 2 * (1 + fast_margin)))
         mgmt.update({"ties": ties, "conduit_dc_m": conduit_dc, "conduit_ac_m": conduit_ac, "conduit_clips": clips})
         role("cable_tie_uv", "Кабелна връзка UV-устойчива 4,8×200 mm (черна)", ties)
@@ -434,6 +600,7 @@ def full_design(
         role("end_sleeve", f"Кабелен накрайник за жило 6 mm² (DC)", 4 * n_str)
     # --------------------------------------------------------------------
     return {
+        "inverters": n_inv,
         "strings": sd,
         "dc": dc,
         "ac": ac,
@@ -480,10 +647,16 @@ def find_item_for_role(items: list[CatalogItem], r: dict[str, Any], chooser: Cal
     good = [it for it in cands if ok(it)]
     if not good:
         return None
-    good.sort(key=lambda it: (_f(it.specs, "rating_a") or 0, _f(it.specs, "cross_section_mm2") or 0, it.purchase_price or 0))
+    # generic items (no declared rating / cross-section) are treated as an exact match, but a declared exact match wins
+    def _key(it: CatalogItem):
+        ra, mm = _f(it.specs, "rating_a"), _f(it.specs, "cross_section_mm2")
+        undeclared = bool((need_a and not ra) or (need_mm2 and not mm))
+        return (ra or (need_a or 0), mm or (need_mm2 or 0), undeclared, it.purchase_price or 0)
+
+    good.sort(key=_key)
     if chooser is not None:
         top = good[0]
-        same = [it for it in good if (_f(it.specs, "rating_a") or 0) == (_f(top.specs, "rating_a") or 0) and (_f(it.specs, "cross_section_mm2") or 0) == (_f(top.specs, "cross_section_mm2") or 0)]
+        same = [it for it in good if _key(it)[:3] == _key(top)[:3]]
         if len(same) > 1:
             return chooser(same)
     return good[0]

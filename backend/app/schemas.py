@@ -403,6 +403,9 @@ class QuoteOut(ORMModel):
 # ---------------- sizing ----------------
 class InverterSuggestion(BaseModel):
     item: CatalogItemOut
+    qty: int = 1
+    ac_total_kw: float = 0
+    ratio: float = 0
     score: float
     reasons: list[str]
     warnings: list[str]

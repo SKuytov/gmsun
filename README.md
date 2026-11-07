@@ -103,6 +103,23 @@ XM‑PL за плоски керемиди), LT ламарина (CompactMETAL T
 - Документите (оферта за клиента, вътрешна калкулация, техническо досие, Excel КСС/Поръчка/Запитване) са с единен
   фирмен стил: шрифт Inter, бланка, обобщение „Предложено решение“, ценови блок, спецификация по раздели, условия.
 
+### Желана мощност, целият покрив и няколко инвертора в паралел
+
+- В стъпка 2 има поле **„Желана мощност (kWp)“**. Предложенията се оразмеряват по нея; без него — по
+  потреблението, а като последна възможност — по присъединената мощност × 1,2.
+- Когато покривът побира повече (напр. 83 kWp при нужда от 20 kWp), превключвателят **Автоматично / По необходимост /
+  Целият покрив** в стъпка 4 решава: „по необходимост“ офертира само нужния брой модули (останалите остават на
+  разположението като резерв), „целият покрив“ оразмерява всички модули — с **N еднакви инвертора в паралел**
+  (напр. 4 × 20 kW), ако един не стига. Броят се изчислява от макс. PV вход и DC/AC ≤ 1,35 и е ръчно редактируем
+  („Брой инвертори“ в стъпка 4, бутон „предложи“).
+- При N > 1 инженерният модул разделя масива по инвертори, проектира стринговете на всеки (всяка плоскост на
+  собствен MPPT, еднакви дължини в паралел, Voc(−20 °C) ≤ 97 % от макс. DC), слага прекъсвач + ДТЗ и захранващ кабел
+  за всеки инвертор, **табло AC за паралелни инвертори**, **главен прекъсвач (MCCB)** и главен кабел към ГРТ по
+  общия ток и пада на напрежение, кабели за паралелна комуникация и съответните обувки/PE. Офертата, техническото
+  досие (еднолинейна схема с N инвертора и табло AC) и КСС го показват.
+- Надвишаването на присъединената мощност се показва изрично (увеличение на мощността или export limit);
+  паралелна работа се предлага само с инвертори ≥ `min_parallel_unit_kw` (8 kW) и до `max_parallel_inverters` (6).
+
 ### Пълен набор данни и редакция на всички таблици в Excel
 
 - При първи старт **всички** артикули получават цена, доставчик, срок, клас, код и гаранция. Там, където няма реална
@@ -144,6 +161,17 @@ values are derived (supplier defaults, price‑per‑unit percentile + brand + q
 selections. Quotes record the equipment lead time and bottleneck line. `GET /api/quotes/{id}/rfq`, `rfq.xlsx` and
 `rfq.zip` produce supplier‑ready request‑for‑quotation workbooks grouped by supplier. New columns are added to
 existing databases automatically on startup (`ensure_columns`).
+
+### Target power, whole roof and parallel inverters
+
+Projects carry `params.target_kwp` (step 2). Proposals size to that demand (fallbacks: consumption, connected
+power × 1.2); when the layout holds much more, the scope switch **auto / target / roof** either quotes the needed
+module count only (`panel_limit`) or the whole roof with **N identical inverters in parallel** (`inverter_qty`,
+`sizing.inverter_count()`: per‑unit PV ≤ max PV input, DC/AC ≤ 1.35, preferred ≤ 1.25). `engineering.string_design`
+splits the array per inverter (plane → own MPPT, equal parallel lengths, Voc(cold) ≤ 0.97·Vdc,max) and
+`full_design` adds per‑inverter MCB/RCD/feeders, an AC combiner board, a main MCCB and main cable sized for the total
+current and voltage drop, parallel‑communication cables and PE. Catalog roles `ac_combiner` and `parallel_cable` are
+new; settings `procurement.max_parallel_inverters` (6) and `procurement.min_parallel_unit_kw` (8) bound the search.
 
 ### Complete dataset and whole-database Excel round trip
 

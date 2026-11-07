@@ -43,6 +43,7 @@ DEFAULT_SETTINGS: dict[str, dict[str, Any]] = {
         "module_spare_pct": 0.0,  # spare modules ordered with the project
         "design_tmin_c": -20.0,  # minimum ambient (Voc check) – Bulgaria lowland winter
         "design_tcell_max_c": 70.0,  # max cell temperature (Vmp check)
+        "voc_margin": 0.97,  # Voc(cold) must stay below this share of the inverter's max DC voltage
         "dc_vdrop_max_pct": 1.0,  # DC voltage drop target
         "ac_vdrop_max_pct": 1.0,  # AC voltage drop target inverter -> board
         "dc_run_default_m": 15.0,  # one-way array -> inverter distance
@@ -88,6 +89,8 @@ DEFAULT_SETTINGS: dict[str, dict[str, Any]] = {
         "fastest_max_days": 10,
         "candidate_panels": 6,  # how many panel models to evaluate per strategy (top-N by that strategy's ranking)
         "candidate_inverters": 4,
+        "max_parallel_inverters": 6,  # largest number of identical inverters the proposal engine will put in parallel
+        "min_parallel_unit_kw": 8,  # smallest inverter (kW AC) that may be proposed in parallel operation
         "candidate_batteries": 3,
     },
 }

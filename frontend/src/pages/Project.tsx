@@ -95,7 +95,8 @@ export default function ProjectPage() {
     const p = project.data
     const layoutCount = p.layouts.reduce((s, l) => s + (l.summary?.count || 0), 0)
     const useLayout = sel.use_layout !== false && layoutCount > 0
-    const panelQty = useLayout ? layoutCount : sel.panel_qty || 0
+    const limit = Number(sel.panel_limit || 0)
+    const panelQty = useLayout ? (limit > 0 && limit < layoutCount ? limit : layoutCount) : sel.panel_qty || 0
     const panelId = sel.panel_item_id || p.layouts[0]?.panel_item_id
     const panel = items.data.find((i) => i.id === panelId)
     const wp = Number(panel?.specs?.wp || 0)

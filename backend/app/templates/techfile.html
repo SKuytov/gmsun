@@ -59,7 +59,7 @@
 <div class="kpi">
   <div><div class="v">{{ info.panel_qty }} × {{ info.panel_wp | num }} Wp</div><div class="l">Модули</div></div>
   <div><div class="v">{{ info.kwp | num }} kWp</div><div class="l">Инсталирана DC мощност</div></div>
-  <div><div class="v">{{ inverter.specs.ac_power_kw | num if inverter else '—' }} kW</div><div class="l">Инвертор AC</div></div>
+  <div><div class="v">{% if inverter %}{% if ac.inverters and ac.inverters > 1 %}{{ ac.inverters }} × {% endif %}{{ inverter.specs.ac_power_kw | num }} kW{% else %}—{% endif %}</div><div class="l">{{ 'Инвертори AC (общо ' ~ (ac.p_total_kw | num) ~ ' kW)' if ac.inverters and ac.inverters > 1 else 'Инвертор AC' }}</div></div>
   <div><div class="v">{{ sd.count or 0 }} × {{ sd.modules_per_string or 0 }}</div><div class="l">Стрингове</div></div>
   <div><div class="v">{{ annual_yield | thousands }} kWh</div><div class="l">Очакван годишен добив</div></div>
 </div>
@@ -97,7 +97,7 @@
     <tr><td>Макс. предпазител</td><td>{{ panel.specs.max_series_fuse_a }} A · {{ panel.specs.max_system_v }} V</td></tr>
     <tr><td>Размери / тегло</td><td>{{ panel.specs.height_mm }}×{{ panel.specs.width_mm }}×{{ panel.specs.thickness_mm }} mm / {{ panel.specs.weight_kg }} kg</td></tr>
   </table></div>{% endif %}
-  {% if inverter %}<div class="box"><h3>Инвертор</h3><b>{{ inverter.name }}</b><table>
+  {% if inverter %}<div class="box"><h3>{{ 'Инвертори (' ~ ac.inverters ~ ' бр. в паралел)' if ac.inverters and ac.inverters > 1 else 'Инвертор' }}</h3><b>{% if ac.inverters and ac.inverters > 1 %}{{ ac.inverters }} × {% endif %}{{ inverter.name }}</b><table>
     <tr><td>AC мощност / макс. ток</td><td>{{ inverter.specs.ac_power_kw }} kW / {{ inverter.specs.max_ac_current_a }} A</td></tr>
     <tr><td>Макс. PV вход</td><td>{{ inverter.specs.max_pv_kw }} kW ({{ inverter.specs.max_pv_access_kw }} kWp)</td></tr>
     <tr><td>DC напрежение / MPPT</td><td>{{ inverter.specs.max_dc_voltage }} V / {{ inverter.specs.mppt_v_min }}–{{ inverter.specs.mppt_v_max }} V · {{ inverter.specs.mppt_count }} MPPT × {{ inverter.specs.strings_per_mppt }}</td></tr>
@@ -117,9 +117,9 @@
 
 <h2>2. Стрингово оформление и DC проверки</h2>
 <table class="t">
-  <tr><th>Стринг</th><th>Плоскост</th><th class="r">Модули</th><th class="r">kWp</th><th class="r">Vmp STC</th><th class="r">Voc @ {{ sd.tmin_c | num }} °C</th><th class="r">Vmp @ {{ sd.tcell_max_c | num }} °C</th><th class="c">MPPT / вход</th><th class="r">Кабел (едн.)</th><th class="r">ΔU</th></tr>
+  <tr><th>Стринг</th>{% if sd.inverters and sd.inverters > 1 %}<th class="c">Инв.</th>{% endif %}<th>Плоскост</th><th class="r">Модули</th><th class="r">kWp</th><th class="r">Vmp STC</th><th class="r">Voc @ {{ sd.tmin_c | num }} °C</th><th class="r">Vmp @ {{ sd.tcell_max_c | num }} °C</th><th class="c">MPPT / вход</th><th class="r">Кабел (едн.)</th><th class="r">ΔU</th></tr>
   {% for s in sd.strings %}
-  <tr><td><span class="dot" style="background:{{ colors[loop.index0 % colors|length] }}"></span>{{ s.id }}</td><td>{{ s.plane }}</td><td class="r">{{ s.modules }}</td><td class="r">{{ s.kwp | num }}</td><td class="r">{{ s.vmp_stc_v | num }} V</td><td class="r">{{ s.voc_cold_v | num }} V</td><td class="r">{{ s.vmp_hot_v | num }} V</td><td class="c">{{ s.mppt }} / {{ s.input }}</td><td class="r">{{ s.cable_one_way_m | num }} m</td><td class="r">{{ s.vdrop_pct | num }} %</td></tr>
+  <tr><td><span class="dot" style="background:{{ colors[loop.index0 % colors|length] }}"></span>{{ s.id }}</td>{% if sd.inverters and sd.inverters > 1 %}<td class="c">И{{ s.inverter }}</td>{% endif %}<td>{{ s.plane }}</td><td class="r">{{ s.modules }}</td><td class="r">{{ s.kwp | num }}</td><td class="r">{{ s.vmp_stc_v | num }} V</td><td class="r">{{ s.voc_cold_v | num }} V</td><td class="r">{{ s.vmp_hot_v | num }} V</td><td class="c">{{ s.mppt }} / {{ s.input }}</td><td class="r">{{ s.cable_one_way_m | num }} m</td><td class="r">{{ s.vdrop_pct | num }} %</td></tr>
   {% endfor %}
 </table>
 <div class="grid">
@@ -139,15 +139,23 @@
 </div>
 
 <h2>3. Еднолинейна схема</h2>
-<div class="fig">{{ sld | safe }}<div class="cap">Принципна еднолинейна схема — стрингове → {% if dc.box %}DC табло → {% endif %}инвертор{% if bat %} (+ батерия){% endif %} → главно разпределително табло → мрежа. Защитите са според ръководството на инвертора и IEC 60364-7-712.</div></div>
+<div class="fig">{{ sld | safe }}<div class="cap">Принципна еднолинейна схема — стрингове → {% if dc.box %}DC табло → {% endif %}{% if ac.combiner %}{{ ac.inverters }} инвертора в паралел{% if bat %} (+ батерия){% endif %} → табло AC комбиниране{% else %}инвертор{% if bat %} (+ батерия){% endif %}{% endif %} → главно разпределително табло → мрежа. Защитите са според ръководството на инвертора и IEC 60364-7-712.</div></div>
 
 <div class="grid">
   <div class="box"><h3>AC страна</h3><table>
+    {% if ac.combiner %}
+    <tr><td>Инвертори в паралел</td><td>{{ ac.inverters }} × {{ ac.i_max_a }} A = {{ ac.i_total_a }} A ({{ ac.phase }} ф.), общо {{ ac.p_total_kw | num }} kW</td></tr>
+    <tr><td>Защита на инвертор</td><td>{{ ac.inverters }} × {{ ac.breaker_poles }} {{ ac.breaker_a }} A крива C + ДТЗ {{ ac.rcd_a }} A / {{ ac.rcd_ma }} mA тип {{ ac.rcd_type }}</td></tr>
+    <tr><td>Кабел инвертор → табло AC</td><td>СВТ {{ ac.cores }}×{{ ac.cable_mm2 | num }} mm² · общо {{ ac.cable_m | num }} m · ΔU {{ ac.vdrop_pct }} %</td></tr>
+    <tr><td>Табло AC комбиниране</td><td>главен прекъсвач {{ ac.breaker_poles }} {{ ac.main_breaker_a }} A, катоден отводител AC тип 2, паралелна комуникация CAN/RS485</td></tr>
+    <tr><td>Кабел табло AC → ГРТ</td><td>СВТ {{ ac.cores }}×{{ ac.main_cable_mm2 | num }} mm² · {{ ac.main_cable_m | num }} m · ΔU {{ ac.main_vdrop_pct }} %</td></tr>
+    {% else %}
     <tr><td>Макс. AC ток</td><td>{{ ac.i_max_a }} A ({{ ac.phase }} ф.)</td></tr>
     <tr><td>Прекъсвач вход</td><td>{{ ac.breaker_poles }} {{ ac.breaker_a }} A крива C</td></tr>
     <tr><td>Дефектнотокова защита</td><td>{{ ac.rcd_a }} A / {{ ac.rcd_ma }} mA тип {{ ac.rcd_type }}</td></tr>
     <tr><td>Катоден отводител</td><td>AC тип 2 в ГРТ{% if ac.spd_integrated %} (+ вграден в инвертора){% endif %}</td></tr>
     <tr><td>Кабел</td><td>СВТ {{ ac.cores }}×{{ ac.cable_mm2 | num }} mm² · {{ ac.cable_m_raw | num }} m → {{ ac.cable_m | num }} m · ΔU {{ ac.vdrop_pct }} %</td></tr>
+    {% endif %}
     <tr><td>Измерване</td><td>{{ 'токови трансформатори (3 бр., в комплекта)' if ac.metering == 'ct' else 'смарт електромер Modbus' }}</td></tr>
   </table></div>
   {% if bat %}<div class="box"><h3>Батерийна верига</h3><table>

@@ -201,3 +201,33 @@ def test_engineering_design_and_techfile(client, auth):
     xlsx = client.get(f"/api/quotes/{q['id']}/xlsx?internal=true", headers=auth)
     wb = load_workbook(io.BytesIO(xlsx.content))
     assert "Поръчка" in wb.sheetnames and wb["Поръчка"].max_row > 10 and "Доставчици" in wb.sheetnames
+
+
+def test_recalculate_after_project_change_adds_new_lines(client, auth):
+    """Changing the project (roof type) after a quote exists and recalculating must add the new auto lines
+    (regression: new lines have no position yet and used to crash the ordering)."""
+    p = _make_project(client, auth)
+    pid = p["id"]
+    client.patch(f"/api/projects/{pid}", headers=auth, json={"roof_type": "unknown_roof"})
+    lay = client.post(f"/api/projects/{pid}/layouts", headers=auth, json={"name": "Юг", "plane_w_m": 3.23, "plane_h_m": 16.9, "orientation": "landscape", "setback_m": 0.3}).json()
+    client.post(f"/api/projects/{pid}/layouts/{lay['id']}/autofill", headers=auth, json={})
+    q = client.post(f"/api/projects/{pid}/quotes", headers=auth, json={"selections": {}}).json()
+    assert "Непознат тип покрив." in q["selections"]["_warnings"]
+    assert not [l for l in q["lines"] if l["section"] == "construction" and (l.get("meta") or {}).get("mode") != "lump" and "Доставка" not in l["name"] and "клема" not in l["name"]]
+    client.patch(f"/api/projects/{pid}", headers=auth, json={"roof_type": "lt_sheet"})
+    r = client.post(f"/api/quotes/{q['id']}/recalculate", headers=auth)
+    assert r.status_code == 200, r.text
+    q2 = r.json()
+    assert "Непознат тип покрив." not in q2["selections"]["_warnings"]
+    constr = [l for l in q2["lines"] if l["section"] == "construction"]
+    assert len(constr) > 3
+    positions = [l["position"] for l in q2["lines"]]
+    assert sorted(positions) == list(range(len(positions)))
+
+
+def test_trapezoidal_sheet_rules_include_bridges_and_screws(client, auth):
+    """Regression: the TL25 bridges and MSS screws for LT sheet were deactivated by the retired-rules upgrade step."""
+    rules = client.get("/api/catalog/mounting-rules", headers=auth).json()
+    lt = {r["name"]: r for r in rules if r["roof_type"] == "lt_sheet"}
+    assert lt["CompactMETAL TL25 трапецовиден мост 250 mm с EPDM"]["active"] is True
+    assert lt["MSS 6×25 самопробивен винт с EPDM шайба (ламарина)"]["active"] is True

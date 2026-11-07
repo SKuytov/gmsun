@@ -10,6 +10,7 @@ lines (`source == "manual"`) are always preserved.
 from __future__ import annotations
 
 import math
+import re
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -70,24 +71,42 @@ def active_layout_summary(project: Project) -> dict[str, Any]:
     return total
 
 
-def _design(db: Session, project: Project, sel: dict[str, Any], pricing: dict[str, Any], panel: CatalogItem | None, inverter: CatalogItem | None, battery: CatalogItem | None, bq: int, panel_qty: int, layout_sum: dict[str, Any]) -> dict[str, Any]:
-    """Collect roof planes + rail statistics and run the engineering engine."""
+def _design(db: Session, project: Project, sel: dict[str, Any], pricing: dict[str, Any], panel: CatalogItem | None, inverter: CatalogItem | None, battery: CatalogItem | None, bq: int, panel_qty: int, layout_sum: dict[str, Any], inverter_qty: int = 1) -> dict[str, Any]:
+    """Collect roof planes + rail statistics and run the engineering engine.
+
+    When ``panel_qty`` is smaller than the layout count (a "target power" quote on a roof with more room) the planes
+    are scaled down proportionally, so strings, rails and cables follow the quoted module count."""
     pw = float((panel.specs or {}).get("width_mm", 1134)) / 1000 if panel else 1.134
     planes: list[dict[str, Any]] = []
-    if sel.get("use_layout", True) and layout_sum.get("count"):
+    lay_count = int(layout_sum.get("count") or 0)
+    scale = (panel_qty / lay_count) if (lay_count > 0 and 0 < panel_qty < lay_count) else 1.0
+    if sel.get("use_layout", True) and lay_count:
+        remaining = panel_qty if scale < 1 else None
         for lay in project.layouts:
             s = lay.summary or {}
-            if int(s.get("count") or 0) > 0:
-                planes.append({"name": lay.name, "modules": int(s["count"]), "module_w_m": pw, "azimuth": lay.azimuth_deg, "tilt": lay.tilt_deg, "layout_id": lay.id})
+            n = int(s.get("count") or 0)
+            if n <= 0:
+                continue
+            if remaining is not None:
+                n = min(remaining, max(0, int(round(n * scale))))
+                remaining -= n
+            if n > 0:
+                planes.append({"name": lay.name, "modules": n, "module_w_m": pw, "azimuth": lay.azimuth_deg, "tilt": lay.tilt_deg, "layout_id": lay.id})
+        if remaining and planes:  # rounding leftovers go to the largest plane
+            planes.sort(key=lambda x: -x["modules"])
+            planes[0]["modules"] += remaining
     if not planes and panel_qty > 0:
         planes.append({"name": "Плоскост 1", "modules": panel_qty, "module_w_m": pw})
     lines = layout_sum.get("lines") or []
-    rail_lines = sum(int(l.get("rails") or 2) for l in lines) if lines else math.ceil(panel_qty / 10) * 2
-    row_m = sum(float(l.get("length_m") or 0) for l in lines) if lines else panel_qty * (pw + 0.02)
+    rail_lines = (sum(int(l.get("rails") or 2) for l in lines) if lines else math.ceil(panel_qty / 10) * 2)
+    row_m = (sum(float(l.get("length_m") or 0) for l in lines) if lines else panel_qty * (pw + 0.02))
+    if scale < 1:
+        rail_lines = max(2, int(round(rail_lines * scale)))
+        row_m = row_m * scale
     try:
         return engineering.full_design(
             db, project=project, panel=panel, inverter=inverter, battery=battery, battery_qty=bq, panel_qty=panel_qty,
-            planes=planes, rail_lines=rail_lines, row_length_m=row_m, sel=sel, pricing=pricing,
+            planes=planes, rail_lines=rail_lines, row_length_m=row_m, sel=sel, pricing=pricing, inverter_qty=inverter_qty,
         )
     except Exception as e:  # noqa: BLE001 - design must never block the quote
         return {"roles": [], "warnings": [f"Грешка в инженерния модул: {e}"], "strings": {}}
@@ -107,6 +126,10 @@ def build_lines(db: Session, project: Project, quote: Quote) -> tuple[list[dict[
     panel_qty = int(sel.get("panel_qty") or 0)
     if sel.get("use_layout", True) and layout_sum["count"] > 0:
         panel_qty = layout_sum["count"]
+        limit = int(sel.get("panel_limit") or 0)
+        if 0 < limit < panel_qty:  # quote only part of the roof (target power), the rest stays as an option
+            info["roof_panel_qty"] = panel_qty
+            panel_qty = limit
     if panel is None and project.layouts:
         panel = _item(db, project.layouts[0].panel_item_id)
     panel_wp = float((panel.specs or {}).get("wp", 0)) if panel else 0.0
@@ -126,15 +149,22 @@ def build_lines(db: Session, project: Project, quote: Quote) -> tuple[list[dict[
 
     # --------------------------------------------------------- inverter/battery
     inverter = _item(db, sel.get("inverter_item_id"))
+    inv_qty = max(1, int(sel.get("inverter_qty") or 1)) if inverter else 0
     if inverter:
-        inv_qty = int(sel.get("inverter_qty") or 1)
         lines.append(_item_line("inverter", "inverter", inverter, inv_qty, markup))
         inv_sp = inverter.specs or {}
         ac = float(inv_sp.get("ac_power_kw") or 0)
-        if ac and project.connected_power_kw and ac > project.connected_power_kw * 1.1:
-            warnings.append(f"Инверторът ({ac:g} kW) надвишава присъединената мощност ({project.connected_power_kw:g} kW).")
-        if ac and kwp and kwp > ac * float(pricing.get("dc_ac_ratio_max", 1.35)):
-            warnings.append(f"Мощността на панелите ({kwp:g} kWp) е над препоръчителната за инвертора ({ac:g} kW).")
+        ac_tot = ac * inv_qty
+        info["inverter_qty"] = inv_qty
+        info["ac_kw"] = round(ac_tot, 2)
+        lbl = f"{inv_qty} × {ac:g} kW = {ac_tot:g} kW" if inv_qty > 1 else f"{ac:g} kW"
+        if ac and project.connected_power_kw and ac_tot > project.connected_power_kw * 1.1:
+            warnings.append(f"Инверторите ({lbl}) надвишават присъединената мощност ({project.connected_power_kw:g} kW) — нужно е увеличение на присъединената мощност или ограничение на отдаваната мощност (export limit)." if inv_qty > 1 else f"Инверторът ({lbl}) надвишава присъединената мощност ({project.connected_power_kw:g} kW).")
+        if ac and kwp and kwp > ac_tot * float(pricing.get("dc_ac_ratio_max", 1.35)):
+            need = math.ceil(kwp / (ac * float(pricing.get("dc_ac_ratio_max", 1.35))) - 1e-9)
+            warnings.append(f"Мощността на панелите ({kwp:g} kWp) е над препоръчителната за {lbl} инвертор(и) — нужни са поне {need} × {ac:g} kW или по-голям модел.")
+        if ac and kwp and inv_qty > 1 and kwp < ac_tot * 0.6:
+            warnings.append(f"Инверторната мощност ({lbl}) е значително по-голяма от панелите ({kwp:g} kWp) — намалете броя инвертори.")
         if int(inv_sp.get("phases", project.phase)) != project.phase:
             warnings.append("Фазите на инвертора не съответстват на инсталацията.")
     else:
@@ -186,10 +216,10 @@ def build_lines(db: Session, project: Project, quote: Quote) -> tuple[list[dict[
     else:
         warnings.append("Не е избрано електрическо табло.")
     # engineering design: strings, protections, cables, earthing, consumables
-    design = _design(db, project, sel, pricing, panel, inverter, battery, bq, panel_qty, layout_sum)
+    design = _design(db, project, sel, pricing, panel, inverter, battery, bq, panel_qty, layout_sum, inverter_qty=inv_qty or 1)
     info["design"] = design
     sd = design.get("strings") or {}
-    info["strings"] = {"strings": sd.get("count", 0), "modules_per_string": sd.get("modules_per_string", 0), "mppts": sd.get("mppts", 0), "warnings": sd.get("warnings") or []}
+    info["strings"] = {"strings": sd.get("count", 0), "modules_per_string": sd.get("modules_per_string", 0), "mppts": sd.get("mppts", 0), "inverters": sd.get("inverters", 1), "per_inverter": sd.get("per_inverter") or [], "warnings": sd.get("warnings") or []}
     warnings.extend(design.get("warnings") or [])
     auto_el = sel.get("auto_electrical", True)
     all_items = db.query(CatalogItem).filter(CatalogItem.active.is_(True)).all()
@@ -224,9 +254,14 @@ def build_lines(db: Session, project: Project, quote: Quote) -> tuple[list[dict[
                 qty = float(sel["power_cable_m"])
         if item is None:
             item = engineering.find_item_for_role(all_items, r, pick)
-        meta = {"role": rk, "auto_qty": r["qty"], "spec": r["spec"]}
+        meta = {"role": rk, "auto_qty": r["qty"], "spec": r["spec"], "role_name": r["name"]}
         if item:
-            lines.append(_item_line(key, r["section"], item, qty, markup, name=r["name"] if rk in ("pv_cable",) else item.name, meta=meta))
+            name = r["name"] if rk in ("pv_cable",) else item.name
+            if int(design.get("inverters") or 1) > 1 and rk in ("ac_mcb", "ac_cable", "ac_lug", "ac_rcd"):
+                m = re.search(r"\(([^()]*)\)\s*$", r["name"])  # keep the purpose, e.g. "(табло AC → ГРТ)", when several AC lines coexist
+                if m:
+                    name = f"{name} ({m.group(1)})"
+            lines.append(_item_line(key, r["section"], item, qty, markup, name=name, meta=meta))
         else:
             missing.append(r["name"])
             lines.append(_line(key, r["section"], r["name"], r["unit"], qty, 0.0, meta={**meta, "missing_item": True}))
@@ -323,7 +358,8 @@ def apply_lines(db: Session, quote: Quote, new_lines: list[dict[str, Any]]) -> N
             quote.lines.remove(ln)
             db.delete(ln)
     # positions: by section order then existing position / insertion
-    ordered = sorted(quote.lines, key=lambda l: (SECTION_ORDER.get(l.section, 99), l.position, l.id or 10**9))
+    # new lines (position None) sort after the existing ones of their section, in insertion order
+    ordered = sorted(quote.lines, key=lambda l: (SECTION_ORDER.get(l.section, 99), l.position if l.position is not None else 10**6, l.id or 10**9))
     for i, ln in enumerate(ordered):
         ln.position = i
 

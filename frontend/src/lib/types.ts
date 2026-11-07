@@ -58,6 +58,9 @@ export interface ProposalVariant {
   selections: Selections
   kwp: number
   panel_qty: number
+  inverter_qty: number
+  ac_kw?: number | null
+  roof_panel_qty?: number | null
   battery_kwh: number
   subtotal: number
   vat: number
@@ -80,12 +83,22 @@ export interface ProposalVariant {
   same_as?: Strategy | null
 }
 
+export type ProposalScope = 'auto' | 'target' | 'roof'
+
 export interface ProposalsResult {
   target_kwp: number
-  target_basis: 'layout' | 'selection' | 'consumption' | 'connected_power' | 'default'
+  target_basis: 'layout' | 'selection' | 'consumption' | 'connected_power' | 'target' | 'default' | 'none'
   layout_fixed: boolean
   target_kwh: number
   variants: ProposalVariant[]
+  /** effective sizing scope: the client's demand or the whole layout */
+  scope: 'target' | 'roof'
+  scope_requested: ProposalScope
+  demand_kwp: number
+  demand_basis: 'target' | 'consumption' | 'connected_power' | 'none'
+  roof_kwp: number
+  roof_panel_qty: number
+  notes: string[]
 }
 
 export interface RfqSupplier {
@@ -250,6 +263,8 @@ export interface Selections {
   use_layout?: boolean
   inverter_item_id?: number | null
   inverter_qty?: number
+  /** quote only this many modules of the layout (target-power proposals on a bigger roof) */
+  panel_limit?: number | null
   battery_item_id?: number | null
   battery_qty?: number
   battery_accessories?: { item_id: number; qty: number }[]
@@ -327,6 +342,10 @@ export interface Quote {
 
 export interface InverterSuggestion {
   item: CatalogItem
+  /** number of identical units needed for the PV power (1 = single inverter, N = parallel operation) */
+  qty: number
+  ac_total_kw: number
+  ratio: number
   score: number
   reasons: string[]
   warnings: string[]
@@ -377,6 +396,7 @@ export interface PricingSettings {
   module_spare_pct: number
   design_tmin_c: number
   design_tcell_max_c: number
+  voc_margin?: number
   dc_vdrop_max_pct: number
   ac_vdrop_max_pct: number
   dc_run_default_m: number
@@ -398,6 +418,8 @@ export interface DesignRole {
 
 export interface DesignString {
   id: string
+  /** 1-based inverter index when several inverters run in parallel */
+  inverter?: number
   plane: string
   modules: number
   mppt: number
@@ -411,7 +433,8 @@ export interface DesignString {
 }
 
 export interface Design {
-  strings: { strings: DesignString[]; warnings: string[]; checks: { ok: boolean; text: string }[]; modules_per_string: number; fuses_required: boolean; fuse_a: number }
+  inverters?: number
+  strings: { strings: DesignString[]; warnings: string[]; checks: { ok: boolean; text: string }[]; modules_per_string: number; fuses_required: boolean; fuse_a: number; inverters?: number }
   dc: Record<string, number | string | boolean>
   ac: Record<string, number | string | boolean>
   battery: Record<string, number | string | boolean>

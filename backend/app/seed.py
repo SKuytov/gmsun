@@ -195,7 +195,29 @@ CATALOG: list[dict] = [
     {"category": "ac_protection", "name": "Катоден отводител AC тип 2, 1P+N 275 V 20 kA", "unit": "бр.", "purchase_price": 32.0, "specs": {"role": "ac_spd", "phases": 1, "price_source": "indicative"}},
     {"category": "ac_protection", "name": "Катоден отводител AC тип 2, 3P+N 275 V 20 kA", "unit": "бр.", "purchase_price": 58.0, "specs": {"role": "ac_spd", "phases": 3, "price_source": "indicative"}},
     {"category": "ac_protection", "name": "Табло за резервирани товари 12–24 модула IP40", "unit": "бр.", "purchase_price": 28.0, "specs": {"role": "ac_enclosure", "price_source": "indicative"}},
-    {"category": "ac_protection", "name": "Кабелен накрайник / обувка 6–16 mm²", "unit": "бр.", "purchase_price": 0.25, "specs": {"role": "ac_lug", "price_source": "indicative"}},
+    # ----- multi-inverter plants (parallel inverters → AC combiner board → main board) -----
+    {"category": "ac_protection", "name": "Автоматичен прекъсвач 4P 40 A C 6 kA", "unit": "бр.", "purchase_price": 22.0, "specs": {"role": "ac_mcb", "rating_a": 40, "poles": "4P", "price_source": "indicative"}},
+    {"category": "ac_protection", "name": "Автоматичен прекъсвач 4P 50 A C 6 kA", "unit": "бр.", "purchase_price": 25.0, "specs": {"role": "ac_mcb", "rating_a": 50, "poles": "4P", "price_source": "indicative"}},
+    {"category": "ac_protection", "name": "Дефектнотокова защита 4P 40 A 300 mA тип A", "unit": "бр.", "purchase_price": 54.0, "specs": {"role": "ac_rcd", "rating_a": 40, "poles": "4P", "price_source": "indicative"}},
+    {"category": "electrical", "name": "Кабелна обувка тръбна 35 mm² M10 (AC)", "unit": "бр.", "purchase_price": 0.55, "specs": {"role": "ac_lug", "cross_section_mm2": 35, "price_source": "indicative"}},
+    {"category": "electrical", "name": "Кабелна обувка тръбна 50 mm² M10 (AC)", "unit": "бр.", "purchase_price": 0.75, "specs": {"role": "ac_lug", "cross_section_mm2": 50, "price_source": "indicative"}},
+    {"category": "electrical", "name": "Кабелна обувка тръбна 70 mm² M10 (AC)", "unit": "бр.", "purchase_price": 0.95, "specs": {"role": "ac_lug", "cross_section_mm2": 70, "price_source": "indicative"}},
+    {"category": "electrical", "name": "Кабелна обувка тръбна 95 mm² M12 (AC)", "unit": "бр.", "purchase_price": 1.3, "specs": {"role": "ac_lug", "cross_section_mm2": 95, "price_source": "indicative"}},
+    {"category": "electrical", "name": "Кабелна обувка тръбна 120 mm² M12 (AC)", "unit": "бр.", "purchase_price": 1.6, "specs": {"role": "ac_lug", "cross_section_mm2": 120, "price_source": "indicative"}},
+    {"category": "ac_protection", "name": "Автоматичен прекъсвач 4P 125 A C 10 kA", "unit": "бр.", "purchase_price": 96.0, "specs": {"role": "ac_mcb", "rating_a": 125, "poles": "4P", "price_source": "indicative"}},
+    {"category": "ac_protection", "name": "Автоматичен прекъсвач MCCB 4P 160 A 25 kA", "unit": "бр.", "purchase_price": 165.0, "specs": {"role": "ac_mcb", "rating_a": 160, "poles": "4P", "price_source": "indicative"}},
+    {"category": "ac_protection", "name": "Автоматичен прекъсвач MCCB 4P 250 A 36 kA", "unit": "бр.", "purchase_price": 290.0, "specs": {"role": "ac_mcb", "rating_a": 250, "poles": "4P", "price_source": "indicative"}},
+    {"category": "ac_protection", "name": "Автоматичен прекъсвач MCCB 4P 400 A 36 kA", "unit": "бр.", "purchase_price": 520.0, "specs": {"role": "ac_mcb", "rating_a": 400, "poles": "4P", "price_source": "indicative"}},
+    {"category": "ac_protection", "name": "Дефектнотокова защита 4P 125 A 300 mA тип A", "unit": "бр.", "purchase_price": 185.0, "specs": {"role": "ac_rcd", "rating_a": 125, "poles": "4P", "price_source": "indicative"}},
+    {"category": "ac_protection", "name": "Табло AC за паралелни инвертори 2–4 входа IP65 (шини 160 A)", "unit": "бр.", "purchase_price": 240.0, "specs": {"role": "ac_combiner", "rating_a": 160, "inputs": 4, "price_source": "indicative"}},
+    {"category": "ac_protection", "name": "Табло AC за паралелни инвертори 5–8 входа IP65 (шини 400 A)", "unit": "бр.", "purchase_price": 520.0, "specs": {"role": "ac_combiner", "rating_a": 400, "inputs": 8, "price_source": "indicative"}},
+    {"category": "monitoring", "name": "Кабел за паралелна комуникация между инвертори CAN/RS485 (RJ45 екраниран, 3 m)", "unit": "бр.", "purchase_price": 9.0, "specs": {"role": "parallel_cable", "price_source": "indicative"}},
+    {"category": "power_cable", "name": "Кабел СВТ 5×35 mm²", "unit": "м", "purchase_price": 15.5, "specs": {"cores": 5, "cross_section_mm2": 35, "phases": 3, "role": "ac_cable", "price_source": "indicative"}},
+    {"category": "power_cable", "name": "Кабел СВТ 5×50 mm²", "unit": "м", "purchase_price": 21.0, "specs": {"cores": 5, "cross_section_mm2": 50, "phases": 3, "role": "ac_cable", "price_source": "indicative"}},
+    {"category": "power_cable", "name": "Кабел СВТ 5×70 mm²", "unit": "м", "purchase_price": 29.5, "specs": {"cores": 5, "cross_section_mm2": 70, "phases": 3, "role": "ac_cable", "price_source": "indicative"}},
+    {"category": "power_cable", "name": "Кабел СВТ 5×95 mm²", "unit": "м", "purchase_price": 40.0, "specs": {"cores": 5, "cross_section_mm2": 95, "phases": 3, "role": "ac_cable", "price_source": "indicative"}},
+    {"category": "power_cable", "name": "Кабел СВТ 5×120 mm²", "unit": "м", "purchase_price": 51.0, "specs": {"cores": 5, "cross_section_mm2": 120, "phases": 3, "role": "ac_cable", "price_source": "indicative"}},
+    {"category": "ac_protection", "name": "Кабелен накрайник / обувка 6–16 mm²", "unit": "бр.", "purchase_price": 0.25, "specs": {"role": "ac_lug", "cross_section_mm2": 16, "price_source": "indicative"}},
     # ----- battery DC side -----
     {"category": "battery_accessory", "name": "Батериен кабел 50 mm² H07V-K (червен/черен)", "unit": "м", "purchase_price": 7.8, "specs": {"role": "battery_cable", "cross_section_mm2": 50, "price_source": "indicative"}},
     {"category": "battery_accessory", "name": "Батериен кабел 70 mm² H07V-K (червен/черен)", "unit": "м", "purchase_price": 10.9, "specs": {"role": "battery_cable", "cross_section_mm2": 70, "price_source": "indicative"}},
@@ -252,12 +274,16 @@ MOUNTING_RULES: list[tuple[str, str, str, float, bool]] = list(AERO_RULES) + GRO
 RETIRED_RULES: set[tuple[str, str]] = {
     ("lt_sheet", "X50-3550 монтажна шина 3550 mm"), ("lt_sheet", "XPCN съединител за шина X40/X50"),
     ("lt_sheet", "GSC 10×30 фиксиращ винт (кука↔шина)"), ("lt_sheet", "XCL50 капачка лява за шина X50"), ("lt_sheet", "XCR50 капачка дясна за шина X50"),
-    ("lt_sheet", "CompactMETAL TL25 трапецовиден мост 250 mm с EPDM"), ("lt_sheet", "MSS 6×25 самопробивен винт с EPDM шайба (ламарина)"),
     ("sandwich", "X50-3550 монтажна шина 3550 mm"), ("sandwich", "XPCN съединител за шина X40/X50"),
     ("sandwich", "Шпилка (hanger bolt) M10×250 A2 с EPDM уплътнение и адаптер за шина (сандвич панел)"),
     ("sandwich", "Уплътнителна EPDM шайба/маншон за шпилка M10"), ("sandwich", "XCL50 капачка лява за шина X50"), ("sandwich", "XCR50 капачка дясна за шина X50"),
     ("flat_concrete", "CompactFLAT S10 основа (базов профил) за 1 модул 10°"), ("flat_concrete", "Ветрозащитен дефлектор CompactFLAT (заден лист)"),
     ("flat_concrete", "Защитна подложка (строителна защита) за хидроизолация"), ("flat_concrete", "CLE10 крайна скоба Click 30-46"),
+}
+
+# Rules that an earlier release wrongly listed as retired although the Aerocompact rule set still uses them.
+_PREVIOUSLY_RETIRED: set[tuple[str, str]] = {
+    ("lt_sheet", "CompactMETAL TL25 трапецовиден мост 250 mm с EPDM"), ("lt_sheet", "MSS 6×25 самопробивен винт с EPDM шайба (ламарина)"),
 }
 
 LABOR: list[tuple[int, int, float]] = [
@@ -305,9 +331,14 @@ def seed(db: Session) -> None:
             sup = supplier_of(c)
             if sup:
                 c.supplier = sup
-    for r in db.query(MountingRule).filter(MountingRule.active.is_(True)).all():
-        if (r.roof_type, r.name) in RETIRED_RULES:
+    current_rules = {(roof, name) for roof, name, *_ in MOUNTING_RULES}
+    retired = RETIRED_RULES - current_rules  # never retire a rule that the current rule set still defines
+    for r in db.query(MountingRule).all():
+        key = (r.roof_type, r.name)
+        if r.active and key in retired:
             r.active = False
+        elif not r.active and key in current_rules and key in _PREVIOUSLY_RETIRED:
+            r.active = True  # re-enable rules an earlier upgrade switched off by mistake (TL bridges + screws)
     existing_rules = {(r.roof_type, r.name) for r in db.query(MountingRule.roof_type, MountingRule.name).all()}
     for i, (roof, name, basis, factor, ru) in enumerate(MOUNTING_RULES):
         if (roof, name) in existing_rules:
