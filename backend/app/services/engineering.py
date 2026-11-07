@@ -66,6 +66,47 @@ def _round_up(v: float, step: float = 1.0) -> float:
 
 
 # ----------------------------------------------------------------------------- strings
+# brands whose hybrid inverters only accept their own battery systems (closed BMS protocol)
+CLOSED_BATTERY_ECOSYSTEMS = {"huawei": ["huawei"], "sungrow": ["sungrow"], "goodwe": ["goodwe"], "luxpower": []}
+
+
+def battery_compatibility(inverter: CatalogItem | None, battery: CatalogItem | None, qty: int = 1) -> list[str]:
+    """Cross-check a battery against the inverter: voltage class, DC window, charge current and brand ecosystem."""
+    if not inverter or not battery:
+        return []
+    inv, bs = inverter.specs or {}, battery.specs or {}
+    w: list[str] = []
+    ivc = (inv.get("battery_voltage_class") or "").upper()
+    bvc = (bs.get("voltage_class") or "").upper()
+    if inv.get("hybrid") is False:
+        w.append("Избраният инвертор не е хибриден — батерията не може да се свърже към него.")
+        return w
+    if ivc and bvc and ivc != bvc:
+        w.append(f"Клас на напрежение: инверторът е за {ivc} батерии, а батерията е {bvc}.")
+    vmin, vmax, vnom = _f(inv, "battery_v_min"), _f(inv, "battery_v_max"), _f(bs, "nominal_v")
+    if vmin and vmax and vnom:
+        v_sys = vnom * qty if bvc == "HV" and bs.get("stackable") else vnom
+        if not (vmin <= v_sys <= vmax):
+            w.append(f"Напрежението на батерията ({v_sys:g} V) е извън прозореца на инвертора {vmin:g}–{vmax:g} V.")
+    inv_i = _f(inv, "battery_max_charge_a")
+    bat_i = _f(bs, "max_charge_a")
+    if inv_i and bat_i and bvc == "LV" and bat_i * qty < inv_i * 0.5:
+        w.append(f"Токът на зареждане на батериите ({bat_i * qty:g} A общо) е доста под възможностите на инвертора ({inv_i:g} A) — помислете за повече модули или ограничете тока в настройките.")
+    inv_kw = _f(inv, "battery_max_charge_kw")
+    bat_kwh = _f(bs, "kwh") * qty
+    if inv_kw and bat_kwh and inv_kw > bat_kwh * 1.0:
+        w.append(f"Макс. мощност на зареждане на инвертора ({inv_kw:g} kW) надвишава 1C за {bat_kwh:g} kWh — задайте лимит на тока в инвертора.")
+    im = (inverter.manufacturer or "").lower().split()[0] if inverter.manufacturer else ""
+    bm = (battery.manufacturer or "").lower().split()[0] if battery.manufacturer else ""
+    allowed = CLOSED_BATTERY_ECOSYSTEMS.get(im)
+    if allowed is not None and bm and bm not in allowed and allowed:
+        w.append(f"{inverter.manufacturer} инверторите работят само със собствени батерии — {battery.manufacturer} не е съвместима.")
+    compat = inv.get("compatible_batteries")
+    if isinstance(compat, list) and compat and bm and not any(bm in str(c).lower() for c in compat):
+        w.append(f"Батерията не е в списъка със съвместими за инвертора: {', '.join(map(str, compat))}.")
+    return w
+
+
 def string_design(panel: CatalogItem | None, inverter: CatalogItem | None, planes: list[dict[str, Any]], design: dict[str, Any]) -> dict[str, Any]:
     """planes: [{name, modules, span_m, azimuth, tilt}] -> string table + checks."""
     out: dict[str, Any] = {"strings": [], "warnings": [], "checks": []}
@@ -88,6 +129,13 @@ def string_design(panel: CatalogItem | None, inverter: CatalogItem | None, plane
     spm = max(1, int(_f(inv, "strings_per_mppt", 1)))
     i_op = _f(inv, "max_input_current_a", 0)  # per MPPT operating current
     i_sc_max = _f(inv, "max_isc_a", i_op * 1.5 if i_op else 0)
+    # asymmetric MPPTs (e.g. Sungrow SH10RT 13.5 A / 27 A, Deye 2×26 A + 1×13 A): per-input lists from the datasheet
+    i_op_list = [float(x) for x in (inv.get("mppt_input_current_a") or []) if x]
+    i_sc_list = [float(x) for x in (inv.get("mppt_isc_a") or []) if x]
+    if not ps.get("specs_verified") and ps.get("spec_source"):
+        out["warnings"].append(f"Характеристиките на панела са извлечени автоматично ({ps.get('spec_source')}) и не са проверени — сверете с datasheet-а.")
+    if not inv.get("specs_verified") and inv.get("spec_source"):
+        out["warnings"].append(f"Характеристиките на инвертора са извлечени автоматично ({inv.get('spec_source')}) и не са проверени — сверете с datasheet-а.")
 
     voc_cold = voc * (1 + b_voc * (25 - tmin))
     vmp_cold = vmp * (1 + b_pmax * (25 - tmin))
@@ -149,10 +197,12 @@ def string_design(panel: CatalogItem | None, inverter: CatalogItem | None, plane
             out["warnings"].append(f"MPPT {m}: паралелни стрингове с различна дължина ({', '.join(str(s['modules']) for s in sts)}). Изравнете ги.")
         if len({s["plane_index"] for s in sts}) > 1:
             out["warnings"].append(f"MPPT {m}: паралелни стрингове от различни плоскости — препоръчва се отделен MPPT за всяка ориентация.")
-        if i_op and len(sts) * imp > i_op + 1e-6:
-            out["warnings"].append(f"MPPT {m}: работен ток {len(sts) * imp:.1f} A надвишава {i_op:g} A на входа (ограничение на мощността).")
-        if i_sc_max and len(sts) * isc > i_sc_max + 1e-6:
-            out["warnings"].append(f"MPPT {m}: Isc {len(sts) * isc:.1f} A надвишава максимално допустимия {i_sc_max:g} A.")
+        i_op_m = i_op_list[m - 1] if len(i_op_list) >= m else i_op
+        i_sc_m = i_sc_list[m - 1] if len(i_sc_list) >= m else (i_sc_max if not i_op_list or len(i_op_list) < m else i_op_m * 1.5)
+        if i_op_m and len(sts) * imp > i_op_m + 1e-6:
+            out["warnings"].append(f"MPPT {m}: работен ток {len(sts) * imp:.1f} A надвишава {i_op_m:g} A на входа (ограничение на мощността).")
+        if i_sc_m and len(sts) * isc > i_sc_m + 1e-6:
+            out["warnings"].append(f"MPPT {m}: Isc {len(sts) * isc:.1f} A надвишава максимално допустимия {i_sc_m:g} A.")
         if (len(sts) - 1) * isc * 1.25 > max_fuse:
             fuses_required = True
     out["strings"] = strings
@@ -353,6 +403,7 @@ def full_design(
         role("comm_cable", "Комуникационен кабел CAN/RS485 RJ45 (батерия ↔ инвертор/батерия)", battery_qty, section="inverter")
         if battery_qty > int(_f(bs, "max_parallel", 16)):
             warnings.append(f"Батерии в паралел ({battery_qty}) надвишават допустимото за модела ({int(_f(bs, 'max_parallel'))}).")
+        warnings.extend(battery_compatibility(inverter, battery, battery_qty))
     # -------------------------------------------------------------- earthing
     grd: dict[str, Any] = {}
     if panel_qty:
@@ -363,7 +414,7 @@ def full_design(
         role("bonding_cable", "Заземителен проводник 6 mm² жълто-зелен (изравняване на потенциалите на конструкцията)", grd["bonding_m"], unit="м", cross_section_mm2=6)
         role("bonding_clamp", "Клема за заземяване на шина (WCL8-10 / еквивалент)", int(math.ceil(rail_lines * (1 + fast_margin))), section="construction")
         role("earth_bar", "Заземителна шина / клеморед PE в таблото", 1)
-        if sel.get("earth_rod", getattr(project, "roof_type", "") == "ground"):
+        if sel.get("earth_rod", str(getattr(project, "roof_type", "")).startswith("ground")):
             role("earth_rod", "Заземителен кол 1,5 m поцинкован + клема за кол", 1 if panel_qty <= 40 else 2)
             role("earth_strip", "Поцинкована шина 30×4 mm за заземител", 10 if panel_qty <= 40 else 20, unit="м")
             grd["earth_rod"] = True

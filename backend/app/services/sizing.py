@@ -70,6 +70,10 @@ def suggest_inverters(
                 reasons.append(f"DC/AC {ratio:.2f}")
         if it.purchase_price <= 0 and it.sell_price is None:
             warnings.append("няма цена в каталога")
+        if not sp.get("specs_verified") and sp.get("spec_source"):
+            warnings.append("характеристиките са извлечени автоматично от datasheet — непроверени")
+        if sp.get("datasheet_url") or sp.get("datasheet_file"):
+            reasons.append("datasheet наличен")
         out.append(
             {
                 "item": it,
@@ -120,6 +124,12 @@ def suggest_batteries(
                     warnings.append("напрежението на батерията е извън прозореца на инвертора — проверете")
         if it.purchase_price <= 0 and it.sell_price is None:
             warnings.append("няма цена в каталога")
+        if not sp.get("specs_verified") and sp.get("spec_source"):
+            warnings.append("характеристиките са извлечени автоматично от datasheet — непроверени")
+        if inverter is not None:
+            from .engineering import battery_compatibility
+
+            warnings.extend(battery_compatibility(inverter, it, qty))
         accessories: list[dict[str, Any]] = []
         for acc in sp.get("accessories") or []:
             accessories.append(acc)

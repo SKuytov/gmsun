@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Copy, Download, Plus, Search, Trash2, Upload } from 'lucide-react'
+import { Copy, Download, ExternalLink, FileText, Plus, RefreshCw, Search, Trash2, Upload } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Badge, Confirm, ErrorBox, Field, Input, Loading, Modal, NumInput, Select, Textarea, Toggle, cx, useToast } from '@/components/ui'
@@ -7,6 +7,7 @@ import { api, del, downloadFile, errMsg, get, patch, post, put } from '@/lib/api
 import { fmtMoney, fmtNum, useT } from '@/lib/i18n'
 import type { CatalogItem, LaborOption, MountingRule, RoofType } from '@/lib/types'
 import { useAuth } from '@/lib/auth'
+import { DocLinks, useMountingSystems } from '@/components/MountingSystem'
 
 const TABS = ['items', 'labor', 'roofs', 'rules'] as const
 type Tab = (typeof TABS)[number]
@@ -15,6 +16,24 @@ interface Meta {
   categories: string[]
   mounting_bases: string[]
 }
+interface SupplierStatus {
+  supplier: string
+  snapshot_items: number
+  snapshot_file: string | null
+  linked_items: number
+  with_datasheet: number
+  unverified_items: number
+}
+interface SyncResult {
+  products?: number
+  created?: number
+  updated?: number
+  datasheets?: number
+  errors?: string[]
+}
+const SPEC_CATS = ['panel', 'inverter', 'battery']
+const hasDatasheet = (i: CatalogItem) => !!(i.specs.datasheet_url || i.specs.datasheet_file)
+const openDatasheet = (i: CatalogItem) => downloadFile(`/api/catalog/items/${i.id}/datasheet`, `${(i.sku || i.name).slice(0, 60)}.pdf`)
 
 const CAT_LABELS: Record<string, [string, string]> = {
   panel: ['Фотоволтаични модули', 'PV modules'],
@@ -45,6 +64,7 @@ const BASIS_LABELS: Record<string, [string, string]> = {
   per_mid_clamp: ['на средна скоба', 'per mid clamp'],
   per_end_clamp: ['на крайна скоба', 'per end clamp'],
   per_connector: ['на съединител', 'per rail connector'],
+  per_clamp: ['на скоба/опорна точка', 'per clamp / support point'],
   per_string: ['на стринг', 'per string'],
   per_kwp: ['на kWp', 'per kWp'],
   per_project: ['фиксирано за проект', 'fixed per project'],
@@ -89,6 +109,18 @@ function ItemsTab({ lang }: { lang: string }) {
   const [editing, setEditing] = useState<Partial<CatalogItem> | null>(null)
   const [toDelete, setToDelete] = useState<CatalogItem | null>(null)
   const [importOpen, setImportOpen] = useState(false)
+  const [syncOpen, setSyncOpen] = useState(false)
+  const [reseedOpen, setReseedOpen] = useState(false)
+  const status = useQuery({ queryKey: ['catalog', 'supplier-status'], queryFn: () => get<SupplierStatus>('/api/catalog/supplier/status'), enabled: admin })
+  const reseed = useMutation({
+    mutationFn: () => post<{ added_items: number }>('/api/catalog/mounting/reseed'),
+    onSuccess: (r) => {
+      qc.invalidateQueries()
+      setReseedOpen(false)
+      toast.push(`${r.added_items} ${t('added_items')}`, 'ok')
+    },
+    onError: (e) => toast.push(errMsg(e), 'bad'),
+  })
   const items = useQuery({ queryKey: ['catalog', 'items', inactive], queryFn: () => get<CatalogItem[]>(`/api/catalog/items${inactive ? '?include_inactive=true' : ''}`) })
   const meta = useQuery({ queryKey: ['catalog', 'meta'], queryFn: () => get<Meta>('/api/catalog/meta') })
   const invalidate = () => qc.invalidateQueries({ queryKey: ['catalog'] })
@@ -129,6 +161,12 @@ function ItemsTab({ lang }: { lang: string }) {
         <Toggle checked={inactive} onChange={setInactive} label={t('show_inactive')} />
         {admin && (
           <div className="ml-auto flex flex-wrap gap-1">
+            <button type="button" className="btn-ghost btn-sm" onClick={() => setSyncOpen(true)} data-testid="button-supplier-sync" title={t('supplier_sync_hint')}>
+              <RefreshCw className="h-4 w-4" /> {t('supplier_sync')}
+            </button>
+            <button type="button" className="btn-ghost btn-sm" onClick={() => setReseedOpen(true)} data-testid="button-aero-reseed" title={t('aero_reseed_hint')}>
+              <RefreshCw className="h-4 w-4" /> {t('aero_reseed')}
+            </button>
             <button type="button" className="btn-ghost btn-sm" onClick={() => setImportOpen(true)} data-testid="button-import">
               <Upload className="h-4 w-4" /> {t('import_xlsx')}
             </button>
@@ -141,6 +179,12 @@ function ItemsTab({ lang }: { lang: string }) {
           </div>
         )}
       </div>
+      {admin && status.data && (
+        <p className="text-xs text-ink-3" data-testid="text-supplier-status">
+          {t('supplier_status')} {status.data.supplier}: {status.data.linked_items} {t('supplier_linked')} · {status.data.with_datasheet} {t('supplier_with_ds')} · {status.data.unverified_items} {t('supplier_unverified')}
+          {status.data.snapshot_file ? ` · ${status.data.snapshot_file} (${status.data.snapshot_items})` : ''}
+        </p>
+      )}
       {items.isLoading && <Loading label={t('loading')} />}
       {items.data && (
         <div className="card overflow-hidden">
@@ -169,6 +213,23 @@ function ItemsTab({ lang }: { lang: string }) {
                         {i.name}
                       </button>
                       {i.sku && <span className="ml-2 text-xs text-ink-3">{i.sku}</span>}
+                      {SPEC_CATS.includes(i.category) && i.specs.specs_verified === false && !!i.specs.spec_source && (
+                        <span className="ml-2 whitespace-nowrap rounded bg-warn/15 px-1.5 py-0.5 text-[11px] text-warn" title={t('specs_unverified_hint')}>
+                          {t('specs_unverified')}
+                        </span>
+                      )}
+                      <span className="ml-1 inline-flex gap-0.5 align-middle">
+                        {hasDatasheet(i) && (
+                          <button type="button" className="btn-quiet btn-sm" onClick={() => openDatasheet(i).catch((e) => toast.push(errMsg(e), 'bad'))} aria-label={t('datasheet')} title={t('datasheet')} data-testid={`button-datasheet-${i.id}`}>
+                            <FileText className="h-4 w-4" />
+                          </button>
+                        )}
+                        {typeof i.specs.product_url === 'string' && (
+                          <a href={i.specs.product_url} target="_blank" rel="noreferrer" className="btn-quiet btn-sm" aria-label={t('product_page')} title={t('product_page')}>
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        )}
+                      </span>
                     </td>
                     <td className="text-ink-2">{i.manufacturer}</td>
                     <td className="text-ink-2">{i.unit}</td>
@@ -200,6 +261,8 @@ function ItemsTab({ lang }: { lang: string }) {
 
       {editing && <ItemModal item={editing} meta={meta.data} onClose={() => setEditing(null)} onSave={(it) => save.mutate(it)} busy={save.isPending} />}
       <ImportModal open={importOpen} onClose={() => setImportOpen(false)} categories={meta.data?.categories || []} lang={lang} onDone={invalidate} />
+      <SyncModal open={syncOpen} onClose={() => setSyncOpen(false)} onDone={() => qc.invalidateQueries()} />
+      <Confirm open={reseedOpen} onClose={() => setReseedOpen(false)} onConfirm={() => reseed.mutate()} title={t('aero_reseed')} text={t('aero_reseed_hint')} />
       <Confirm open={!!toDelete} onClose={() => setToDelete(null)} onConfirm={() => toDelete && remove.mutate(toDelete.id)} title={t('delete')} text={`${t('confirm_delete')} ${toDelete?.name}`} danger />
     </div>
   )
@@ -207,9 +270,34 @@ function ItemsTab({ lang }: { lang: string }) {
 
 function ItemModal({ item, meta, onClose, onSave, busy }: { item: Partial<CatalogItem>; meta?: Meta; onClose: () => void; onSave: (it: Partial<CatalogItem>) => void; busy: boolean }) {
   const { t, lang } = useT()
+  const toast = useToast()
+  const qc = useQueryClient()
   const [f, setF] = useState<Partial<CatalogItem>>({ ...item })
   const [specs, setSpecs] = useState(JSON.stringify(item.specs || {}, null, 2))
   const [specsErr, setSpecsErr] = useState('')
+  const [autofill, setAutofill] = useState(true)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const upload = useMutation({
+    mutationFn: (file: File) => {
+      const form = new FormData()
+      form.append('file', file)
+      return api<CatalogItem>(`/api/catalog/items/${f.id}/datasheet?autofill=${autofill}`, { method: 'POST', form })
+    },
+    onSuccess: (it) => {
+      setF((cur) => ({ ...cur, specs: it.specs }))
+      setSpecs(JSON.stringify(it.specs || {}, null, 2))
+      qc.invalidateQueries({ queryKey: ['catalog'] })
+      toast.push(t('saved'), 'ok')
+    },
+    onError: (e) => toast.push(errMsg(e), 'bad'),
+  })
+  const curSpecs = (() => {
+    try {
+      return JSON.parse(specs || '{}') as Record<string, unknown>
+    } catch {
+      return {}
+    }
+  })()
   const submit = () => {
     try {
       const sp = JSON.parse(specs || '{}')
@@ -332,6 +420,32 @@ function ItemModal({ item, meta, onClose, onSave, busy }: { item: Partial<Catalo
           <Input value={f.description || ''} onChange={(e) => setF({ ...f, description: e.target.value })} />
         </Field>
         {f.category && commonSpecs[f.category] && <div className="grid grid-cols-2 gap-3 sm:col-span-3 sm:grid-cols-4">{commonSpecs[f.category]}</div>}
+        <div className="flex flex-wrap items-center gap-2 sm:col-span-3">
+          {f.id && (curSpecs.datasheet_url || curSpecs.datasheet_file) ? (
+            <button type="button" className="btn-ghost btn-sm" onClick={() => openDatasheet(f as CatalogItem).catch((e) => toast.push(errMsg(e), 'bad'))}>
+              <FileText className="h-4 w-4" /> {t('datasheet')}
+            </button>
+          ) : null}
+          {typeof curSpecs.product_url === 'string' && (
+            <a href={curSpecs.product_url} target="_blank" rel="noreferrer" className="btn-ghost btn-sm">
+              <ExternalLink className="h-4 w-4" /> {t('product_page')}
+            </a>
+          )}
+          {f.id && (
+            <>
+              <input ref={fileRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => e.target.files?.[0] && upload.mutate(e.target.files[0])} data-testid="input-datasheet-file" />
+              <button type="button" className="btn-ghost btn-sm" onClick={() => fileRef.current?.click()} disabled={upload.isPending} data-testid="button-upload-datasheet">
+                <Upload className="h-4 w-4" /> {upload.isPending ? t('loading') : t('upload_datasheet')}
+              </button>
+              {SPEC_CATS.includes(f.category || '') && <Toggle checked={autofill} onChange={setAutofill} label={t('autofill_specs')} />}
+            </>
+          )}
+          {SPEC_CATS.includes(f.category || '') && curSpecs.specs_verified === false && !!curSpecs.spec_source && (
+            <span className="text-xs text-warn" title={t('specs_unverified_hint')}>
+              {t('specs_unverified')} ({String(curSpecs.spec_source)})
+            </span>
+          )}
+        </div>
         <Field label={t('specs')} className="sm:col-span-3" error={specsErr}>
           <Textarea className="font-mono text-xs" rows={6} value={specs} onChange={(e) => setSpecs(e.target.value)} />
         </Field>
@@ -390,6 +504,54 @@ function ImportModal({ open, onClose, categories, lang, onDone }: { open: boolea
 }
 
 // ----------------------------------------------------------------- labor
+function SyncModal({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
+  const { t, lang } = useT()
+  const toast = useToast()
+  const [withDs, setWithDs] = useState(false)
+  const [overwrite, setOverwrite] = useState(false)
+  const [result, setResult] = useState<SyncResult | null>(null)
+  const sync = useMutation({
+    mutationFn: () => post<SyncResult>(`/api/catalog/sync/green-energy?parse_datasheets=${withDs}&overwrite_specs=${overwrite}`),
+    onSuccess: (r) => {
+      setResult(r)
+      onDone()
+      toast.push(t('supplier_sync_done'), 'ok')
+    },
+    onError: (e) => toast.push(errMsg(e), 'bad'),
+  })
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={t('supplier_sync')}
+      footer={
+        <>
+          <button type="button" className="btn-ghost" onClick={onClose}>
+            {t('close')}
+          </button>
+          <button type="button" className="btn-primary" onClick={() => sync.mutate()} disabled={sync.isPending} data-testid="button-run-sync">
+            {sync.isPending ? t('loading') : t('supplier_sync')}
+          </button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        <p className="text-sm text-ink-2">{t('supplier_sync_hint')}</p>
+        <Toggle checked={withDs} onChange={setWithDs} label={t('supplier_sync_with_ds')} />
+        <Toggle checked={overwrite} onChange={setOverwrite} label={t('supplier_sync_overwrite')} />
+        {sync.isPending && <Loading label={lang === 'bg' ? 'Изтегляне от green-energy.bg…' : 'Downloading from green-energy.bg…'} />}
+        {result && (
+          <div className="rounded bg-ok/10 p-2 text-sm" data-testid="text-sync-result">
+            {lang === 'bg' ? 'Продукти' : 'Products'}: {result.products ?? '—'} · {lang === 'bg' ? 'нови' : 'new'}: {result.created ?? 0} · {lang === 'bg' ? 'обновени' : 'updated'}: {result.updated ?? 0}
+            {result.datasheets != null ? ` · datasheets: ${result.datasheets}` : ''}
+            {result.errors && result.errors.length > 0 && <div className="mt-1 text-xs text-warn">{result.errors.slice(0, 5).join('; ')}</div>}
+          </div>
+        )}
+      </div>
+    </Modal>
+  )
+}
+
 function LaborTab() {
   const { t, lang } = useT()
   const qc = useQueryClient()
@@ -488,6 +650,8 @@ function RoofsTab({ lang }: { lang: string }) {
   })
   const [edit, setEdit] = useState<RoofType | null>(null)
   const [isNew, setIsNew] = useState(false)
+  const systems = useMountingSystems()
+  const sysFor = (code: string) => systems.data?.systems.find((x) => x.code === systems.data?.roof_system[code])
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
@@ -505,11 +669,12 @@ function RoofsTab({ lang }: { lang: string }) {
       </div>
       {roofs.isLoading && <Loading />}
       <div className="card overflow-x-auto">
-        <table className="tbl min-w-[720px]">
+        <table className="tbl min-w-[900px]">
           <thead>
             <tr>
               <th>{t('name')}</th>
               <th>code</th>
+              <th>{t('mounting_system')}</th>
               <th>{t('mounting')}</th>
               <th className="text-right">{t('rails')}/mod</th>
               <th className="text-right">{lang === 'bg' ? 'Шина m' : 'Rail m'}</th>
@@ -524,6 +689,20 @@ function RoofsTab({ lang }: { lang: string }) {
               <tr key={r.code} className={cx(!r.active && 'opacity-50')}>
                 <td className="font-medium">{lang === 'bg' ? r.label_bg : r.label_en}</td>
                 <td className="font-mono text-xs text-ink-3">{r.code}</td>
+                <td>
+                  {(() => {
+                    const sy = sysFor(r.code)
+                    if (!sy) return <span className="text-ink-3">—</span>
+                    return (
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs font-medium">
+                          AEROCOMPACT {sy.family} {sy.code}
+                        </span>
+                        <DocLinks docs={Object.fromEntries(Object.entries(sy.docs).filter(([k]) => ['leaflet', 'leaflet_s10', 'assembly', 'assembly_uk'].includes(k)))} compact />
+                      </div>
+                    )
+                  })()}
+                </td>
                 <td>
                   <Badge tone={r.pricing_mode === 'lump' ? 'sun' : 'neutral'}>{r.pricing_mode === 'lump' ? t('mounting_lump') : t('mounting_detailed')}</Badge>
                 </td>

@@ -1,17 +1,50 @@
 import { useQuery } from '@tanstack/react-query'
-import { Check } from 'lucide-react'
-import { Badge, Field, Loading, NumInput, Select, Toggle, Warn, cx } from '@/components/ui'
-import { get } from '@/lib/api'
+import { useEffect } from 'react'
+import { Check, ExternalLink, FileText } from 'lucide-react'
+import { Badge, Field, Loading, NumInput, Select, Toggle, Warn, cx, useToast } from '@/components/ui'
+import { downloadFile, errMsg, get } from '@/lib/api'
 import { fmtMoney, fmtNum, useT } from '@/lib/i18n'
 import type { BatterySuggestion, CatalogItem, InverterSuggestion } from '@/lib/types'
 import type { StepCtx } from '../Project'
 
+/** Datasheet / supplier page links + unverified-specs hint for a catalog item. */
+function ItemLinks({ item }: { item: CatalogItem | undefined }) {
+  const { t } = useT()
+  const toast = useToast()
+  if (!item) return null
+  const ds = !!(item.specs.datasheet_url || item.specs.datasheet_file)
+  const url = typeof item.specs.product_url === 'string' ? item.specs.product_url : ''
+  const unverified = item.specs.specs_verified === false && !!item.specs.spec_source
+  if (!ds && !url && !unverified) return null
+  return (
+    <span className="mt-1 flex flex-wrap items-center gap-1" onClick={(e) => e.stopPropagation()}>
+      {ds && (
+        <button type="button" className="btn-ghost btn-sm" onClick={() => downloadFile(`/api/catalog/items/${item.id}/datasheet`, `${(item.sku || item.name).slice(0, 60)}.pdf`).catch((e) => toast.push(errMsg(e), 'bad'))} data-testid={`button-datasheet-${item.id}`}>
+          <FileText className="h-3.5 w-3.5" /> {t('datasheet')}
+        </button>
+      )}
+      {url && (
+        <a href={url} target="_blank" rel="noreferrer" className="btn-ghost btn-sm">
+          <ExternalLink className="h-3.5 w-3.5" /> {t('product_page')}
+        </a>
+      )}
+      {unverified && (
+        <span className="text-xs text-warn" title={t('specs_unverified_hint')}>
+          {t('specs_unverified')}
+        </span>
+      )}
+    </span>
+  )
+}
+
 function ItemCard({ item, selected, onSelect, lines, warnings, extra }: { item: CatalogItem; selected: boolean; onSelect: () => void; lines: string[]; warnings: string[]; extra?: React.ReactNode }) {
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onSelect}
-      className={cx('card flex w-full items-start gap-3 p-3 text-left transition hover:border-ink/30', selected && 'border-sun ring-2 ring-sun/30')}
+      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onSelect())}
+      className={cx('card flex w-full cursor-pointer items-start gap-3 p-3 text-left transition hover:border-ink/30', selected && 'border-sun ring-2 ring-sun/30')}
       aria-pressed={selected}
       data-testid={`card-item-${item.id}`}
     >
@@ -21,9 +54,10 @@ function ItemCard({ item, selected, onSelect, lines, warnings, extra }: { item: 
         <span className="mt-0.5 block text-xs text-ink-3">{lines.join(' · ')}</span>
         {extra}
         {warnings.length > 0 && <span className="mt-1 block text-xs text-warn">{warnings.join('; ')}</span>}
+        {item.id ? <ItemLinks item={item} /> : null}
       </span>
       <span className="num shrink-0 text-right text-sm font-semibold">{item.effective_price > 0 ? fmtMoney(item.effective_price) : <span className="text-ink-3">—</span>}</span>
-    </button>
+    </div>
   )
 }
 
@@ -36,6 +70,10 @@ export function EquipmentStep({ ctx }: { ctx: StepCtx }) {
   const layoutCount = p.layouts.reduce((s, l) => s + (l.summary?.count || 0), 0)
   const useLayout = sel.use_layout !== false && layoutCount > 0
   const panelId = sel.panel_item_id || p.layouts[0]?.panel_item_id || panels[0]?.id
+  // Persist the implicit default so kWp, sizing and the quote all use the same module.
+  useEffect(() => {
+    if (!sel.panel_item_id && panelId) setSel({ panel_item_id: panelId })
+  }, [sel.panel_item_id, panelId, setSel])
 
   const invQ = useQuery({
     queryKey: ['sizing', 'inv', p.phase, p.connected_power_kw, ctx.kwp, p.voltage_class],
@@ -74,6 +112,7 @@ export function EquipmentStep({ ctx }: { ctx: StepCtx }) {
                 </option>
               ))}
             </Select>
+            <ItemLinks item={panels.find((x) => x.id === panelId)} />
           </Field>
           <Field label={t('panel_count')}>
             <div className="flex items-center gap-2">
@@ -111,7 +150,6 @@ export function EquipmentStep({ ctx }: { ctx: StepCtx }) {
                 ...s.reasons,
               ].filter(Boolean)}
               warnings={s.warnings}
-              extra={s.item.specs.specs_verified === false ? <span className="mt-0.5 block text-xs text-ink-3">{lang === 'bg' ? 'Параметрите са ориентировъчни — проверете в каталога.' : 'Specs approximate — verify in catalog.'}</span> : null}
             />
           ))}
           {otherInv.length > 0 && (

@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from ..config import get_settings
 from ..models import CatalogItem, Quote, RoofTypeConfig
+from ..seed_data.aerocompact import system_for_roof
 from .pdf import _data_uri, _money, _num, _thousands
 from .pricing import SECTIONS, estimate_yield
 from .settings import get_setting
@@ -266,6 +267,7 @@ def render_techfile_html(db: Session, quote: Quote) -> str:
         margins=design.get("margins") or {},
         stats=info.get("mounting_stats") or {},
         roof=roof,
+        msys=system_for_roof(project.roof_type),
         panel=panel,
         inverter=inverter,
         battery=battery,

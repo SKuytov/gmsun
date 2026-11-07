@@ -5,6 +5,7 @@ import { get } from '@/lib/api'
 import { fmtNum, useT } from '@/lib/i18n'
 import type { Project } from '@/lib/types'
 import type { StepCtx } from '../Project'
+import { MountingSystemCard } from '@/components/MountingSystem'
 
 type TextKeys = 'name' | 'client_name' | 'client_company' | 'client_eik' | 'client_vat' | 'client_phone' | 'client_email' | 'client_address' | 'site_address' | 'notes'
 
@@ -112,6 +113,7 @@ export function ParamsStep({ ctx }: { ctx: StepCtx }) {
             <NumInput value={p.annual_consumption_kwh} onChange={(v) => ctx.update({ annual_consumption_kwh: v })} min={0} />
           </Field>
         </div>
+        <MountingSystemCard roofType={p.roof_type} className="mt-4" />
       </div>
       <aside className="flex flex-col gap-2">
         <Stat label={t('modules')} value={ctx.panelQty} sub={`${fmtNum(ctx.kwp, 2)} kWp`} />

@@ -233,3 +233,139 @@ def delete_rule(rid: int, db: Session = Depends(get_db), _: User = Depends(requi
         db.delete(r)
         db.commit()
     return Response(status_code=204)
+
+
+# ----------------------------------------------------------------------------- Aerocompact mounting systems
+@router.get("/mounting/systems")
+def mounting_systems(_: User = Depends(get_current_user)):
+    """Aerocompact system catalogue (technical data + documents) and the roof type -> system mapping."""
+    from ..seed_data.aerocompact import DOCS, ROOF_SYSTEM, SYSTEMS, all_documents
+
+    return {"systems": SYSTEMS, "roof_system": ROOF_SYSTEM, "documents": all_documents(), "doc_sets": DOCS}
+
+
+@router.post("/mounting/reseed", status_code=200)
+def mounting_reseed(db: Session = Depends(get_db), _: User = Depends(require_admin)):
+    """Add any missing Aerocompact items / roof types / rules from the built-in catalogue (never overwrites edits)."""
+    from ..seed import seed
+
+    before = db.query(CatalogItem).count()
+    seed(db)
+    return {"added_items": db.query(CatalogItem).count() - before}
+
+
+# ----------------------------------------------------------------------------- supplier portfolio & datasheets
+@router.get("/supplier/status")
+def supplier_status(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    """How much of the catalog comes from the supplier snapshot / live sync."""
+    from ..services.supplier_sync import SEED_FILE, SUPPLIER, load_seed_items
+
+    rows = db.query(CatalogItem).all()
+    linked = [r for r in rows if (r.specs or {}).get("supplier") == SUPPLIER]
+    with_ds = [r for r in linked if (r.specs or {}).get("datasheet_url")]
+    unverified = [r for r in rows if r.category in ("panel", "inverter", "battery") and not (r.specs or {}).get("specs_verified")]
+    return {
+        "supplier": SUPPLIER,
+        "snapshot_items": len(load_seed_items()),
+        "snapshot_file": SEED_FILE.name if SEED_FILE.exists() else None,
+        "linked_items": len(linked),
+        "with_datasheet": len(with_ds),
+        "unverified_items": len(unverified),
+    }
+
+
+@router.post("/sync/green-energy")
+def sync_green_energy(
+    parse_datasheets: bool = Query(True, description="download + parse PDF datasheets (slower, needs internet)"),
+    overwrite_specs: bool = Query(False, description="refresh auto-parsed specs of items not marked as verified"),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """Re-import the supplier portfolio from the live green-energy.bg Store API (prices, links, new products)."""
+    from ..config import get_settings
+    from ..services.supplier_sync import sync_from_site
+
+    try:
+        return sync_from_site(db, get_settings().data_dir, parse_datasheets=parse_datasheets, overwrite_specs=overwrite_specs)
+    except Exception as exc:  # network / parsing problems must not 500 without a message
+        raise HTTPException(502, f"Синхронизацията не успя: {exc}") from exc
+
+
+@router.get("/items/{item_id}/datasheet")
+def item_datasheet(item_id: int, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    """Serve the datasheet PDF (uploaded or downloaded from the supplier and cached under DATA_DIR/datasheets)."""
+    from ..config import get_settings
+    from ..services.supplier_sync import cached_datasheet
+
+    it = db.get(CatalogItem, item_id)
+    if not it:
+        raise HTTPException(404, "Артикулът не е намерен")
+    sp = it.specs or {}
+    data_dir = get_settings().data_dir
+    path = None
+    if sp.get("datasheet_file"):
+        from pathlib import Path
+
+        p = Path(data_dir) / "datasheets" / sp["datasheet_file"]
+        path = p if p.exists() else None
+    if path is None and sp.get("datasheet_url"):
+        path = cached_datasheet(sp["datasheet_url"], data_dir)
+    if path is None:
+        raise HTTPException(404, "Няма наличен datasheet за този артикул")
+    fname = f"{(it.sku or it.name)[:60]}.pdf".replace("/", "-")
+    return Response(path.read_bytes(), media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="{fname}"'})
+
+
+@router.post("/items/{item_id}/datasheet", response_model=CatalogItemOut)
+async def upload_datasheet(
+    item_id: int,
+    file: UploadFile = File(...),
+    autofill: bool = Query(True, description="parse the PDF and fill empty spec fields"),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """Upload a datasheet PDF for an item; optionally auto-fill its technical specs from the PDF text."""
+    import hashlib
+    from pathlib import Path
+
+    from ..config import get_settings
+    from ..services import datasheet_parse as dp
+    from ..services.supplier_sync import datasheet_cache_dir
+
+    it = db.get(CatalogItem, item_id)
+    if not it:
+        raise HTTPException(404, "Артикулът не е намерен")
+    content = await file.read()
+    if not content.startswith(b"%PDF"):
+        raise HTTPException(400, "Файлът не е PDF")
+    d = datasheet_cache_dir(get_settings().data_dir)
+    fname = f"item{item_id}-{hashlib.sha1(content).hexdigest()[:10]}.pdf"
+    (d / fname).write_bytes(content)
+    sp = dict(it.specs or {})
+    sp["datasheet_file"] = fname
+    filled: list[str] = []
+    if autofill and it.category in ("panel", "inverter", "battery"):
+        text = dp.pdf_to_text(str(d / fname))
+        cols = dp.parse_by_category(it.category, text, [it.sku] if it.sku else None)
+        col: dict = {}
+        if cols:
+            if it.category == "panel" and sp.get("wp"):
+                col = min(cols, key=lambda c: abs((c.get("wp") or 0) - float(sp["wp"])))
+            elif it.category == "inverter" and sp.get("ac_power_kw"):
+                col = min(cols, key=lambda c: abs((c.get("ac_power_kw") or 0) - float(sp["ac_power_kw"])))
+            else:
+                col = cols[0]
+        for k, v in col.items():
+            if k in ("parsed_fields", "specs_verified", "spec_source", "model"):
+                continue
+            if sp.get(k) in (None, "", 0) and v not in (None, ""):
+                sp[k] = v
+                filled.append(k)
+        if filled:
+            sp["spec_source"] = "datasheet-upload"
+    it.specs = sp
+    db.commit()
+    db.refresh(it)
+    out = _out(db, it)
+    out.specs = {**out.specs, "_autofilled": filled} if filled else out.specs
+    return out

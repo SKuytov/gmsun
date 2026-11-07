@@ -47,12 +47,61 @@ mounts (`earth_rod`).
 UV‑resistant ties 4.8×200: 4 per module + 2 per metre of rail; HFT conduit Ø32 for DC, Ø40 for AC runs with 1 clip per
 0.5 m; end sleeves per conductor termination.
 
-## Mounting (Aerocompact CompactPITCH XM / CompactMETAL / CompactFLAT)
+## Mounting (AEROCOMPACT® full catalogue, `backend/app/seed_data/aerocompact.py`)
 
-Per roof type in `MOUNTING_RULES`: X50‑3550 rails by total rail length (+1 splice per joint, −1 per line), hooks /
-hanger bolts / TL25 clamps per fixation (spacing from the mounting instructions), mid clamps per inner joint, end
-clamps 2 per row, 2 SDS‑W 8×100 + 1 GSC per hook, support plates, flashing, caps, cable clips, bonding clamps.
-Small parts flagged `small_part` get the fastener margin.
+Fourteen roof/terrain types, each mapped to one AEROCOMPACT system (`ROOF_SYSTEM`) with its technical limits
+(`SYSTEMS`: roof pitch, distance to roof, wind/snow design loads from the leaflets, module frame range, documents) and a
+complete rule set (`RULES`, 141 rules → 159 catalogue items with article numbers, `datasheet_url`, `assembly_url`,
+`product_url`, `small_part`, `price_source`).
+
+| Roof type | System | Basis of the main component | Key manufacturer rule |
+| --- | --- | --- | --- |
+| `tile` | CompactPITCH XM‑F | hook per fixation (1.2 m) | 2× SDS‑W 8×100 (or 3× 6×100) per hook, flashing XM‑FCMR, support plate XM‑FSP; pitch 10–75°, snow 6.0 / wind 2.4 kN/m² |
+| `tile_xt` | CompactPITCH XT | hook per fixation | 2× SDS‑W per hook, snow 5.4 kN/m² |
+| `tile_xtr` | CompactPITCH XT‑R 2.0 + XM‑B metal tile | hook per fixation | no tile cutting, XM‑B replaces one tile per hook |
+| `plain_tile` | CompactPITCH XM‑PL | hook per fixation (1.1 m) | XM‑PL30X on the counter‑batten + XM‑PLR/PLB metal tile |
+| `fibre_cement` | CompactPITCH XW hanger bolts | bolt per fixation | pre‑drill M10 Ø7/Ø13, M12 Ø8.4/Ø15 |
+| `lt_sheet` | CompactMETAL TL25/TL38 bridges | **`per_clamp`** (= mid + end clamps) | one bridge under every clamp, 4× MSS 6×25 per bridge, clamp 250–330 mm from the short module edge, 2 modules = 6 bridges / 4 CLE10 / 2 CLM10; sheet ≥ 0.5 mm Al / 0.4 mm steel |
+| `lt_sheet_ts` | CompactMETAL TS15 short rails | `per_clamp` | ≥ 2 MSS 6×25 per short rail |
+| `standing_seam` | CompactMETAL TM seam clamps | `per_clamp` | no penetration, clamps on the seam clamp; ≤ 3 modules vertically (6 on aluminium) |
+| `sandwich` | CompactMETAL TR | TR15 console per fixation + TR59/TR74 rails | SDS‑12 long screw into the purlin + MSS 6×25, rails 5800 mm |
+| `flat_concrete` | CompactFLAT S10 (south 10°) | brackets `per_clamp`, ballast trays per row | row spacing 380 / 527 mm, 1200 mm edge zone, > 5° roof pitch → APA anchors; ballast per AEROTOOL |
+| `flat_ew` | CompactFLAT S10 PLUS (east/west) | brackets `per_clamp` | middle bracket S10plusMB‑PP, connectors 464 / 297 mm |
+| `flat_bifacial`, `ground_ballast` | CompactGROUND GS15 | posts `per_clamp`, ballast per row | ≈ 400 mm elevation, 15° south; CLEG10/CLMG10 clamps |
+| `ground` | generic driven/concrete ground mount | posts per fixation, rails per metre | — |
+
+Shared rules: clamps torque 15 Nm (WCL8‑10 10 Nm), end clamp ≥ 40 mm from the rail end, CLM10 carries the bonding
+pins, one left/right cap per rail line, `small_part` items get the fastener margin. For rail systems the BOM uses
+`bom.compute_stats` (lines = rows × rails/module, pieces = ⌈rail m × (1+waste) / stock⌉, splices = pieces − lines,
+fixations = ⌈row length / spacing⌉ + 1 per rail); for direct‑mount systems the rails are "support lines" and the
+`per_clamp` basis puts one bridge / short rail / seam clamp / bracket under every mid and end clamp.
+
+Prices for the XM‑F set come from the supplier quote 64845 (X50‑3550 24.92 €, XM‑F 12.29 €, CLM10/CLE10 1.54 €, SDS‑W
+0.26 € …); everything else is `price_source: indicative` (or `unknown`) and must be replaced by the distributor's
+offer. The seed is additive: `POST /api/catalog/mounting/reseed` (Catalog → "Add missing Aerocompact items") adds new
+items / roof types / rules without touching edited rows; rules in `RETIRED_RULES` are deactivated on upgrade.
+Final structural sizing (hook spacing, ballast, wind zones to EN 1991‑1‑4) is confirmed with the manufacturer's
+AEROTOOL report, as the technical file states.
+
+## Supplier portfolio and datasheets (`backend/app/services/supplier_sync.py`, `datasheet_parse.py`)
+
+- Source: the public WooCommerce Store API of green-energy.bg (`/wp-json/wc/store/v1/products`, 302 products →
+  388 items after expanding multi‑model titles such as `SUN-14/15/16/18/20K-SG05LP3-EU-SM2`).
+- Each product gives `product_url`, `image_url`, `datasheet_url` (PDF links found in the description), the Bulgarian
+  spec bullet list (parsed with `parse_bg_description`) and the price (`prices.price` in BGN minor units → EUR at
+  1.95583, VAT status unknown; panels have no public price).
+- Datasheets are downloaded to `DATA_DIR/datasheets/<sha1>.pdf`, converted with `pdftotext -layout` and parsed by
+  category (`parse_panel`, `parse_inverter`, `parse_battery`): multi‑column tables are split per model, STC columns
+  are preferred over NOCT, numbers outside physical ranges (`*_RANGES`) are rejected, OCR garbage lines ignored; for
+  multi‑model sheets the column closest to the Wp / kW in the title is chosen. `_sanitize_battery` drops cell
+  voltages (3.2 V) and recomputes Ah from kWh / nominal V.
+- Everything auto‑parsed is stored with `specs_verified: false` and `spec_source` (`datasheet-auto`, `datasheet-ocr`,
+  `bg-description`); the engineering engine still uses it but the quote/techfile carry a warning until a user verifies
+  the item. Verified rows are never overwritten by a sync unless `overwrite_specs` is requested.
+- Snapshot: `backend/app/seed_data/green_energy_catalog.json` (regenerate with
+  `python -m app.services.supplier_sync --write-seed`), live refresh: `POST /api/catalog/sync/green-energy`,
+  status: `GET /api/catalog/supplier/status`, PDF: `GET /api/catalog/items/{id}/datasheet`, upload:
+  `POST /api/catalog/items/{id}/datasheet?autofill=true`.
 
 ## Margins (industry practice, configurable in Settings → Pricing → Engineering defaults)
 
@@ -70,8 +119,10 @@ Small parts flagged `small_part` get the fastener margin.
 - Deye SUN‑14–20K user manual (breakers, cables, clearances) — https://www.deyeinverter.com/deyeinverter/2026/03/19/rand/8499/%E3%80%90b%E3%80%91manual_sun-14-20k-sg05lp3-eu-sm2_20260319_en.pdf
 - Deye SUN‑3–12K user manual — https://www.deyeinverter.com/deyeinverter/2026/03/19/BManualSUN-3-12K-SG05LP3-EU-SM220260319en.pdf
 - Deye RW‑F16 — https://deye.com/product/rw-f16/ · SE‑G5.1 Pro‑B — https://deye.com/product/se-g5-1-pro-b/ · RW‑M6.1‑B — https://deyeinverters.net/en/products/batteries/deye-6-14kwh-low-voltage-lithium-solar-battery-rw-m6-1-b
-- Aerocompact CompactPITCH XM‑F mounting instructions — https://shop.sonepar.at/asset_external/downloads/pim/402002/MD21_120160400.pdf
-- Aerocompact CompactMETAL — https://www.aerocompact.com/en/products/pitched-roofs/compactmetal-tm · TL25 — https://www.mastersolar.rs/wp-content/uploads/2025/02/AC_AI_TL25_en-gbr_AI_TL25_09.pdf
+- green-energy.bg product portfolio (Store API) — https://green-energy.bg/wp-json/wc/store/v1/products · example product — https://green-energy.bg/produkt/fotovoltaichen-panel-ulica-solar-575-wp-n-type-topcon-bifacial/
+- Aerocompact product pages — https://www.aerocompact.com/en/products/pitched-roofs/compactmetal-tm · https://www.aerocompact.com/en/products/pitched-roofs/compactmetal-tl · https://www.aerocompact.com/en-in/products/flat-roof/compactflat-s · https://www.aerocompact.com/en/products/ground-mount
+- Aerocompact document library (leaflets, assembly instructions, checklists; mirrored by distributor Master Solar) — https://www.mastersolar.rs/aerocompact-en/?lang=en · XM‑F AI — https://www.mastersolar.rs/wp-content/uploads/2025/02/AI_CompactPITCH_XM_F_en_v3.3.pdf · TL25 AI — https://www.mastersolar.rs/wp-content/uploads/2025/02/AC_AI_TL25_en-gbr_AI_TL25_09.pdf · S10 PLUS manual — https://sunbeam369.sk/wp-content/uploads/2025/02/AC720921_Aerocompact-S10-Mittelstutze_Installation-manual_ENU.pdf
+- Aerocompact article list (Sonepar, 01/2024, no prices) — https://shop.sonepar.at/asset_external/downloads/pim/402002/MD21_120160400.pdf
 - IEC 62548 DC architecture summary — https://ieccalc.com/solar-design-guide/dc-architecture/
 - Weidmüller PV fuse / string protection fact sheet — https://assets.dam.weidmueller.com/assets/api/ebb318db-7048-4ce2-8fb1-79ae69074cb2/Original/HB-03_PV-Fact-Sheet-CB-Fuses_EN.pdf
 

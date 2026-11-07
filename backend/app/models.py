@@ -144,6 +144,7 @@ MOUNTING_BASES = [
     "per_mid_clamp",
     "per_end_clamp",
     "per_connector",
+    "per_clamp",  # mid + end clamp positions (support points along the module long sides)
 ]
 
 

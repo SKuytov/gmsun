@@ -37,6 +37,10 @@
   .ok { color: #1e8e3e; font-weight: bold; }
   .bad { color: #c0392b; font-weight: bold; }
   .warn { background: #fff4d6; border-left: 3px solid #f0a500; padding: 4px 8px; margin: 3px 0; font-size: 8.5pt; }
+  table.kv { width: 100%; table-layout: fixed; font-size: 8.5pt; margin: 4px 0 6px; border-collapse: collapse; }
+  table.kv td { padding: 2px 6px 2px 0; border-bottom: 1px solid #eee; vertical-align: top; word-wrap: break-word; }
+  table.kv td:first-child { width: 28%; color: #666; }
+  table.kv a { color: #1b4f9c; text-decoration: none; }
   .fig { border: 1px solid #ddd; border-radius: 4px; padding: 6px; margin: 6px 0; page-break-inside: avoid; }
   .fig svg { width: 100%; height: auto; display: block; }
   .fig img { max-width: 100%; max-height: 95mm; display: block; margin: 0 auto; }
@@ -182,22 +186,49 @@
 {% endfor %}
 
 <h2>5. Конструкция — изчисление</h2>
+{% set direct = msys and not msys.rails %}
 <div class="kpi">
-  <div><div class="v">{{ stats.lines }}</div><div class="l">Шинни линии</div></div>
+  <div><div class="v">{{ stats.lines }}</div><div class="l">{{ 'Опорни линии' if direct else 'Шинни линии' }}</div></div>
+  {% if direct %}
+  <div><div class="v">{{ stats.mid_clamps + stats.end_clamps }}</div><div class="l">Опорни точки (мостове / носачи)</div></div>
+  {% else %}
   <div><div class="v">{{ stats.rail_m | num }} m</div><div class="l">Шини (с {{ roof.waste_pct | num if roof else 0 }} % отпадък)</div></div>
   <div><div class="v">{{ stats.rail_pieces }}</div><div class="l">Шини × {{ roof.rail_stock_length_m | num if roof else '—' }} m</div></div>
-  <div><div class="v">{{ stats.fixations }}</div><div class="l">Точки на закрепване</div></div>
+  {% endif %}
+  <div><div class="v">{{ stats.fixations }}</div><div class="l">{{ 'Контролни точки по реда' if direct else 'Точки на закрепване' }}</div></div>
   <div><div class="v">{{ stats.mid_clamps }} / {{ stats.end_clamps }}</div><div class="l">Средни / крайни скоби</div></div>
-  <div><div class="v">{{ stats.connectors }}</div><div class="l">Съединители</div></div>
+  {% if not direct %}<div><div class="v">{{ stats.connectors }}</div><div class="l">Съединители</div></div>{% endif %}
 </div>
 <ol class="rules">
+{% if direct %}
+  <li>Система без дълги шини: всяка скоба стъпва върху собствена опора (мост, къса шина, фалцова скоба или носач на баластната система), закрепена директно към покритието или баластната вана — опорни точки = средни + крайни скоби за всеки ред.</li>
+  <li>Опорни линии = непрекъснати редове модули × {{ roof.rails_per_module if roof else 2 }} линии на модул (горна и долна), в зоната 250–330 mm от късия ръб на модула (според инструкцията на производителя).</li>
+  <li>Скоби: средни = (модули − 1) × линии за всеки ред; крайни = 2 × линии за всеки ред (затягане 15 Nm).</li>
+  <li>Винтове / баласт — според правилата за конструкция (напр. 4× MSS 6×25 на мост TL25/TL38; баластът по доклада AEROTOOL); контролните точки по реда са ориентир за статичната проверка на стъпката.</li>
+{% else %}
   <li>Шинни линии = непрекъснати редове модули × {{ roof.rails_per_module if roof else 2 }} шини/модул; дължина на шините = дължина на реда × шини + {{ roof.waste_pct | num if roof else 0 }} % отпадък при рязане.</li>
   <li>Точки на закрепване (куки/мостове/шпилки) = ⌈дължина на реда / {{ roof.fixation_spacing_m | num if roof else 1.2 }} m⌉ + 1 за всяка шина; стъпката се потвърждава със статично изчисление за снеговата/ветровата зона на обекта.</li>
   <li>Скоби: средни = (модули − 1) × шини за всеки ред; крайни = 2 × шини за всеки ред (разстояние ≥ 40 mm от края на шината, затягане 15 Nm).</li>
   <li>Съединители = брой шини − брой шинни линии; капачки — по 1 лява и 1 дясна на линия.</li>
+{% endif %}
   <li>Дребни крепежни елементи (винтове, скоби, клипси, съединители, капачки) са с резерв {{ margins.fastener_pct | num }} % за загуби на обекта.</li>
 </ol>
 {% if roof and roof.notes %}<p class="muted">{{ roof.notes }}</p>{% endif %}
+{% if msys %}
+<h3>Монтажна система AEROCOMPACT® {{ msys.code }}</h3>
+<table class="kv">
+  <tr><td>Система</td><td>{{ msys.name_bg }}</td></tr>
+  <tr><td>Покритие / приложение</td><td>{{ msys.covering_bg }}</td></tr>
+  <tr><td>Ориентация на модулите</td><td>{{ msys.orientation }}</td></tr>
+  <tr><td>Допустим наклон на покрива</td><td>{{ msys.roof_pitch_deg[0] }}–{{ msys.roof_pitch_deg[1] }}°</td></tr>
+  <tr><td>Разстояние до покрива</td><td>{{ msys.distance_to_roof_mm[0] }}{% if msys.distance_to_roof_mm[1] %}–{{ msys.distance_to_roof_mm[1] }}{% endif %} mm</td></tr>
+  <tr><td>Натоварване (вятър / сняг)</td><td>{{ msys.wind_kn_m2 ~ ' kN/m²' if msys.wind_kn_m2 else 'по AEROTOOL' }} / {{ msys.snow_kn_m2 ~ ' kN/m²' if msys.snow_kn_m2 else 'по AEROTOOL' }}</td></tr>
+  <tr><td>Рамка на модула</td><td>{{ msys.frame_mm[0] }}–{{ msys.frame_mm[1] }} mm</td></tr>
+  {% if msys.notes_bg %}<tr><td>Бележки</td><td>{{ msys.notes_bg }}</td></tr>{% endif %}
+  <tr><td>Документи</td><td>{% for k, u in msys.docs.items() %}<a href="{{ u }}">{{ k }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</td></tr>
+</table>
+<p class="muted">Окончателното статично оразмеряване (стъпка на закрепване, баласт, покривни зони по EN 1991-1-4, снегова зона) се потвърждава с AEROTOOL на производителя; монтажът — по инструкцията за монтаж и контролния списък (checklist) на системата.</p>
+{% endif %}
 
 <h2 class="pb">6. Пълна спецификация (BOM)</h2>
 <table class="t">

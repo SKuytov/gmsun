@@ -113,6 +113,8 @@ def quantity_for_rule(rule: MountingRule, st: LayoutStats) -> float:
         base = st.end_clamps
     elif basis == "per_connector":
         base = st.connectors
+    elif basis == "per_clamp":
+        base = st.mid_clamps + st.end_clamps
     else:
         base = 0
     q = base * rule.factor

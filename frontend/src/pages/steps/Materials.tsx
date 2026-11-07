@@ -6,6 +6,7 @@ import { post } from '@/lib/api'
 import { fmtMoney, fmtNum, useT } from '@/lib/i18n'
 import type { CatalogItem, Design, Selections } from '@/lib/types'
 import type { StepCtx } from '../Project'
+import { MountingSystemCard } from '@/components/MountingSystem'
 
 function useDebounced<T>(v: T, ms = 500) {
   const [d, setD] = useState(v)
@@ -272,7 +273,7 @@ export function MaterialsStep({ ctx }: { ctx: StepCtx }) {
         <div className="flex flex-col">
           <Toggle checked={!!sel.dc_box_fuses} onChange={(v) => setSel({ dc_box_fuses: v })} label={`${t('dc_box_fuses')} (${lang === 'bg' ? 'авто при необходимост по IEC 62548' : 'auto when required by IEC 62548'})`} disabled={sel.dc_box === 'no'} />
           <Toggle checked={!!sel.backup_output} onChange={(v) => setSel({ backup_output: v })} label={t('backup_output')} />
-          <Toggle checked={sel.earth_rod ?? p.roof_type === 'ground'} onChange={(v) => setSel({ earth_rod: v })} label={t('earth_rod')} />
+          <Toggle checked={sel.earth_rod ?? p.roof_type.startsWith('ground')} onChange={(v) => setSel({ earth_rod: v })} label={t('earth_rod')} />
           <Toggle checked={sel.auto_electrical !== false} onChange={(v) => setSel({ auto_electrical: v })} label={t('auto_electrical')} />
         </div>
 
@@ -337,6 +338,7 @@ export function MaterialsStep({ ctx }: { ctx: StepCtx }) {
               {mounting.length} {lang === 'bg' ? 'артикула конструкция в каталога; количествата се изчисляват от разположението (шини, куки, скоби).' : 'mounting items in the catalog; quantities are derived from the layout (rails, hooks, clamps).'}
             </p>
           )}
+          {sel.mounting_mode !== 'none' && <MountingSystemCard roofType={p.roof_type} />}
         </div>
 
         <div className="card flex flex-col gap-3 p-4">

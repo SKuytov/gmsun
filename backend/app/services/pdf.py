@@ -114,7 +114,7 @@ def _default_title(info: dict, project) -> str:
     kw = float(info.get("kwp") or 0) * 1000
     storage = float(info.get("storage_kwh") or 0)
     t = f"ДОСТАВКА И МОНТАЖ НА ОБОРУДВАНЕ ЗА 1 БРОЙ ФвЕЦ {kw:,.0f} W".replace(",", " ")
-    t += ", НА ПОКРИВ НА СЪЩЕСТВУВАЩА СГРАДА" if project.roof_type != "ground" else ", НАЗЕМНА"
+    t += ", НА ПОКРИВ НА СЪЩЕСТВУВАЩА СГРАДА" if not str(project.roof_type).startswith("ground") else ", НАЗЕМНА"
     if storage:
         t += f" И БАТЕРИЙНА СИСТЕМА ЗА СЪХРАНЕНИЕ С КАПАЦИТЕТ {storage:g} kWh"
     if project.site_address:

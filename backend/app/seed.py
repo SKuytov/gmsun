@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from .auth import hash_password
 from .config import get_settings
 from .models import CatalogItem, LaborOption, MountingRule, RoofTypeConfig, User
+from .seed_data.aerocompact import ITEMS as AERO_ITEMS, ROOF_TYPES as AERO_ROOF_TYPES, RULES as AERO_RULES
 
 
 DEYE_LP3_SM2 = {
@@ -220,36 +221,8 @@ CATALOG: list[dict] = [
     # ----- monitoring / metering -----
     {"category": "monitoring", "name": "Кабел за удължаване на CT 2×0,75 mm² екраниран", "unit": "м", "purchase_price": 0.55, "specs": {"role": "ct_cable", "price_source": "indicative"}},
     {"category": "monitoring", "name": "Кабел RS485 екраниран 2×0,5 mm²", "unit": "м", "purchase_price": 0.5, "specs": {"role": "rs485_cable", "price_source": "indicative"}},
-    # ----- mounting: AEROCOMPACT CompactPITCH (tile) — codes from quote 64845 / Aerocompact catalogue -----
-    {"category": "mounting", "sku": "705100-3550", "name": "X50-3550 монтажна шина 3550 mm", "manufacturer": "Aerocompact", "purchase_price": 24.92, "specs": {"length_m": 3.55, "system": "CompactPITCH"}},
-    {"category": "mounting", "sku": "705100-4400", "name": "X50-4400 монтажна шина 4400 mm", "manufacturer": "Aerocompact", "purchase_price": 31.0, "specs": {"length_m": 4.4, "system": "CompactPITCH", "price_source": "indicative"}},
-    {"category": "mounting", "sku": "705100-5850", "name": "X50-5850 монтажна шина 5850 mm", "manufacturer": "Aerocompact", "purchase_price": 41.0, "specs": {"length_m": 5.85, "system": "CompactPITCH", "price_source": "indicative"}},
-    {"category": "mounting", "sku": "705202", "name": "XPCN съединител за шина X40/X50", "manufacturer": "Aerocompact", "purchase_price": 1.85, "specs": {"small_part": True}},
-    {"category": "mounting", "sku": "705310", "name": "XM-F кука за керемиден покрив (регулируема)", "manufacturer": "Aerocompact", "purchase_price": 12.29, "specs": {"system": "CompactPITCH", "screws": "2× SDS-W 8×100 или 3× SDS-W 6×100", "datasheet": "https://shop.sonepar.at/asset_external/downloads/pim/402002/MD21_120160400.pdf"}},
-    {"category": "mounting", "sku": "705309", "name": "XM-FSP опорна плоча за кука", "manufacturer": "Aerocompact", "purchase_price": 1.76, "specs": {"small_part": True}},
-    {"category": "mounting", "sku": "705308-8004", "name": "XM-FCMR покривна ламарина среден размер, червена", "manufacturer": "Aerocompact", "purchase_price": 8.02},
-    {"category": "mounting", "sku": "701544", "name": "SDS-W 8×100 самонарезен винт за дърво (A2)", "manufacturer": "Aerocompact", "purchase_price": 0.26, "specs": {"small_part": True}},
-    {"category": "mounting", "sku": "701590", "name": "GSC 10×30 фиксиращ винт (кука↔шина)", "manufacturer": "Aerocompact", "purchase_price": 0.23, "specs": {"small_part": True}},
-    {"category": "mounting", "sku": "707011", "name": "CLM10 средна скоба Click 30-46 (със заземяващи щифтове)", "manufacturer": "Aerocompact", "purchase_price": 1.54, "specs": {"small_part": True, "torque_nm": 15}},
-    {"category": "mounting", "sku": "707003", "name": "CLE10 крайна скоба Click 30-46", "manufacturer": "Aerocompact", "purchase_price": 1.54, "specs": {"small_part": True, "torque_nm": 15, "edge_distance_mm": 40}},
-    {"category": "mounting", "sku": "705205", "name": "XCL50 капачка лява за шина X50", "manufacturer": "Aerocompact", "purchase_price": 0.46, "specs": {"small_part": True}},
-    {"category": "mounting", "sku": "705206", "name": "XCR50 капачка дясна за шина X50", "manufacturer": "Aerocompact", "purchase_price": 0.46, "specs": {"small_part": True}},
-    {"category": "mounting", "sku": "701902", "name": "CLP-M кабелна клипса за модул", "manufacturer": "Aerocompact", "purchase_price": 0.26, "specs": {"small_part": True}},
-    {"category": "mounting", "sku": "706457", "name": "CLP-R кабелна клипса за шина", "manufacturer": "Aerocompact", "purchase_price": 0.16, "specs": {"small_part": True}},
-    {"category": "mounting", "name": "WCL8-10 клема за заземителен проводник 6–10 mm² към шина", "manufacturer": "Aerocompact", "purchase_price": 1.9, "specs": {"small_part": True, "role": "bonding_clamp", "torque_nm": 10, "price_source": "indicative"}},
-    # ----- CompactMETAL (trapezoidal sheet) -----
-    {"category": "mounting", "name": "CompactMETAL TL25 трапецовиден мост 250 mm с EPDM", "manufacturer": "Aerocompact", "purchase_price": 4.5, "specs": {"system": "CompactMETAL", "datasheet": "https://www.aerocompact.com/en/products/pitched-roofs/compactmetal-tm", "price_source": "indicative"}},
-    {"category": "mounting", "name": "MSS 6×25 самопробивен винт с EPDM шайба (ламарина)", "manufacturer": "Aerocompact", "purchase_price": 0.12, "specs": {"small_part": True, "price_source": "indicative"}},
-    {"category": "mounting", "name": "CLE10 Plus крайна скоба Click (за къси шини)", "manufacturer": "Aerocompact", "sku": "707080", "purchase_price": 2.35, "specs": {"small_part": True, "price_source": "indicative"}},
-    # ----- sandwich / corrugated: hanger bolts to purlins -----
-    {"category": "mounting", "name": "Шпилка (hanger bolt) M10×250 A2 с EPDM уплътнение и адаптер за шина (сандвич панел)", "purchase_price": 5.8, "specs": {"price_source": "indicative"}},
-    {"category": "mounting", "name": "Уплътнителна EPDM шайба/маншон за шпилка M10", "purchase_price": 0.4, "specs": {"small_part": True, "price_source": "indicative"}},
-    # ----- CompactFLAT S10 (flat roof, 10° south) -----
-    {"category": "mounting", "name": "CompactFLAT S10 основа (базов профил) за 1 модул 10°", "manufacturer": "Aerocompact", "purchase_price": 38.0, "specs": {"system": "CompactFLAT", "price_source": "indicative"}},
-    {"category": "mounting", "name": "Баластен блок бетон 40×20×10 cm (≈18 kg)", "purchase_price": 3.2, "specs": {"weight_kg": 18, "price_source": "indicative"}},
-    {"category": "mounting", "name": "Защитна подложка (строителна защита) за хидроизолация", "purchase_price": 1.5},
-    {"category": "mounting", "name": "Ветрозащитен дефлектор CompactFLAT (заден лист)", "manufacturer": "Aerocompact", "purchase_price": 9.5, "specs": {"price_source": "indicative"}},
-    # ----- ground mount -----
+    # ----- mounting: the full AEROCOMPACT catalogue lives in seed_data/aerocompact.py (ITEMS) -----
+    # ----- generic ground-mount items (steel tables, foundations) -----
     {"category": "mounting", "name": "Наземна конструкция — стоманена поцинкована (на модул)", "purchase_price": 55.0},
     {"category": "mounting", "name": "Бетонен фундамент / забит профил (на опора)", "purchase_price": 28.0},
     {"category": "mounting", "name": "Болт M10×30 A2 с гайка и шайби (наземна конструкция)", "purchase_price": 0.35, "specs": {"small_part": True, "price_source": "indicative"}},
@@ -259,69 +232,10 @@ CATALOG: list[dict] = [
     {"category": "service", "name": "Монтаж и настройка на мониторинг (Wi-Fi/4G)", "unit": "бр.", "purchase_price": 0.0, "sell_price": 60.0},
 ]
 
-ROOF_TYPES: list[dict] = [
-    {"code": "tile", "label_bg": "Покрив с керемиди", "label_en": "Tile roof", "pricing_mode": "detailed", "lump_price_per_module": 124.0, "rails_per_module": 2, "fixation_spacing_m": 1.2, "waste_pct": 8.0, "default_tilt_deg": 25.0, "sort_order": 1,
-     "notes": "Куки за керемиди върху ребрата (стъпка ~0.7 m), шини X50, скоби Click."},
-    {"code": "flat_concrete", "label_bg": "Плосък бетонен покрив", "label_en": "Flat concrete roof", "pricing_mode": "detailed", "lump_price_per_module": 95.0, "rails_per_module": 2, "fixation_spacing_m": 1.2, "waste_pct": 8.0, "default_tilt_deg": 15.0, "sort_order": 2,
-     "notes": "CompactFLAT S10 с баласт, без пробиване на хидроизолацията. Баластът се потвърждава с ветрово/снегово изчисление."},
-    {"code": "lt_sheet", "label_bg": "LT ламарина", "label_en": "Trapezoidal metal sheet", "pricing_mode": "detailed", "lump_price_per_module": 70.0, "rails_per_module": 2, "fixation_spacing_m": 1.0, "waste_pct": 8.0, "default_tilt_deg": 10.0, "sort_order": 3,
-     "notes": "CompactMETAL TL25 мостове с EPDM върху гребена на ламарината, 4 винта MSS 6×25 на мост."},
-    {"code": "sandwich", "label_bg": "Сандвич панел", "label_en": "Sandwich panel roof", "pricing_mode": "detailed", "lump_price_per_module": 78.0, "rails_per_module": 2, "fixation_spacing_m": 1.0, "waste_pct": 8.0, "default_tilt_deg": 10.0, "sort_order": 4,
-     "notes": "Шпилки M10 през панела към столиците с EPDM уплътнение."},
-    {"code": "ground", "label_bg": "Наземна конструкция", "label_en": "Ground mount", "pricing_mode": "detailed", "lump_price_per_module": 83.0, "rails_per_module": 2, "fixation_spacing_m": 2.5, "waste_pct": 5.0, "default_tilt_deg": 30.0, "sort_order": 5,
-     "notes": "Стоманени маси, фундаменти/забити профили. Разстояние между редовете за избягване на засенчване."},
-]
+# Roof / terrain types and the per-type component rules come from the Aerocompact catalogue module.
+ROOF_TYPES: list[dict] = list(AERO_ROOF_TYPES)
 
-# (roof_type, item name, basis, factor, round_up)
-# Quantities follow the racking configurator logic (Aerocompact report, quote 64845):
-# one hook per fixation point, 2 SDS-W screws + 1 GSC set screw per hook, support plate
-# on ~75 % of hooks (depends on rafter height), clamps per rail run, 2 cable clips/module.
-# Small parts additionally receive the fastener reserve from Settings (default 10 %).
-MOUNTING_RULES: list[tuple[str, str, str, float, bool]] = [
-    # tile roof — Aerocompact CompactPITCH XM-F
-    ("tile", "X50-3550 монтажна шина 3550 mm", "per_rail", 1, True),
-    ("tile", "XPCN съединител за шина X40/X50", "per_connector", 1, True),
-    ("tile", "XM-F кука за керемиден покрив (регулируема)", "per_fixation", 1, True),
-    ("tile", "XM-FSP опорна плоча за кука", "per_fixation", 0.75, True),
-    ("tile", "XM-FCMR покривна ламарина среден размер, червена", "per_fixation", 1, True),
-    ("tile", "SDS-W 8×100 самонарезен винт за дърво (A2)", "per_fixation", 2, True),
-    ("tile", "GSC 10×30 фиксиращ винт (кука↔шина)", "per_fixation", 1, True),
-    ("tile", "CLM10 средна скоба Click 30-46 (със заземяващи щифтове)", "per_mid_clamp", 1, True),
-    ("tile", "CLE10 крайна скоба Click 30-46", "per_end_clamp", 1, True),
-    ("tile", "XCL50 капачка лява за шина X50", "per_line", 1, True),
-    ("tile", "XCR50 капачка дясна за шина X50", "per_line", 1, True),
-    ("tile", "CLP-M кабелна клипса за модул", "per_module", 2, True),
-    ("tile", "CLP-R кабелна клипса за шина", "per_module", 1, True),
-    # trapezoidal sheet — CompactMETAL TL25 bridges (4 MSS screws each), rails on bridges
-    ("lt_sheet", "X50-3550 монтажна шина 3550 mm", "per_rail", 1, True),
-    ("lt_sheet", "XPCN съединител за шина X40/X50", "per_connector", 1, True),
-    ("lt_sheet", "CompactMETAL TL25 трапецовиден мост 250 mm с EPDM", "per_fixation", 1, True),
-    ("lt_sheet", "MSS 6×25 самопробивен винт с EPDM шайба (ламарина)", "per_fixation", 4, True),
-    ("lt_sheet", "GSC 10×30 фиксиращ винт (кука↔шина)", "per_fixation", 1, True),
-    ("lt_sheet", "CLM10 средна скоба Click 30-46 (със заземяващи щифтове)", "per_mid_clamp", 1, True),
-    ("lt_sheet", "CLE10 крайна скоба Click 30-46", "per_end_clamp", 1, True),
-    ("lt_sheet", "XCL50 капачка лява за шина X50", "per_line", 1, True),
-    ("lt_sheet", "XCR50 капачка дясна за шина X50", "per_line", 1, True),
-    ("lt_sheet", "CLP-M кабелна клипса за модул", "per_module", 2, True),
-    # sandwich panel — hanger bolts into purlins
-    ("sandwich", "X50-3550 монтажна шина 3550 mm", "per_rail", 1, True),
-    ("sandwich", "XPCN съединител за шина X40/X50", "per_connector", 1, True),
-    ("sandwich", "Шпилка (hanger bolt) M10×250 A2 с EPDM уплътнение и адаптер за шина (сандвич панел)", "per_fixation", 1, True),
-    ("sandwich", "Уплътнителна EPDM шайба/маншон за шпилка M10", "per_fixation", 1, True),
-    ("sandwich", "CLM10 средна скоба Click 30-46 (със заземяващи щифтове)", "per_mid_clamp", 1, True),
-    ("sandwich", "CLE10 крайна скоба Click 30-46", "per_end_clamp", 1, True),
-    ("sandwich", "XCL50 капачка лява за шина X50", "per_line", 1, True),
-    ("sandwich", "XCR50 капачка дясна за шина X50", "per_line", 1, True),
-    ("sandwich", "CLP-M кабелна клипса за модул", "per_module", 2, True),
-    # flat concrete — CompactFLAT S10 ballasted (ballast per module to be confirmed by wind/snow calc)
-    ("flat_concrete", "CompactFLAT S10 основа (базов профил) за 1 модул 10°", "per_module", 1, True),
-    ("flat_concrete", "Ветрозащитен дефлектор CompactFLAT (заден лист)", "per_module", 1, True),
-    ("flat_concrete", "Баластен блок бетон 40×20×10 cm (≈18 kg)", "per_module", 4, True),
-    ("flat_concrete", "Защитна подложка (строителна защита) за хидроизолация", "per_module", 2, True),
-    ("flat_concrete", "CLM10 средна скоба Click 30-46 (със заземяващи щифтове)", "per_mid_clamp", 1, True),
-    ("flat_concrete", "CLE10 крайна скоба Click 30-46", "per_end_clamp", 1, True),
-    ("flat_concrete", "CLP-M кабелна клипса за модул", "per_module", 2, True),
-    # ground mount
+GROUND_RULES: list[tuple[str, str, str, float, bool]] = [
     ("ground", "Наземна конструкция — стоманена поцинкована (на модул)", "per_module", 1, True),
     ("ground", "Бетонен фундамент / забит профил (на опора)", "per_fixation", 1, True),
     ("ground", "Болт M10×30 A2 с гайка и шайби (наземна конструкция)", "per_module", 4, True),
@@ -329,6 +243,22 @@ MOUNTING_RULES: list[tuple[str, str, str, float, bool]] = [
     ("ground", "CLE10 крайна скоба Click 30-46", "per_end_clamp", 1, True),
     ("ground", "CLP-M кабелна клипса за модул", "per_module", 2, True),
 ]
+
+# (roof_type, item name, basis, factor, round_up) — small parts additionally receive the fastener reserve from Settings.
+MOUNTING_RULES: list[tuple[str, str, str, float, bool]] = list(AERO_RULES) + GROUND_RULES
+
+# Seed rules from earlier versions that were replaced by the Aerocompact-specific rule sets; they are
+# deactivated on upgrade so that quantities are not doubled (user-created rules are never touched).
+RETIRED_RULES: set[tuple[str, str]] = {
+    ("lt_sheet", "X50-3550 монтажна шина 3550 mm"), ("lt_sheet", "XPCN съединител за шина X40/X50"),
+    ("lt_sheet", "GSC 10×30 фиксиращ винт (кука↔шина)"), ("lt_sheet", "XCL50 капачка лява за шина X50"), ("lt_sheet", "XCR50 капачка дясна за шина X50"),
+    ("lt_sheet", "CompactMETAL TL25 трапецовиден мост 250 mm с EPDM"), ("lt_sheet", "MSS 6×25 самопробивен винт с EPDM шайба (ламарина)"),
+    ("sandwich", "X50-3550 монтажна шина 3550 mm"), ("sandwich", "XPCN съединител за шина X40/X50"),
+    ("sandwich", "Шпилка (hanger bolt) M10×250 A2 с EPDM уплътнение и адаптер за шина (сандвич панел)"),
+    ("sandwich", "Уплътнителна EPDM шайба/маншон за шпилка M10"), ("sandwich", "XCL50 капачка лява за шина X50"), ("sandwich", "XCR50 капачка дясна за шина X50"),
+    ("flat_concrete", "CompactFLAT S10 основа (базов профил) за 1 модул 10°"), ("flat_concrete", "Ветрозащитен дефлектор CompactFLAT (заден лист)"),
+    ("flat_concrete", "Защитна подложка (строителна защита) за хидроизолация"), ("flat_concrete", "CLE10 крайна скоба Click 30-46"),
+}
 
 LABOR: list[tuple[int, int, float]] = [
     (1, 2, 1100.0), (1, 3, 1500.0), (2, 2, 1600.0), (2, 3, 3000.0), (3, 2, 2300.0), (3, 3, 3300.0), (3, 4, 4200.0),
@@ -340,8 +270,9 @@ def seed(db: Session) -> None:
     s = get_settings()
     if not db.query(User).first():
         db.add(User(email=s.admin_email, name="Администратор", password_hash=hash_password(s.admin_password), role="admin"))
-    if not db.query(RoofTypeConfig).first():
-        for rt in ROOF_TYPES:
+    existing_roofs = {r.code for r in db.query(RoofTypeConfig.code).all()}
+    for rt in ROOF_TYPES:  # additive: new roof/terrain types appear after upgrade, edited ones are kept
+        if rt["code"] not in existing_roofs:
             db.add(RoofTypeConfig(**rt))
     if not db.query(LaborOption).first():
         for d, w, p in LABOR:
@@ -353,12 +284,22 @@ def seed(db: Session) -> None:
         db.commit()
         return
     existing_names = {c.name for c in db.query(CatalogItem.name).all()}
-    for i, it in enumerate(CATALOG):
+    for i, it in enumerate(CATALOG + AERO_ITEMS):
         if it["name"] in existing_names:
             continue
+        existing_names.add(it["name"])
         db.add(CatalogItem(sort_order=i, **it))
     db.flush()
+    # Supplier snapshot (green-energy.bg portfolio with datasheet-derived specs) – additive as well.
+    from .services.supplier_sync import load_seed_items, upsert_items
+
+    supplier_items = load_seed_items()
+    if supplier_items:
+        upsert_items(db, supplier_items, overwrite_prices=False, overwrite_specs=False)
     by_name = {c.name: c for c in db.query(CatalogItem).all()}
+    for r in db.query(MountingRule).filter(MountingRule.active.is_(True)).all():
+        if (r.roof_type, r.name) in RETIRED_RULES:
+            r.active = False
     existing_rules = {(r.roof_type, r.name) for r in db.query(MountingRule.roof_type, MountingRule.name).all()}
     for i, (roof, name, basis, factor, ru) in enumerate(MOUNTING_RULES):
         if (roof, name) in existing_rules:
