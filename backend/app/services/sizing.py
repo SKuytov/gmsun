@@ -37,10 +37,9 @@ def suggest_inverters(
         ph = int(_f(sp, "phases", 3))
         if ph != phase:
             continue
-        reasons.append("fits phase")
         ac = _f(sp, "ac_power_kw")
         if ac <= 0:
-            warnings.append("missing AC power spec")
+            warnings.append("липсва AC мощност в характеристиките")
         vc = (sp.get("battery_voltage_class") or "").upper()
         if voltage_class and vc and vc != voltage_class.upper():
             continue
@@ -51,26 +50,26 @@ def suggest_inverters(
         if connected_kw > 0 and ac > 0:
             if ac > connected_kw * 1.1:
                 score -= (ac - connected_kw) * 2
-                warnings.append(f"AC {ac:g} kW exceeds connected power {connected_kw:g} kW")
+                warnings.append(f"AC {ac:g} kW надвишава присъединената мощност {connected_kw:g} kW")
             else:
                 score += 10 - abs(connected_kw - ac)
-                reasons.append(f"AC {ac:g} kW ≤ connected {connected_kw:g} kW")
-        if pv_kwp > 0:
+                reasons.append(f"AC {ac:g} kW ≤ присъединена {connected_kw:g} kW")
+        if pv_kwp > 0 and ac > 0:
+            ratio = pv_kwp / ac
             if max_pv and pv_kwp > max_pv:
                 score -= (pv_kwp - max_pv) * 3
-                warnings.append(f"PV {pv_kwp:g} kWp exceeds max PV input {max_pv:g} kW")
+                warnings.append(f"PV {pv_kwp:g} kWp надвишава макс. вход {max_pv:g} kW")
+            elif 0.8 <= ratio <= dc_ac_max:
+                score += 8 - abs(ratio - 1.1) * 2
+                reasons.append(f"DC/AC {ratio:.2f} — оптимално")
+            elif ratio < 0.8:
+                score += 3
+                reasons.append(f"инверторът е с резерв (DC/AC {ratio:.2f})")
             else:
-                ratio = pv_kwp / ac if ac else 0
-                if 0.9 <= ratio <= dc_ac_max:
-                    score += 8
-                    reasons.append(f"DC/AC ratio {ratio:.2f} optimal")
-                elif ratio < 0.9 and ratio > 0:
-                    score += 3
-                    reasons.append(f"inverter oversized (DC/AC {ratio:.2f})")
-                else:
-                    score += 5
+                score += 5
+                reasons.append(f"DC/AC {ratio:.2f}")
         if it.purchase_price <= 0 and it.sell_price is None:
-            warnings.append("no price in catalog")
+            warnings.append("няма цена в каталога")
         out.append(
             {
                 "item": it,
@@ -109,18 +108,18 @@ def suggest_batteries(
         warnings: list[str] = []
         max_par = int(_f(sp, "max_parallel", 0))
         if max_par and qty > max_par:
-            warnings.append(f"max {max_par} units in parallel for this model")
+            warnings.append(f"макс. {max_par} бр. паралелно за този модел")
         if inv_max_parallel and qty > inv_max_parallel:
-            warnings.append(f"inverter supports max {inv_max_parallel} battery units")
+            warnings.append(f"инверторът поддържа макс. {inv_max_parallel} батерийни модула")
         if vc == "HV" and inverter is not None:
             # HV stacks: check voltage window if given
             vmin, vmax = _f(inv_sp, "battery_v_min"), _f(inv_sp, "battery_v_max")
             vnom = _f(sp, "nominal_v")
             if vmin and vmax and vnom:
                 if not (vmin <= vnom * qty <= vmax) and not (vmin <= vnom <= vmax):
-                    warnings.append("battery stack voltage outside inverter window — check modules per rack")
+                    warnings.append("напрежението на батерията е извън прозореца на инвертора — проверете")
         if it.purchase_price <= 0 and it.sell_price is None:
-            warnings.append("no price in catalog")
+            warnings.append("няма цена в каталога")
         accessories: list[dict[str, Any]] = []
         for acc in sp.get("accessories") or []:
             accessories.append(acc)

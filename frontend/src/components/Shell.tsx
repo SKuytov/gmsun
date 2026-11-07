@@ -20,7 +20,7 @@ export function Shell({ children }: { children: ReactNode }) {
     )
   return (
     <div className="flex min-h-full flex-col md:flex-row">
-      <aside className="hidden w-56 shrink-0 flex-col border-r border-line/10 bg-surface px-3 py-4 md:flex">
+      <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col self-start overflow-y-auto border-r border-line/10 bg-surface px-3 py-4 md:flex">
         <div className="mb-6 flex items-center gap-2 px-2">
           <span className="grid h-8 w-8 place-items-center rounded-md bg-ink text-sun">
             <Sun className="h-5 w-5" />

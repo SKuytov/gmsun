@@ -25,7 +25,7 @@
   table.lines tr.section td { background: #fff4d6; font-weight: bold; border-top: 1px solid #f0a500; }
   table.lines .r { text-align: right; white-space: nowrap; }
   table.lines .c { text-align: center; }
-  .totals { width: 55%; margin-left: auto; margin-top: 10px; border-collapse: collapse; }
+  .totals { width: 55%; margin-left: auto; margin-top: 10px; border-collapse: collapse; page-break-inside: avoid; }
   .totals td { padding: 4px 8px; font-size: 9.5pt; }
   .totals td.r { text-align: right; white-space: nowrap; }
   .totals tr.grand td { font-weight: bold; font-size: 11.5pt; border-top: 2px solid #1b1f24; padding-top: 6px; }
@@ -41,7 +41,7 @@
   .layout-img { max-width: 100%; max-height: 95mm; display: block; margin: 6px auto; border: 1px solid #ddd; }
   .kpi { display: flex; gap: 8px; margin: 8px 0 4px; }
   .kpi div { flex: 1; background: #f6f7f9; border-radius: 4px; padding: 6px 8px; text-align: center; }
-  .kpi .v { font-weight: bold; font-size: 11pt; }
+  .kpi .v { font-weight: bold; font-size: 11pt; white-space: nowrap; }
   .kpi .l { font-size: 7.5pt; color: #777; text-transform: uppercase; }
   .muted { color: #777; font-size: 8pt; }
 </style>
@@ -95,6 +95,7 @@
   <div><div class="v">{{ annual_yield|int|thousands }} kWh</div><div class="l">Очакван годишен добив*</div></div>
   <div><div class="v">{{ quote.execution_days or "—" }} {% if quote.execution_days %}{{ "ден" if quote.execution_days == 1 else "дни" }}{% endif %}</div><div class="l">Срок за изпълнение</div></div>
 </div>
+</div>
 
 <table class="lines">
   <thead>
@@ -124,6 +125,7 @@
   </tbody>
 </table>
 
+<div style="page-break-inside: avoid;">
 <table class="totals">
   {% if quote.discount_amount %}
   <tr><td>Сума:</td><td class="r">{{ quote.subtotal|money }} {{ quote.currency }}</td></tr>

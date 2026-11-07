@@ -70,6 +70,8 @@ def test_project_layout_quote_flow(client, auth):
     assert q.status_code == 201, q.text
     q = q.json()
     assert q["net_total"] > 0
+    # totals must equal the sum of visible lines right after creation (regression: double-appended lines)
+    assert abs(q["subtotal"] - round(sum(l["total"] for l in q["lines"] if not l["hidden"]), 2)) < 0.02
     assert abs(q["total"] - round(q["net_total"] * 1.2, 2)) < 0.02
     assert abs(q["advance_amount"] - round(q["net_total"] * 0.7, 2)) < 0.02
     sections = {l["section"] for l in q["lines"]}

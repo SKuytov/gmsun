@@ -1,4 +1,5 @@
 import { Plus, Trash2 } from 'lucide-react'
+import { useEffect } from 'react'
 import { Field, Input, NumInput, Segmented, Select, Toggle } from '@/components/ui'
 import { fmtMoney, fmtNum, useT } from '@/lib/i18n'
 import type { CatalogItem, Selections } from '@/lib/types'
@@ -30,6 +31,24 @@ export function MaterialsStep({ ctx }: { ctx: StepCtx }) {
   const mounting = by('mounting')
   const extras = sel.extra_items || []
   const el = sel.electrical_items || []
+
+  // Smart defaults: pre-select the first matching catalog item and estimate cable lengths once.
+  // Explicit "none" is stored as null and is never overridden.
+  useEffect(() => {
+    if (!items.length) return
+    const d: Partial<Selections> = {}
+    const first = (xs: CatalogItem[]) => xs[0]?.id ?? null
+    if (sel.switchboard_item_id === undefined) d.switchboard_item_id = first(sb.length ? sb : by('switchboard'))
+    if (sel.solar_cable_item_id === undefined) d.solar_cable_item_id = first(by('solar_cable'))
+    if (sel.mc4_item_id === undefined) d.mc4_item_id = first(electrical.filter((x) => /mc4/i.test(x.name)))
+    if (sel.power_cable_item_id === undefined) d.power_cable_item_id = first(by('power_cable'))
+    const n = ctx.panelQty || 0
+    if (sel.solar_cable_red_m === undefined) d.solar_cable_red_m = n ? Math.ceil(n * 1.2 + 15) : 0
+    if (sel.solar_cable_black_m === undefined) d.solar_cable_black_m = n ? Math.ceil(n * 1.2 + 15) : 0
+    if (sel.power_cable_m === undefined) d.power_cable_m = 15
+    if (Object.keys(d).length) setSel(d)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items.length])
 
   const setExtra = (i: number, patch: Partial<NonNullable<Selections['extra_items']>[number]>) => setSel({ extra_items: extras.map((x, j) => (j === i ? { ...x, ...patch } : x)) })
 

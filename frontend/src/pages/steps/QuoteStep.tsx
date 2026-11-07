@@ -172,11 +172,11 @@ function QuoteEditor({ quote: q0, ctx, lang }: { quote: Quote; ctx: StepCtx; lan
 
         <div className="card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="tbl min-w-[760px]">
+            <table className="tbl min-w-[720px]">
               <thead>
                 <tr>
                   <th className="w-8">№</th>
-                  <th>{t('name')}</th>
+                  <th className="min-w-[200px]">{t('name')}</th>
                   <th className="w-16">{t('unit')}</th>
                   <th className="w-24 text-right">{t('qty')}</th>
                   <th className="w-28 text-right">{t('unit_price')}</th>

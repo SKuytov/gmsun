@@ -230,9 +230,8 @@ def apply_lines(db: Session, quote: Quote, new_lines: list[dict[str, Any]]) -> N
         seen.add(nl["key"])
         ln = existing.get(nl["key"])
         if ln is None:
-            ln = QuoteLine(quote=quote, key=nl["key"], source="auto")
-            db.add(ln)
-            quote.lines.append(ln)
+            ln = QuoteLine(key=nl["key"], source="auto")
+            quote.lines.append(ln)  # backref sets quote_id; do not also pass quote= (would double-append)
         if ln.locked:
             # keep user's manual override but still refresh purchase price for margin reporting
             ln.purchase_price = nl["purchase_price"]
