@@ -129,6 +129,20 @@ XM‑PL за плоски керемиди), LT ламарина (CompactMETAL T
 - Надвишаването на присъединената мощност се показва изрично (увеличение на мощността или export limit);
   паралелна работа се предлага само с инвертори ≥ `min_parallel_unit_kw` (8 kW) и до `max_parallel_inverters` (6).
 
+### Препоръка за модул, фотореалистична визуализация и 3D
+
+- **Препоръка за модул** (стъпка 3 и 4): всеки активен модул от каталога се подрежда върху реалните плоскости
+  (контур, препятствия, отстъп, портрет/пейзаж) и се класира по стратегия и обхват — ефективна €/Wp (цена + конструкция
+  и труд за брой), срок на доставка, клас/ефективност, покритие на целта и добри практики (формат и тегло спрямо достъпа
+  и височината, рамка 30–46 mm за скобите, двулицеви на плоски покриви, проверка на стринговете с инвертора, липсващи
+  размери/цени). „Приложи“ записва модула, ориентацията и подредбата във всяка плоскост. Предложенията в стъпка 4 правят
+  същото за всяка стратегия („Автоматичен избор на модул“).
+- **Визуализация върху снимката**: модулите се проектират фотореалистично върху качената снимка на покрива (стъкло,
+  отблясък, клетки, черна/сребриста рамка, сянка, съгласуване на осветеността) и влизат в офертата като приложение
+  „Как ще изглежда Вашата централа“ и в техническото досие.
+- **3D модел**: сграда и плоскости по наклон/азимут/размери/височина, модули с рамка и шини/баласт, сенки по час и месец,
+  реалната снимка като текстура; „Запази изгледа за документите“ добавя изгледа към офертата.
+
 ### Пълен набор данни и редакция на всички таблици в Excel
 
 - При първи старт **всички** артикули получават цена, доставчик, срок, клас, код и гаранция. Там, където няма реална
@@ -185,6 +199,20 @@ splits the array per inverter (plane → own MPPT, equal parallel lengths, Voc(c
 `full_design` adds per‑inverter MCB/RCD/feeders, an AC combiner board, a main MCCB and main cable sized for the total
 current and voltage drop, parallel‑communication cables and PE. Catalog roles `ac_combiner` and `parallel_cable` are
 new; settings `procurement.max_parallel_inverters` (6) and `procurement.min_parallel_unit_kw` (8) bound the search.
+
+### Module recommendation, photo visualisation and 3D
+
+`services/module_fit.py` lays every active catalog module on the real planes (polygon, obstacles, setback, both
+orientations, cached) and ranks candidates per strategy/scope: effective €/Wp (price + `procurement.bos_per_module_eur`
+for mounting/labour per module), lead time, tier/efficiency, target coverage and best‑practice rules (format/weight vs
+roof access and height, 30–46 mm frame for the clamps, bifacial on flat/ground, string quick‑check against the chosen
+inverter, missing dimensions/prices, unverified specs). `apply()` writes module, orientation and a compact centred block
+(`pick_compact`) into each plane; proposals use the same engine per strategy (`panel_auto`, default on).
+`services/visual.py` renders the modules photorealistically onto the uploaded photo (homography from the plane corners,
+glass gradient, specular band, cells, frame, shadow, luminance matching) → quote appendix and technical file.
+`services/scene.py` + `components/Scene3D.tsx` (three.js, lazy‑loaded) build a schematic 3D model from the planes
+(tilt/azimuth/size/survey height), with sun position by hour/month, the photo as texture and a “save view” that embeds
+the render in the documents.
 
 ### Complete dataset and whole-database Excel round trip
 

@@ -85,6 +85,111 @@ export interface ProposalVariant {
 
 export type ProposalScope = 'auto' | 'target' | 'roof'
 
+export interface ModuleCandidateLayout {
+  layout_id: number
+  name: string
+  azimuth: number
+  tilt: number
+  area_m2: number
+  factor: number
+  orientation: 'portrait' | 'landscape'
+  count_max: number
+  count_used: number
+  utilization: number
+}
+export interface ModuleCandidate {
+  item_id: number
+  name: string
+  manufacturer: string | null
+  sku: string | null
+  wp: number
+  width_mm: number
+  height_mm: number
+  weight_kg: number | null
+  kg_m2: number | null
+  efficiency: number
+  cells: number | null
+  thickness_mm: number | null
+  bifacial: boolean
+  tier: 'economy' | 'standard' | 'premium'
+  quality: number
+  lead_time_days: number
+  supplier: string | null
+  unit_price: number | null
+  eur_per_wp: number | null
+  eur_per_wp_effective: number | null
+  modules_cost: number | null
+  verified: boolean
+  layouts: ModuleCandidateLayout[]
+  count_max: number
+  kwp_max: number
+  count_used: number
+  kwp: number
+  mode: 'roof' | 'target'
+  utilization: number | null
+  kwp_per_m2: number | null
+  warranty: string | null
+  datasheet: boolean
+  warnings: string[]
+  reasons: string[]
+  badges: string[]
+  score: number
+  rank: number
+}
+export interface ModuleRecommendation {
+  candidates: ModuleCandidate[]
+  evaluated: number
+  target_kwp: number
+  demand_basis: string
+  scope: 'roof' | 'target'
+  scope_requested: ProposalScope
+  strategy: Strategy
+  total_area_m2: number
+  layouts: { layout_id: number; name: string; area_m2: number; azimuth: number; tilt: number; factor: number; panel_item_id: number | null; count: number }[]
+  current_panel_id: number | null
+}
+
+export interface ScenePanel {
+  x: number
+  y: number
+  w: number
+  h: number
+  enabled?: boolean
+  row?: number
+}
+export interface ScenePlane {
+  layout_id: number
+  name: string
+  width_m: number
+  height_m: number
+  tilt: number
+  azimuth: number
+  u_offset: number
+  eave_offset: number
+  eave_height: number
+  roof_polygon: Pt[]
+  obstacles: Pt[][]
+  panels: ScenePanel[]
+  panel: { name: string | null; wp: number; width_m: number; height_m: number; thickness_m: number; cells: number; bifacial: boolean }
+  texture: string | null
+  colour: [number, number, number]
+  ballast: boolean
+  elevated: boolean
+}
+export interface Scene {
+  project_id: number
+  name: string
+  roof_type: string
+  flat: boolean
+  ground: boolean
+  building: { width_m: number; depth_m: number; eave_height_m: number; ridge_height_m: number; colour: [number, number, number] }
+  planes: ScenePlane[]
+  modules: number
+  kwp: number
+  site: { lat: number; lon: number }
+  render3d_path: string | null
+}
+
 export interface ProposalsResult {
   target_kwp: number
   target_basis: 'layout' | 'selection' | 'consumption' | 'connected_power' | 'target' | 'default' | 'none'
@@ -175,6 +280,8 @@ export interface Layout {
   image_w: number | null
   image_h: number | null
   render_path: string | null
+  visual_path?: string | null
+  rect_path?: string | null
   corners: Pt[]
   plane_w_m: number
   plane_h_m: number
@@ -190,6 +297,7 @@ export interface Layout {
   tilt_deg: number
   panels: PanelRect[]
   summary: LayoutSummary
+  updated_at?: string | null
 }
 
 export interface Project {
@@ -289,6 +397,9 @@ export interface Selections {
   labor_mode?: 'matrix' | 'per_w' | 'manual'
   strategy?: Strategy | null
   labor_option_id?: number | null
+  labor_auto?: boolean
+  panel_auto?: boolean
+  panel_fit?: { panel_item_id: number; count: number; roof_count: number; mode: 'roof' | 'target'; layouts: Record<string, { count_used: number; count_max: number; orientation: string }> }
   install_price_per_w?: number
   labor_price?: number
   labor_name?: string
@@ -482,6 +593,7 @@ export interface ProcurementSettings {
   candidate_panels: number
   candidate_inverters: number
   candidate_batteries: number
+  bos_per_module_eur?: number
 }
 
 // ---------------------------------------------------------------- ERP: orders, deliveries, documents, completeness

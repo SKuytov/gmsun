@@ -150,6 +150,15 @@ def check(db: Session, q: Quote) -> dict[str, Any]:
         add("survey", "warn", "Няма въведен оглед на обекта", "Попълнете секция „Оглед“ в стъпка Параметри — височина, достъп, състояние на покрива, ЕРП, интернет. Това е източникът на най-честите непредвидени разходи.", {"type": "step", "step": "params"}, "site")
     else:
         add("survey", "ok", "Оглед: попълнен" + (f" ({survey.get('surveyed_at')})" if survey.get("surveyed_at") else ""), group="site")
+    lays = list(project.layouts)
+    if lays and not any(getattr(l, "visual_path", None) for l in lays):
+        if any(l.image_path for l in lays):
+            add("visual", "info", "Няма визуализация върху снимката", "Запазете разположението отново (стъпка Разположение → раздел „Визуализация“), за да се генерира реалистична визуализация за клиента.", {"type": "step", "step": "layout"}, "site")
+        else:
+            add("visual", "info", "Няма снимка на покрива", "Качете снимка на покрива в стъпка Разположение — системата ще покаже на клиента как ще изглежда инсталацията и ще я включи в офертата.", {"type": "step", "step": "layout"}, "site")
+    else:
+        if lays:
+            add("visual", "ok", "Визуализация върху снимка: налична", group="site")
     if not is_ground and (height >= 6 or access in ("scaffold", "lift", "crane")) and not _has(lines, SERVICE_ITEMS["scaffold"]["pattern"]):
         days = max(1, int(q.execution_days or info.get("execution_days") or 2))
         add("scaffold", "warn", f"Нужно скеле/подемна техника (височина {height:g} m, достъп: {access or 'неясен'})", "Наемът на скеле/вишка не е в офертата.", _fix_add(items, "scaffold", days), "site")

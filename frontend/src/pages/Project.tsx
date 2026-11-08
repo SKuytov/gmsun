@@ -21,6 +21,8 @@ export interface StepCtx {
   project: Project
   sel: Selections
   setSel: (patch: Partial<Selections>) => void
+  /** Replace the local selections with the ones the server already stored (no PATCH). */
+  replaceSel: (s: Selections) => void
   update: (patch: Partial<Project>) => Promise<void>
   items: CatalogItem[]
   roofTypes: RoofType[]
@@ -79,6 +81,11 @@ export default function ProjectPage() {
     [pid],
   )
 
+  const replaceSel = useCallback((s: Selections) => {
+    window.clearTimeout(timer.current)
+    setSelState(s || {})
+  }, [])
+
   const update = useCallback(
     async (p: Partial<Project>) => {
       try {
@@ -102,8 +109,8 @@ export default function ProjectPage() {
     const panelId = sel.panel_item_id || p.layouts[0]?.panel_item_id
     const panel = items.data.find((i) => i.id === panelId)
     const wp = Number(panel?.specs?.wp || 0)
-    return { project: p, sel, setSel, update, items: items.data, roofTypes: roofTypes.data, labor: labor.data, pricing: pricing.data.value, panelQty, kwp: Math.round(panelQty * wp) / 1000 }
-  }, [project.data, items.data, roofTypes.data, labor.data, pricing.data, sel, setSel, update])
+    return { project: p, sel, setSel, replaceSel, update, items: items.data, roofTypes: roofTypes.data, labor: labor.data, pricing: pricing.data.value, panelQty, kwp: Math.round(panelQty * wp) / 1000 }
+  }, [project.data, items.data, roofTypes.data, labor.data, pricing.data, sel, setSel, replaceSel, update])
 
   if (project.isError) return <div className="text-bad">{errMsg(project.error)}</div>
   if (!ctx) return <Loading label={t('loading')} />

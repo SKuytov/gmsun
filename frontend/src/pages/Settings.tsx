@@ -385,6 +385,12 @@ function SuppliersTab() {
           <Field label={bg ? 'Кандидати: батерии' : 'Candidates: batteries'}>
             <NumInput value={pd.candidate_batteries} min={1} onChange={(v) => proc.setDraft({ ...pd, candidate_batteries: Math.round(v || 1) })} />
           </Field>
+          <Field
+            label={bg ? 'Препоръка за модул: конструкция + труд на модул (€)' : 'Module advisor: mounting + labour per module (€)'}
+            hint={bg ? 'добавя се към цената на модула при сравнение €/Wp между формати' : 'added to the module price when comparing €/Wp across formats'}
+          >
+            <NumInput value={pd.bos_per_module_eur ?? 55} min={0} onChange={(v) => proc.setDraft({ ...pd, bos_per_module_eur: v || 0 })} />
+          </Field>
         </div>
         <SaveBar dirty={proc.dirty} busy={proc.save.isPending} onSave={() => proc.save.mutate(pd)} />
       </div>

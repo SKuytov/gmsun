@@ -203,6 +203,47 @@ exposed by `GET /api/catalog/datasheets/status`). `item_datasheet_path(ci, downl
 generation use local files only. `client_package` builds the ZIP and merges quote + technical file + unique
 datasheets into one PDF with pypdf.
 
+## Module recommendation (`services/module_fit.py`)
+
+- **Fit**: `fit_on_layout(layout, w, h, orientation)` runs the layout engine on the plane's polygon/obstacles with the
+  plane's own gaps/setback/row spacing for portrait and landscape and keeps the better one (lru‑cached on geometry).
+  Missing catalog dimensions fall back to the power class (`default_dims_mm`: ≥600 Wp → 1134×2382, ≥520 → 1134×2278,
+  ≥400 → 1134×1762, else 1134×1722) and are flagged in the warnings; the editor, visual, 3D and pricing use the same
+  helper (`module_dims_m`).
+- **Orientation factor** (`orientation_factor(az, tilt)`): simple yield proxy for Bulgaria, 1.0 at south/33°, cosine
+  penalty for azimuth and tilt deviation (west/east at 33° ≈ 0.84, at 10° ≈ 0.9; south 10° ≈ 0.95; north ≈ 0.67). Planes are filled best factor
+  first (`distribute`) so a partial array sits on the productive plane.
+- **Scope**: `roof` fills every plane; `target` uses the demand (target kWp → consumption → connected power × 1.2);
+  `auto` picks target when the roof holds > 15 % more than needed.
+- **Score** = Σ weight × normalised metric (+ penalties). Weights (cost, lead, quality, fit, count): economy
+  .55/.08/.05/.17/.15, balanced .38/.14/.18/.18/.12, premium .15/.08/.47/.18/.12, fastest .22/.50/.06/.12/.10.
+  Effective €/Wp = (price + `procurement.bos_per_module_eur`, default 55 €/module) / Wp — per‑module mounting and labour
+  make 450 Wp modules more expensive per Wp than 600 Wp ones on an open roof. Penalties: no price +0.6, unverified specs
+  +0.05, estimated dimensions +0.1, frame outside 30–46 mm +0.25 (clamps), large module (> 2.05 m or > 26 kg) with ladder
+  access +0.2, large module on a small residential roof (< 120 m² or tile family) +0.08, large module on a ≥ 10 m
+  building +0.1, > 13.5 kg/m² on poor/fair or wooden roofs +0.2, target shortfall below 95 % +0.5 and more, string
+  quick‑check vs the selected inverter (any string length with Voc(−20 °C) ≤ 0.97·Vdc,max and Vmp(70 °C) ≥ MPPT min) +0.3; bifacial on flat/ground −0.08.
+- **Apply** (`apply`): writes `panel_item_id`, orientation and panels for every plane. A partial array is a compact
+  rectangular block (`pick_compact`: consecutive rows, smallest bounding box, symmetric row ends, centred — away from
+  edge/corner wind zones), then `selections.panel_item_id / panel_qty / use_layout` are updated and the visuals are
+  re‑rendered. Proposals (`panel_auto`, default on) run the same recommendation per strategy and store `panel_fit`
+  (`count`, `roof_count`, per‑layout counts/orientation); `apply_proposal` turns it into real panels on the planes. With
+  `panel_auto` the "whole roof" capacity shown in the proposals is the planes auto‑filled with the base module, not only
+  the modules currently drawn.
+
+## Visualisation and 3D (`services/visual.py`, `services/scene.py`, `components/Scene3D.tsx`)
+
+- Photo overlay: homography plane‑metres → photo pixels from the four corners; each module is drawn in a panel layer
+  (glass gradient, one global specular band, cell grid / half‑cut split, bevelled black or silver frame), luminance
+  matched to the roof, soft shadow, caption. Also a rectified plan (`render_plan`) and the rectified roof texture
+  (`render_rect`) for the 3D scene. Re‑rendered on every layout save / autofill / apply; stored in `uploads/visual_<lid>.jpg`.
+  The result is illustrative — module positions follow the layout, the final arrangement is confirmed on site.
+- 3D scene (`GET /projects/{pid}/scene`): planes grouped by azimuth; the widest group faces +Z (south), side groups are
+  rotated around the building; footprint stretched to hold gable/hip planes; eave height from the survey (ridge height −
+  1.5 m); flat/ground → ballast feet/elevated rows. Modules are boxes with glass + frame, rails under pitched arrays. Sun
+  direction from hour/month for ~43 °N. `POST /render3d` stores a PNG of the current view (`params.visual.render3d_path`)
+  used by the quote appendix.
+
 ## Data sources
 
 - LONGi Hi‑MO X10 LR8‑66HVD‑650M datasheet — https://eu.longi.com/longi-solar-panels-datasheets/lr8-66hvd-640-670m

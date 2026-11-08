@@ -394,7 +394,7 @@ export function LaborStep({ ctx }: { ctx: StepCtx }) {
         <h2>{t('labor')}</h2>
         <Segmented
           value={mode}
-          onChange={(v) => setSel({ labor_mode: v })}
+          onChange={(v) => setSel({ labor_mode: v, labor_auto: false })}
           options={[
             { value: 'matrix', label: t('labor_matrix') },
             { value: 'per_w', label: t('labor_per_w') },
@@ -428,7 +428,7 @@ export function LaborStep({ ctx }: { ctx: StepCtx }) {
                           {o ? (
                             <button
                               type="button"
-                              onClick={() => setSel({ labor_option_id: o.id })}
+                              onClick={() => setSel({ labor_option_id: o.id, labor_auto: false })}
                               className={`num h-10 w-full min-w-[5.5rem] rounded text-sm ${active ? 'bg-ink text-white' : 'bg-surface-2 hover:bg-sun-soft'}`}
                               aria-pressed={active}
                               data-testid={`labor-${dd}-${w}`}

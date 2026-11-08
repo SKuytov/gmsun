@@ -228,7 +228,9 @@ class Layout(Base):
     image_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
     image_w: Mapped[int | None] = mapped_column(Integer, nullable=True)
     image_h: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    render_path: Mapped[str | None] = mapped_column(String(255), nullable=True)  # PNG of the final layout
+    render_path: Mapped[str | None] = mapped_column(String(255), nullable=True)  # PNG of the final layout (plan view)
+    visual_path: Mapped[str | None] = mapped_column(String(255), nullable=True)  # photorealistic overlay on the photo
+    rect_path: Mapped[str | None] = mapped_column(String(255), nullable=True)  # rectified photo of the plane (3D texture)
 
     # Four image-space corners (px) of the reference rectangle and its real size in metres
     corners: Mapped[list[Any]] = mapped_column(JSON, default=list)

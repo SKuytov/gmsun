@@ -23,6 +23,7 @@ from ..seed_data.aerocompact import system_for_roof
 from .pdf import _data_uri, _money, _num, _thousands
 from .pricing import SECTIONS, estimate_yield
 from .settings import get_setting
+from .module_fit import module_dims_m
 
 TEMPLATES = Path(__file__).resolve().parent.parent / "templates"
 STRING_COLORS = ["#f0a500", "#2f80ed", "#27ae60", "#eb5757", "#9b51e0", "#f2994a", "#56ccf2", "#219653", "#bb6bd9", "#828282"]
@@ -295,7 +296,7 @@ def render_techfile_html(db: Session, quote: Quote) -> str:
     battery = item("battery_item_id")
     panel = item("panel_item_id") or (db.get(CatalogItem, project.layouts[0].panel_item_id) if project.layouts and project.layouts[0].panel_item_id else None)
     strings = (design.get("strings") or {}).get("strings") or []
-    pw = float((panel.specs or {}).get("width_mm", 1134)) / 1000 if panel else 1.134
+    pw = module_dims_m(panel.specs)[0] if panel else 1.134
 
     planes = []
     for lay in project.layouts:
@@ -306,6 +307,7 @@ def render_techfile_html(db: Session, quote: Quote) -> str:
                 "name": lay.name,
                 "svg": layout_svg(lay, strings, roof, pw),
                 "photo": _data_uri(settings.data_dir / lay.render_path) if lay.render_path else None,
+                "visual": _data_uri(settings.data_dir / lay.visual_path) if getattr(lay, "visual_path", None) else None,
                 "summary": lay.summary,
                 "azimuth": lay.azimuth_deg,
                 "tilt": lay.tilt_deg,

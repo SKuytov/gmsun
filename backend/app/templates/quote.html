@@ -165,12 +165,21 @@
 </table>
 </div>
 
+{% set appendix = namespace(n=1) %}
+{% if visual_images or render3d %}
+{% set appendix.n = appendix.n + 1 %}
+<h2><span class="n">Приложение {{ appendix.n }}</span>Как ще изглежда Вашата централа</h2>
+{% for v in visual_images %}<div class="fig"><img src="{{ v.uri }}"><div class="cap">{{ v.name }} — визуализация върху снимка на обекта (илюстративна, окончателната подредба се уточнява при монтажа)</div></div>{% endfor %}
+{% if render3d %}<div class="fig"><img src="{{ render3d }}"><div class="cap">3D изглед на инсталацията</div></div>{% endif %}
+{% endif %}
 {% if layout_images %}
-<h2><span class="n">Приложение 2</span>Разположение на модулите</h2>
+{% set appendix.n = appendix.n + 1 %}
+<h2><span class="n">Приложение {{ appendix.n }}</span>Разположение на модулите</h2>
 {% for im in layout_images %}<div class="fig"><img src="{{ im }}"></div>{% endfor %}
 {% endif %}
 
-<h2><span class="n">{{ "Приложение 3" if layout_images else "Приложение 2" }}</span>Условия</h2>
+{% set appendix.n = appendix.n + 1 %}
+<h2><span class="n">Приложение {{ appendix.n }}</span>Условия</h2>
 <div class="grid">
   {% if texts.payment %}<div class="terms"><h3>Плащане</h3><p>{{ texts.payment }}</p></div>{% endif %}
   {% if texts.warranty %}<div class="terms"><h3>Гаранции</h3><p>{{ texts.warranty }}</p></div>{% endif %}

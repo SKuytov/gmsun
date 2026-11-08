@@ -7,6 +7,8 @@ import { useT } from '@/lib/i18n'
 import type { Layout, Project } from '@/lib/types'
 import type { StepCtx } from '../Project'
 import { LayoutEditor } from './LayoutEditor'
+import { ModuleAdvisor } from '@/components/ModuleAdvisor'
+import type { Selections } from '@/lib/types'
 
 export function LayoutStep({ ctx }: { ctx: StepCtx }) {
   const { t } = useT()
@@ -84,6 +86,8 @@ export function LayoutStep({ ctx }: { ctx: StepCtx }) {
           }}
         />
       )}
+
+      {p.layouts.length > 0 && <ModuleAdvisor project={p} onApplied={(proj) => ctx.replaceSel((proj.params?.selections as Selections) || {})} />}
 
       <Confirm open={!!toDelete} onClose={() => setToDelete(null)} onConfirm={() => toDelete && remove.mutate(toDelete.id)} title={t('delete')} text={`${t('confirm_delete')} ${toDelete?.name}`} danger />
     </div>

@@ -1,13 +1,13 @@
 /* Roof photo → rectified plane → roof outline / obstacles → panel placement. */
-import { Camera, Eraser, ImagePlus, RotateCcw, Save, ScanSearch, Sparkles, Undo2, Wand2 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Camera, Download, Eraser, ImagePlus, RefreshCw, RotateCcw, Save, ScanSearch, Sparkles, Undo2, Wand2 } from 'lucide-react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Field, NumInput, Segmented, Select, Spinner, Stat, Warn, cx, useToast } from '@/components/ui'
 import { api, errMsg, fileUrl, isNative, patch, post } from '@/lib/api'
 import { autoFill, polygonArea, pointInPolygon, rectifyImage, round3 } from '@/lib/geometry'
 import { fmtNum, useT } from '@/lib/i18n'
 import type { CatalogItem, Layout, PanelRect, Project, Pt, RoofType } from '@/lib/types'
 
-type Mode = 'corners' | 'roof' | 'obstacle' | 'panels'
+type Mode = 'corners' | 'roof' | 'obstacle' | 'panels' | 'visual' | 'scene'
 
 interface Draft {
   name: string
@@ -45,6 +45,8 @@ const fromLayout = (l: Layout): Draft => ({
   azimuth_deg: l.azimuth_deg,
 })
 
+const Scene3D = lazy(() => import('@/components/Scene3D').then((m) => ({ default: m.Scene3D }))) // three.js loads only when the 3D tab opens
+
 const PANEL_FILL = 'rgba(24, 40, 72, 0.82)'
 const PANEL_OFF = 'rgba(120, 120, 120, 0.35)'
 
@@ -66,9 +68,12 @@ export function LayoutEditor({ project, layout, items, roofType, onSaved }: { pr
 
   const panels = items.filter((i) => i.category === 'panel' && i.active)
   const panel = panels.find((p) => p.id === d.panel_item_id) || panels[0]
-  const pw = Number(panel?.specs?.width_mm || 1134) / 1000
-  const ph = Number(panel?.specs?.height_mm || 2382) / 1000
   const wp = Number(panel?.specs?.wp || 0)
+  // same power-class fallback as the backend (module_fit.default_dims_mm) when the datasheet dimensions are missing
+  const defH = wp >= 600 ? 2382 : wp >= 520 ? 2278 : wp >= 400 ? 1762 : 1722
+  const pw = Number(panel?.specs?.width_mm || 1134) / 1000
+  const ph = Number(panel?.specs?.height_mm || defH) / 1000
+  const dimsEstimated = !!panel && !(Number(panel.specs?.width_mm) > 0 && Number(panel.specs?.height_mm) > 0)
 
   const set = (p: Partial<Draft>, pushHistory = true) => {
     setD((prev) => {
@@ -84,6 +89,16 @@ export function LayoutEditor({ project, layout, items, roofType, onSaved }: { pr
       setDirty(true)
     }
   }
+
+  // ---------- external changes (module advisor / applied proposal rewrite the plane on the server)
+  const seenRev = useRef(layout.updated_at)
+  useEffect(() => {
+    if (layout.updated_at === seenRev.current) return
+    seenRev.current = layout.updated_at
+    if (dirty) return // never discard unsaved edits
+    setD(fromLayout(layout))
+    history.current = []
+  }, [layout, dirty])
 
   // ---------- image loading
   useEffect(() => {
@@ -487,35 +502,16 @@ export function LayoutEditor({ project, layout, items, roofType, onSaved }: { pr
     }
   }
 
-  const exportPng = (): string | null => {
-    if (mode === 'corners') return null
-    const W = 1200
-    const Hh = Math.round((W * d.plane_h_m) / d.plane_w_m)
-    const c = document.createElement('canvas')
-    c.width = W
-    c.height = Hh
-    const ctx = c.getContext('2d')!
-    draw(ctx, W, Hh, true)
-    try {
-      return c.toDataURL('image/png')
-    } catch {
-      return null
-    }
-  }
-
   const save = useCallback(
-    async (withRender = true) => {
+    async (notify = true) => {
       setBusy('save')
       try {
+        // the server regenerates the plan render, the photo visualisation and the 3D texture on every save
         const body = { ...d, panels: d.panels, summary: undefined }
-        let l = await patch<Layout>(`/api/projects/${project.id}/layouts/${layout.id}`, body)
-        if (withRender) {
-          const png = exportPng()
-          if (png) l = await post<Layout>(`/api/projects/${project.id}/layouts/${layout.id}/render`, { png })
-        }
+        const l = await patch<Layout>(`/api/projects/${project.id}/layouts/${layout.id}`, body)
         onSaved(l)
         setDirty(false)
-        if (withRender) toast.push(t('layout_saved'), 'ok')
+        if (notify) toast.push(t('layout_saved'), 'ok')
       } catch (e) {
         toast.push(errMsg(e), 'bad')
       } finally {
@@ -523,14 +519,31 @@ export function LayoutEditor({ project, layout, items, roofType, onSaved }: { pr
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [d, project.id, layout.id, mode, draw],
+    [d, project.id, layout.id],
   )
+
+  const [frame, setFrame] = useState<'black' | 'silver'>(((project.params?.visual as { frame?: 'black' | 'silver' } | undefined)?.frame) || 'black')
+  const [visualV, setVisualV] = useState(0)
+  const regenerateVisual = async (fr = frame) => {
+    setBusy('visual')
+    try {
+      if (dirty) await save(false)
+      const l = await post<Layout>(`/api/projects/${project.id}/layouts/${layout.id}/visualize`, { frame: fr })
+      onSaved(l)
+      setVisualV((v) => v + 1)
+    } catch (e) {
+      toast.push(errMsg(e), 'bad')
+    } finally {
+      setBusy(null)
+    }
+  }
 
   const enabled = d.panels.filter((p) => p.enabled).length
   const kwp = Math.round(enabled * wp) / 1000
   const area = polygonArea(roofPoly)
 
-  const hint = { corners: t('tool_hint_corners'), roof: t('tool_hint_roof'), obstacle: t('tool_hint_obstacle'), panels: t('tool_hint_panels') }[mode]
+  const hint = { corners: t('tool_hint_corners'), roof: t('tool_hint_roof'), obstacle: t('tool_hint_obstacle'), panels: t('tool_hint_panels'), visual: t('tool_hint_visual'), scene: t('tool_hint_3d') }[mode]
+  const visualUrl = layout.visual_path ? `${fileUrl(layout.visual_path)}?v=${visualV}-${encodeURIComponent(layout.updated_at || '')}` : null
 
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_320px]">
@@ -549,6 +562,8 @@ export function LayoutEditor({ project, layout, items, roofType, onSaved }: { pr
               { value: 'roof', label: t('tool_roof') },
               { value: 'obstacle', label: t('tool_obstacle') },
               { value: 'panels', label: t('tool_panels') },
+              { value: 'visual', label: t('tool_visual') },
+              { value: 'scene', label: t('tool_3d') },
             ]}
           />
           <div className="ml-auto flex flex-wrap items-center gap-1">
@@ -632,11 +647,54 @@ export function LayoutEditor({ project, layout, items, roofType, onSaved }: { pr
               )}
             </>
           )}
+          {mode === 'visual' && (
+            <>
+              <Segmented
+                size="sm"
+                value={frame}
+                onChange={(v) => {
+                  setFrame(v)
+                  void regenerateVisual(v)
+                }}
+                options={[
+                  { value: 'black', label: t('frame_black') },
+                  { value: 'silver', label: t('frame_silver') },
+                ]}
+              />
+              <button type="button" className="btn-ghost btn-sm" onClick={() => regenerateVisual()} disabled={!!busy || !img} data-testid="button-visual-regenerate">
+                {busy === 'visual' ? <Spinner /> : <RefreshCw className="h-4 w-4" />} {t('visual_regenerate')}
+              </button>
+              {visualUrl && (
+                <a className="btn-quiet btn-sm" href={visualUrl} download={`gmsun_${project.number}_${d.name}.jpg`} target="_blank" rel="noreferrer">
+                  <Download className="h-4 w-4" /> {t('visual_download')}
+                </a>
+              )}
+            </>
+          )}
           <span className="basis-full text-xs text-ink-3">{hint}</span>
         </div>
 
+        {mode === 'visual' && (
+          <div className="card flex flex-col items-center justify-center gap-3 overflow-hidden bg-surface-2 p-2" data-testid="visual-view">
+            {visualUrl ? (
+              <img src={visualUrl} alt={d.name} className="max-h-[70vh] w-auto max-w-full rounded" />
+            ) : (
+              <p className="max-w-md py-16 text-center text-sm text-ink-3">{t('visual_none')}</p>
+            )}
+            {dirty && <Warn>{t('visual_unsaved')}</Warn>}
+          </div>
+        )}
+        {mode === 'scene' && (
+          <div className="card overflow-hidden bg-surface-2 p-2" data-testid="scene-view">
+            {dirty && <Warn>{t('visual_unsaved')}</Warn>}
+            <Suspense fallback={<Spinner />}>
+              <Scene3D project={project} onSaved={onSaved} />
+            </Suspense>
+          </div>
+        )}
+
         {/* canvas */}
-        <div ref={wrapRef} className="card flex items-center justify-center overflow-hidden bg-surface-2 p-2">
+        <div ref={wrapRef} className={cx('card flex items-center justify-center overflow-hidden bg-surface-2 p-2', (mode === 'visual' || mode === 'scene') && 'hidden')}>
           {mode === 'corners' && !img ? (
             <div className="flex flex-col items-center gap-3 py-16 text-center text-sm text-ink-3">
               <p className="max-w-sm">{t('no_photo')}</p>
@@ -689,6 +747,7 @@ export function LayoutEditor({ project, layout, items, roofType, onSaved }: { pr
             </Select>
             <span className="mt-1 block text-xs text-ink-3">
               {fmtNum(pw * 1000, 0)} × {fmtNum(ph * 1000, 0)} mm · {wp} Wp
+              {dimsEstimated && <span className="ml-1 text-warn" title={t('dims_estimated_hint')}>· {t('dims_estimated')}</span>}
             </span>
           </Field>
           <Field label={t('orientation')}>

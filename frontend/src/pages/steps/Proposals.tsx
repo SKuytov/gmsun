@@ -1,10 +1,10 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Check, Clock, Coins, Gem, RefreshCw, Scale, Sparkles } from 'lucide-react'
 import { useState } from 'react'
-import { Segmented, Spinner, Warn, cx, useToast } from '@/components/ui'
+import { Segmented, Spinner, Toggle, Warn, cx, useToast } from '@/components/ui'
 import { errMsg, post } from '@/lib/api'
 import { fmtMoney, fmtNum, useT, type Key } from '@/lib/i18n'
-import type { ProposalScope, ProposalVariant, ProposalsResult, Strategy } from '@/lib/types'
+import type { Project, ProposalScope, ProposalVariant, ProposalsResult, Selections, Strategy } from '@/lib/types'
 import { TierBadge } from '../Catalog'
 import type { StepCtx } from '../Project'
 
@@ -15,6 +15,7 @@ const ORDER: Strategy[] = ['economy', 'balanced', 'premium', 'fastest']
 export function Proposals({ ctx }: { ctx: StepCtx }) {
   const { t, lang } = useT()
   const toast = useToast()
+  const qc = useQueryClient()
   const { project: p, sel, setSel } = ctx
   const [res, setRes] = useState<ProposalsResult | null>(null)
   const [scope, setScope] = useState<ProposalScope>('auto')
@@ -28,7 +29,22 @@ export function Proposals({ ctx }: { ctx: StepCtx }) {
     setScope(sc)
     gen.mutate(sc)
   }
+  const applyServer = useMutation({
+    mutationFn: (v: ProposalVariant) => post<Project>(`/api/projects/${p.id}/proposals/apply`, { selections: v.selections, strategy: v.strategy }),
+    onSuccess: (proj) => {
+      qc.setQueryData(['project', proj.id], proj)
+      qc.invalidateQueries({ queryKey: ['project', proj.id] })
+      qc.invalidateQueries({ queryKey: ['quotes', proj.id] })
+      ctx.replaceSel((proj.params?.selections as Selections) || {})
+      toast.push(t('proposals_applied'), 'ok')
+    },
+    onError: (e) => toast.push(errMsg(e), 'bad'),
+  })
   const apply = (v: ProposalVariant) => {
+    if (v.selections.panel_fit) {
+      applyServer.mutate(v) // a different module / count than the drawn layout → the server re-places the modules
+      return
+    }
     setSel({ ...v.selections, strategy: v.strategy })
     toast.push(t('proposals_applied'), 'ok')
   }
@@ -79,6 +95,11 @@ export function Proposals({ ctx }: { ctx: StepCtx }) {
                 ]}
               />
             </div>
+          )}
+          {layoutCount > 0 && (
+            <span title={t('panel_auto_hint')} data-testid="proposals-panel-auto">
+              <Toggle checked={sel.panel_auto !== false} onChange={(v) => setSel({ panel_auto: v })} label={t('panel_auto')} />
+            </span>
           )}
           <button type="button" className={cx(res ? 'btn-ghost' : 'btn-primary')} onClick={() => gen.mutate(scope)} disabled={gen.isPending} data-testid="button-proposals">
             {gen.isPending ? <Spinner /> : <RefreshCw className="h-4 w-4" />} {res ? t('proposals_regenerate') : t('proposals_generate')}

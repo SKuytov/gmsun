@@ -7,6 +7,8 @@ import { fmtMoney, fmtNum, useT } from '@/lib/i18n'
 import type { BatterySuggestion, CatalogItem, InverterSuggestion } from '@/lib/types'
 import type { StepCtx } from '../Project'
 import { Proposals } from './Proposals'
+import { ModuleAdvisor } from '@/components/ModuleAdvisor'
+import type { Selections } from '@/lib/types'
 
 /** Datasheet / supplier page links + unverified-specs hint for a catalog item. */
 function ItemLinks({ item }: { item: CatalogItem | undefined }) {
@@ -112,6 +114,11 @@ export function EquipmentStep({ ctx }: { ctx: StepCtx }) {
       {/* panels */}
       <div className="card p-4 lg:col-span-2">
         <h2 className="mb-3">{t('section_modules')}</h2>
+        {p.layouts.length > 0 && (
+          <div className="mb-4">
+            <ModuleAdvisor project={p} compact onApplied={(proj) => ctx.replaceSel((proj.params?.selections as Selections) || {})} />
+          </div>
+        )}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_auto]">
           <Field label={t('panel_model')}>
             <Select value={panelId ?? ''} onChange={(e) => setSel({ panel_item_id: Number(e.target.value) })} data-testid="select-panel">

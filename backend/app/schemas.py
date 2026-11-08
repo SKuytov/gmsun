@@ -226,6 +226,8 @@ class LayoutOut(ORMModel):
     image_w: int | None
     image_h: int | None
     render_path: str | None
+    visual_path: str | None = None
+    rect_path: str | None = None
     corners: list[Any]
     plane_w_m: float
     plane_h_m: float

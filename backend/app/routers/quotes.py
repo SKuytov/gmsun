@@ -53,6 +53,9 @@ def create_quote(pid: int, body: QuoteCreate, db: Session = Depends(get_db), _: 
         src = db.get(Quote, body.copy_from_quote_id)
         if src and not base_sel:
             base_sel = {k: v for k, v in (src.selections or {}).items() if not k.startswith("_")}
+    if not base_sel and not src:
+        # no explicit selections → the project's current configuration (what the wizard shows)
+        base_sel = {k: v for k, v in ((project.params or {}).get("selections") or {}).items() if not k.startswith("_")}
     q = Quote(
         project_id=pid,
         number=src.number if src else (project.quotes[-1].number if project.quotes else pricing.next_quote_number(db, project, pr.get("quote_number_prefix", ""))),

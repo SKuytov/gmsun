@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from ..models import CatalogItem, LaborOption, Layout, Project, Quote, QuoteLine, RoofTypeConfig
 from . import bom, engineering
 from . import procurement
+from . import module_fit
 from .settings import get_setting
 
 SECTIONS: list[tuple[str, str, str]] = [
@@ -76,11 +77,23 @@ def _design(db: Session, project: Project, sel: dict[str, Any], pricing: dict[st
 
     When ``panel_qty`` is smaller than the layout count (a "target power" quote on a roof with more room) the planes
     are scaled down proportionally, so strings, rails and cables follow the quoted module count."""
-    pw = float((panel.specs or {}).get("width_mm", 1134)) / 1000 if panel else 1.134
+    pw = module_fit.module_dims_m(panel.specs)[0] if panel else 1.134
     planes: list[dict[str, Any]] = []
     lay_count = int(layout_sum.get("count") or 0)
     scale = (panel_qty / lay_count) if (lay_count > 0 and 0 < panel_qty < lay_count) else 1.0
-    if sel.get("use_layout", True) and lay_count:
+    fit = sel.get("panel_fit") if isinstance(sel.get("panel_fit"), dict) else None
+    fit_by_layout = {int(k): v for k, v in (fit or {}).get("layouts", {}).items()} if fit and panel and int(fit.get("panel_item_id") or 0) == panel.id else {}
+    if fit_by_layout and sel.get("use_layout", True):
+        # a module different from the one drawn in the layout: use the counts the module-fit engine placed per plane
+        scale = 1.0
+        for lay in project.layouts:
+            n = int((fit_by_layout.get(lay.id) or {}).get("count_used") or 0)
+            if n > 0:
+                planes.append({"name": lay.name, "modules": n, "module_w_m": pw, "azimuth": lay.azimuth_deg, "tilt": lay.tilt_deg, "layout_id": lay.id})
+        fit_total = sum(int((v or {}).get("count_max") or 0) for v in fit_by_layout.values())
+        if lay_count > 0 and fit_total > 0:
+            scale = min(1.0, panel_qty / lay_count * (lay_count / fit_total))  # rails follow the quoted share of the roof
+    elif sel.get("use_layout", True) and lay_count:
         remaining = panel_qty if scale < 1 else None
         for lay in project.layouts:
             s = lay.summary or {}
@@ -124,7 +137,13 @@ def build_lines(db: Session, project: Project, quote: Quote) -> tuple[list[dict[
     panel = _item(db, sel.get("panel_item_id"))
     layout_sum = active_layout_summary(project)
     panel_qty = int(sel.get("panel_qty") or 0)
-    if sel.get("use_layout", True) and layout_sum["count"] > 0:
+    fit = sel.get("panel_fit") if isinstance(sel.get("panel_fit"), dict) else None
+    if fit and panel and int(fit.get("panel_item_id") or 0) == panel.id and int(fit.get("count") or 0) > 0 and sel.get("use_layout", True):
+        # module chosen by the recommendation engine (may differ from the module drawn in the layout)
+        panel_qty = int(fit["count"])
+        if int(fit.get("roof_count") or 0) > panel_qty:
+            info["roof_panel_qty"] = int(fit["roof_count"])
+    elif sel.get("use_layout", True) and layout_sum["count"] > 0:
         panel_qty = layout_sum["count"]
         limit = int(sel.get("panel_limit") or 0)
         if 0 < limit < panel_qty:  # quote only part of the roof (target power), the rest stays as an option

@@ -110,8 +110,22 @@ def roof_kwp(ctx: Ctx, base_sel: dict[str, Any]) -> tuple[float, int, float]:
     if not (base_sel.get("use_layout", True) and lay.get("count")):
         return 0.0, 0, 0.0
     panel = ctx.by_id.get(int(base_sel.get("panel_item_id") or 0))
-    wp = _f(panel.specs if panel else None, "wp", 0) or (_f(ctx.by_id.get(p.layouts[0].panel_item_id).specs, "wp") if p.layouts and p.layouts[0].panel_item_id in ctx.by_id else 0)
-    return round(int(lay["count"]) * wp / 1000, 3), int(lay["count"]), wp
+    if panel is None and p.layouts and p.layouts[0].panel_item_id in ctx.by_id:
+        panel = ctx.by_id[p.layouts[0].panel_item_id]
+    wp = _f(panel.specs if panel else None, "wp", 0)
+    count = int(lay["count"])
+    if panel is not None and base_sel.get("panel_auto", True):
+        # with automatic module selection the "whole roof" means the planes filled with this module, not only the
+        # modules currently drawn (a target-sized pick leaves most of the roof empty on purpose)
+        from . import module_fit
+
+        w_m, h_m, _est = module_fit.module_dims_m(panel.specs)
+        try:
+            capacity = sum(module_fit.fit_on_layout(l, w_m, h_m, "auto")["count_max"] for l in p.layouts)
+        except Exception:  # noqa: BLE001 - geometry problems must never break the proposals
+            capacity = 0
+        count = max(count, capacity)
+    return round(count * wp / 1000, 3), count, wp
 
 
 def target_kwp(ctx: Ctx, base_sel: dict[str, Any], scope: str = "auto") -> tuple[float, str, dict[str, Any]]:
@@ -184,15 +198,16 @@ def evaluate(ctx: Ctx, sel: dict[str, Any]) -> dict[str, Any]:
 
 
 def _labor_for(ctx: Ctx, base_sel: dict[str, Any], kwp: float) -> dict[str, Any]:
-    if base_sel.get("labor_mode") in ("per_w", "manual") or base_sel.get("labor_option_id"):
-        return {}
+    auto = base_sel.get("labor_auto", bool(base_sel.get("strategy")))  # legacy: selections applied from a proposal were automatic
+    if base_sel.get("labor_mode") in ("per_w", "manual") or (base_sel.get("labor_option_id") and not auto):
+        return {}  # the user chose the labour himself – keep it
     # pick the matrix option closest to a rule of thumb: ~1 day per 4 kWp with 3 workers, min 2 days
     opts = ctx.db.query(LaborOption).all()
     if not opts:
         return {"labor_mode": "per_w"}
     want_days = max(2, math.ceil(kwp / 4))
     best = min(opts, key=lambda o: (abs(o.days - want_days), abs(o.workers - 3), o.price))
-    return {"labor_mode": "matrix", "labor_option_id": best.id}
+    return {"labor_mode": "matrix", "labor_option_id": best.id, "labor_auto": True}
 
 
 def _key_items(ctx: Ctx, sel: dict[str, Any], ev: dict[str, Any]) -> list[dict[str, Any]]:
@@ -225,7 +240,7 @@ def generate(db: Session, project: Project, strategies: list[str] | None = None,
     (use every module of the layout – inverters are then multiplied as needed, e.g. 4 × 20 kW for 83 kWp)."""
     ctx = Ctx(db, project)
     base = dict(base_sel if base_sel is not None else (project.params or {}).get("selections") or {})
-    for k in ("_info", "_warnings", "panel_limit"):
+    for k in ("_info", "_warnings", "panel_limit", "panel_fit"):
         base.pop(k, None)
     strategies = [s for s in (strategies or list(STRATEGIES)) if s in STRATEGIES]
     scope = scope if scope in ("auto", "target", "roof") else "auto"
@@ -248,7 +263,18 @@ def generate(db: Session, project: Project, strategies: list[str] | None = None,
     panels_all = [i for i in ctx.items if i.category == "panel" and _f(i.specs, "wp") > 0]
     priced = [i for i in panels_all if _has_price(i)]
     panel_pool = priced or panels_all
-    if layout_fixed:
+    panel_auto = bool(base.get("panel_auto", True))
+    fit_by_strategy: dict[str, dict[int, dict[str, Any]]] = {}
+    if layout_fixed and panel_auto and project.layouts:
+        # the module itself is part of the optimisation: every catalog module is laid out on the real planes
+        from . import module_fit
+
+        for strat in strategies:
+            rec = module_fit.recommend(db, project, scope=scope, strategy=strat, top=len(panels_all))
+            fit_by_strategy[strat] = {c["item_id"]: c for c in rec["candidates"] if c["count_used"] > 0}
+        if fit_by_strategy and any(fit_by_strategy.values()):
+            notes.append("Модулът е избран автоматично спрямо площта на плоскостите и необходимата мощност (изключете „Автоматичен избор на модул“, за да сравнявате само с избрания модул).")
+    elif layout_fixed:
         pid = int(base.get("panel_item_id") or (project.layouts[0].panel_item_id if project.layouts else 0) or 0)
         panel_pool = [ctx.by_id[pid]] if pid in ctx.by_id else panel_pool[:1]
 
@@ -264,13 +290,23 @@ def generate(db: Session, project: Project, strategies: list[str] | None = None,
 
     variants: list[dict[str, Any]] = []
     for strat in strategies:
-        cand_panels = ctx.rank(strat, panel_pool, lambda it: it.price_for(ctx.markup) / max(1.0, _f(it.specs, "wp")))[:n_p]
+        fits_s = fit_by_strategy.get(strat) or {}
+        if fits_s:
+            cand_panels = [ctx.by_id[iid] for iid in list(fits_s)[:n_p] if iid in ctx.by_id]
+        else:
+            cand_panels = ctx.rank(strat, panel_pool, lambda it: it.price_for(ctx.markup) / max(1.0, _f(it.specs, "wp")))[:n_p]
         best: dict[str, Any] | None = None
         evaluated = 0
         for panel in cand_panels:
             wp = _f(panel.specs, "wp")
             panel_limit = 0
-            if layout_fixed and not limited:
+            panel_fit: dict[str, Any] | None = None
+            if fits_s and panel.id in fits_s:
+                c = fits_s[panel.id]
+                panel_qty = int(c["count_used"])
+                panel_fit = {"panel_item_id": panel.id, "count": panel_qty, "roof_count": int(c["count_max"]), "mode": c["mode"],
+                             "layouts": {str(l["layout_id"]): {"count_used": l["count_used"], "count_max": l["count_max"], "orientation": l["orientation"]} for l in c["layouts"]}}
+            elif layout_fixed and not limited:
                 panel_qty = int(lay["count"])
             elif layout_fixed:
                 panel_limit = min(int(lay["count"]), max(1, round(kwp_target * 1000 / wp)))
@@ -320,6 +356,10 @@ def generate(db: Session, project: Project, strategies: list[str] | None = None,
                         sel["use_layout"] = False
                     if panel_limit:
                         sel["panel_limit"] = panel_limit
+                    if panel_fit:
+                        sel["panel_fit"] = panel_fit
+                    else:
+                        sel.pop("panel_fit", None)
                     sel.update(_labor_for(ctx, base, kwp))
                     ev = evaluate(ctx, sel)
                     evaluated += 1

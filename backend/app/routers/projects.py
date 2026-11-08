@@ -19,7 +19,7 @@ from ..db import get_db
 from ..models import CatalogItem, Layout, Project, Quote, RoofTypeConfig, User
 from ..schemas import LayoutIn, LayoutOut, ProjectCreate, ProjectListItem, ProjectOut, ProjectUpdate, RoofDetectOut
 from ..services import layout_engine as le
-from ..services import proposals
+from ..services import module_fit, proposals, scene, visual
 from ..services.pricing import active_layout_summary
 from ..services.roof_detect import detect_obstacles, detect_roof
 
@@ -118,9 +118,24 @@ def apply_proposal(pid: int, body: ProposalApplyIn, db: Session = Depends(get_db
     sel = {k: v for k, v in body.selections.items() if not k.startswith("_")}
     if body.strategy:
         sel["strategy"] = body.strategy
+    fit = sel.pop("panel_fit", None)
     p.params = {**(p.params or {}), "selections": sel}
     db.commit()
     db.refresh(p)
+    if isinstance(fit, dict) and sel.get("use_layout", True) and p.layouts and int(fit.get("panel_item_id") or 0) == int(sel.get("panel_item_id") or 0):
+        # the proposal uses a module (or a module count) different from the drawn layout → re-place the modules
+        from ..services import module_fit, visual
+
+        scope = "roof" if fit.get("mode") == "roof" else "target"
+        res = module_fit.apply(db, p, int(fit["panel_item_id"]), scope=scope)
+        sel = dict((p.params or {}).get("selections") or {})
+        sel.update({k: v for k, v in body.selections.items() if not k.startswith("_") and k not in ("panel_fit", "panel_qty", "use_layout", "panel_limit")})
+        sel["panel_qty"] = res["count"]
+        p.params = {**(p.params or {}), "selections": sel}
+        db.commit()
+        for lay in p.layouts:
+            visual.render_all(db, lay)
+        db.refresh(p)
     return _project_out(db, p)
 
 
@@ -186,6 +201,7 @@ def update_layout(pid: int, lid: int, body: LayoutIn, db: Session = Depends(get_
     _refresh_summary(db, lay)
     db.commit()
     db.refresh(lay)
+    visual.render_all(db, lay)  # plan + photo overlay + 3D texture always follow the saved geometry
     return lay
 
 
@@ -306,4 +322,80 @@ def autofill(pid: int, lid: int, body: dict[str, Any] | None = None, db: Session
     _refresh_summary(db, lay)
     db.commit()
     db.refresh(lay)
+    visual.render_all(db, lay)
     return lay
+
+
+# ----------------------------------------------------------------------------- module recommendation / visualisation / 3D
+class ModuleRecIn(BaseModel):
+    scope: str = "auto"  # auto | target | roof
+    strategy: str = "balanced"
+    orientation: str = "auto"
+    top: int = 8
+
+
+class ModuleApplyIn(BaseModel):
+    panel_item_id: int
+    scope: str = "auto"
+    orientation: str = "auto"
+    orientations: dict[int, str] | None = None  # per-layout override
+
+
+@router.post("/{pid}/module-recommendations")
+def module_recommendations(pid: int, body: ModuleRecIn | None = None, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    """Rank every catalog module by how it fits the drawn planes, the demand and the strategy (best-practice rules)."""
+    p = _get(db, pid)
+    body = body or ModuleRecIn()
+    return module_fit.recommend(db, p, scope=body.scope, strategy=body.strategy, top=body.top, orientation=body.orientation)
+
+
+@router.post("/{pid}/module-recommendations/apply", response_model=ProjectOut)
+def module_recommendations_apply(pid: int, body: ModuleApplyIn, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    """Put the recommended module on every plane (re-placing the modules) and make it the project's selection."""
+    p = _get(db, pid)
+    try:
+        module_fit.apply(db, p, body.panel_item_id, scope=body.scope, orientation=body.orientation, overrides=body.orientations)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    for lay in p.layouts:
+        visual.render_all(db, lay)
+    db.refresh(p)
+    return _project_out(db, p)
+
+
+@router.post("/{pid}/layouts/{lid}/visualize", response_model=LayoutOut)
+def visualize_layout(pid: int, lid: int, body: dict[str, Any] | None = None, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    """(Re)generate the plan render, the photorealistic overlay and the rectified texture. ``{"frame": "black"|"silver"}``."""
+    lay = _layout(db, pid, lid)
+    frame = (body or {}).get("frame")
+    if frame in ("black", "silver"):
+        params = dict(lay.project.params or {})
+        params["visual"] = {**(params.get("visual") or {}), "frame": frame}
+        lay.project.params = params
+        db.commit()
+    visual.render_all(db, lay, frame=frame)
+    return lay
+
+
+@router.get("/{pid}/scene")
+def project_scene(pid: int, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    """3D scene description (planes, modules, obstacles, building) for the viewer."""
+    return scene.build_scene(db, _get(db, pid))
+
+
+@router.post("/{pid}/render3d", response_model=ProjectOut)
+def upload_render3d(pid: int, body: dict[str, Any], db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    """Store a screenshot of the 3D view (PNG data URL) for the documents."""
+    p = _get(db, pid)
+    data_url: str = body.get("png", "")
+    if not data_url.startswith("data:image/png;base64,"):
+        raise HTTPException(400, "Expected PNG data URL")
+    s = get_settings()
+    name = f"render3d_{p.id}.png"
+    (s.uploads_dir / name).write_bytes(base64.b64decode(data_url.split(",", 1)[1]))
+    params = dict(p.params or {})
+    params["visual"] = {**(params.get("visual") or {}), "render3d_path": f"uploads/{name}"}
+    p.params = params
+    db.commit()
+    db.refresh(p)
+    return _project_out(db, p)

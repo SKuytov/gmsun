@@ -95,6 +95,9 @@ DEFAULT_SETTINGS: dict[str, dict[str, Any]] = {
         "max_parallel_inverters": 6,  # largest number of identical inverters the proposal engine will put in parallel
         "min_parallel_unit_kw": 8,  # smallest inverter (kW AC) that may be proposed in parallel operation
         "candidate_batteries": 3,
+        # Module recommendation: mounting + labour cost per module (EUR) added to the module price when comparing
+        # €/Wp between formats (makes 450 Wp modules dearer per Wp than 600 Wp ones on an open roof).
+        "bos_per_module_eur": 55.0,
     },
 }
 

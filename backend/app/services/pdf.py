@@ -86,13 +86,20 @@ def render_quote_html(db: Session, quote: Quote, mode: str = "client") -> str:
     if company.get("logo_path"):
         logo_uri = _data_uri(settings.data_dir / company["logo_path"])
     layout_images = []
+    visual_images = []  # photorealistic overlays on the client's own photos
     tilt, az = 20.0, 180.0
     for lay in project.layouts:
         if lay.render_path:
             uri = _data_uri(settings.data_dir / lay.render_path)
             if uri:
                 layout_images.append(uri)
+        if getattr(lay, "visual_path", None):
+            uri = _data_uri(settings.data_dir / lay.visual_path)
+            if uri:
+                visual_images.append({"uri": uri, "name": lay.name})
         tilt, az = lay.tilt_deg, lay.azimuth_deg
+    r3 = ((project.params or {}).get("visual") or {}).get("render3d_path")
+    render3d = _data_uri(settings.data_dir / r3) if r3 else None
     kwp = float(info.get("kwp") or 0)
     annual_yield = estimate_yield(kwp, float(pricing.get("specific_yield_kwh_per_kwp", 1250)), az, tilt)
     solution = _solution_rows(db, quote, info, roof, annual_yield, project)
@@ -108,6 +115,8 @@ def render_quote_html(db: Session, quote: Quote, mode: str = "client") -> str:
         company=company,
         texts=texts,
         quote=quote,
+        visual_images=visual_images,
+        render3d=render3d,
         project=project,
         info=info,
         sections=sections,

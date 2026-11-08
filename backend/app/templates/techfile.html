@@ -174,7 +174,8 @@
 {% for pl in planes %}
 <h2 class="{{ 'pb' if loop.first else '' }}">4.{{ loop.index }} Разположение и монтажен план — {{ pl.name }}</h2>
 <p class="sub">{{ pl.summary.count }} модула · {{ pl.summary.kwp | num }} kWp · азимут {{ pl.azimuth | num }}° · наклон {{ pl.tilt | num }}° · площ модули {{ pl.summary.area_m2 | num }} m²</p>
-{% if pl.photo %}<div class="fig"><img src="{{ pl.photo }}"><div class="cap">Разположение върху снимка на обекта</div></div>{% endif %}
+{% if pl.visual %}<div class="fig"><img src="{{ pl.visual }}"><div class="cap">Визуализация върху снимка на обекта</div></div>{% endif %}
+{% if pl.photo %}<div class="fig"><img src="{{ pl.photo }}"><div class="cap">План на плоскостта (ректифициран) с номерирани модули</div></div>{% endif %}
 <div class="fig">{{ pl.svg | safe }}<div class="cap">Монтажен план (в метри): модули оцветени по стринг с пореден номер, шини (плътни линии) и точки на закрепване (●) през {{ roof.fixation_spacing_m | num if roof else '—' }} m. Стрингове: {% for s in pl.strings %}<span class="dot" style="background:{{ colors[(s.id[1:]|int - 1) % colors|length] }}"></span>{{ s.id }} ({{ s.modules }}) {% endfor %}</div></div>
 <table class="t"><tr><th>Ред</th><th class="r">Модули</th><th class="r">Дължина</th><th class="r">Шини</th><th class="r">Точки на закрепване</th></tr>
 {% for ln in pl.summary.lines %}<tr><td>{{ loop.index }} ({{ 'хоризонтален' if ln.direction == 'h' else 'вертикален' }})</td><td class="r">{{ ln.modules }}</td><td class="r">{{ ln.length_m | num }} m</td><td class="r">{{ ln.rails }}</td><td class="r">{{ ((ln.length_m / (roof.fixation_spacing_m if roof else 1.2)) | round(0, 'ceil') | int + 1) * ln.rails }}</td></tr>{% endfor %}

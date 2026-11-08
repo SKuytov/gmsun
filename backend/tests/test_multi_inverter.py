@@ -57,13 +57,21 @@ def test_proposals_target_vs_roof(client, auth):
     assert r.status_code == 200, r.text
     auto = r.json()
     assert auto["scope"] == "target" and auto["demand_basis"] == "connected_power"
-    assert auto["roof_panel_qty"] == count and auto["roof_kwp"] > 60
+    # roof capacity = the planes filled with the base module (auto-fill), at least what is drawn by hand
+    assert auto["roof_panel_qty"] >= count and auto["roof_kwp"] > 60
     assert 20 <= auto["target_kwp"] <= 27
     assert auto["notes"] and "целия покрив" in auto["notes"][0]
     for v in auto["variants"]:
         assert v["panel_qty"] < count and v["kwp"] <= 27.5, (v["strategy"], v["panel_qty"], v["kwp"])
-        assert v["selections"]["panel_limit"] == v["panel_qty"]
-        assert v["roof_panel_qty"] == count
+        sel = v["selections"]
+        # the automatic panel pick stores a per-plane fit; a manual panel keeps the plain panel_limit
+        if "panel_fit" in sel:
+            assert sel["panel_fit"]["count"] == v["panel_qty"], (v["strategy"], sel["panel_fit"])
+            # roof capacity is re-computed for the recommended module, so it may differ from the hand-drawn count
+            assert v["roof_panel_qty"] == sel["panel_fit"]["roof_count"] > v["panel_qty"]
+        else:
+            assert sel["panel_limit"] == v["panel_qty"]
+            assert v["roof_panel_qty"] == count
         assert v["ac_kw"] <= 20 * 1.1 + 1e-6, (v["strategy"], v["ac_kw"])
         assert not any("надвишава присъединената" in w for w in v["warnings"]), v["warnings"]
 
@@ -75,7 +83,11 @@ def test_proposals_target_vs_roof(client, auth):
     assert any("присъединената мощност" in n for n in roof["notes"])
     assert roof["variants"]
     for v in roof["variants"]:
-        assert v["panel_qty"] == count
+        fit = v["selections"].get("panel_fit")
+        if fit:
+            assert v["panel_qty"] == fit["count"] == fit["roof_count"] > 0
+        else:
+            assert v["panel_qty"] == count
         n = v["inverter_qty"]
         inv = next(k for k in v["key_items"] if k["role"] == "inverter")
         assert inv["qty"] == n
@@ -116,7 +128,7 @@ def test_proposals_target_vs_roof(client, auth):
     assert info["inverter_qty"] == n
     st = info["strings"]
     assert st["inverters"] == n and len(st["per_inverter"]) == n
-    assert sum(p["modules"] for p in st["per_inverter"]) == count
+    assert sum(p["modules"] for p in st["per_inverter"]) == chosen["panel_qty"]
     # no inverter gets more strings than it has inputs
     design = info["design"]["strings"]
     per_inv_inputs = design["inputs_per_inverter"]
