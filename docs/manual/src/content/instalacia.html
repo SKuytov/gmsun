@@ -1,0 +1,80 @@
+<h1>Инсталация на сървъра</h1>
+<p class="lead">Инсталацията е една команда на чисто инсталиран Ubuntu Server 26.04 (работи и на 24.04). След 3–5 минути системата е готова за вход.</p>
+
+<h2>1. Инсталиране на Ubuntu Server</h2>
+<ol class="steps">
+<li>Свалете <strong>Ubuntu Server 26.04 LTS</strong> от <a href="https://ubuntu.com/download/server" target="_blank" rel="noopener">ubuntu.com/download/server</a> и го запишете на USB флашка (с <a href="https://etcher.balena.io/" target="_blank" rel="noopener">balenaEtcher</a> или Rufus).</li>
+<li>Стартирайте компютъра от флашката и изберете <span class="ui">Ubuntu Server</span> (не „minimized“).</li>
+<li>Мрежа: свържете кабел. Препоръчително е да зададете <strong>фиксиран IP адрес</strong> (напр. <code>192.168.1.50</code>) — в инсталатора или като резервация на адреса в рутера.</li>
+<li>Диск: <span class="ui">Use an entire disk</span>. Ако има втори диск, оставете го за резервни копия.</li>
+<li>Потребител: име на сървъра <code>gmsun</code>, ваш потребител и силна парола.</li>
+<li>Отметнете <span class="ui">Install OpenSSH server</span>. Не избирайте допълнителни пакети (Docker се инсталира от скрипта).</li>
+<li>След рестарта влезте с потребителя си (директно или по SSH: <code>ssh потребител@192.168.1.50</code>).</li>
+</ol>
+
+<h2>2. Инсталиране на gmsun с една команда</h2>
+<pre><code>curl -fsSL https://raw.githubusercontent.com/SKuytov/gmsun/main/deploy/install.sh | sudo bash</code></pre>
+<p>Ако имате ключ за Tailscale (вижте <a href="@dostap">Отдалечен достъп</a>), сървърът влиза в частната мрежа без отделен вход:</p>
+<pre><code>curl -fsSL https://raw.githubusercontent.com/SKuytov/gmsun/main/deploy/install.sh | sudo TS_AUTHKEY=tskey-auth-xxxxx bash</code></pre>
+<h3>Какво прави скриптът</h3>
+<ol>
+<li>Обновява системата, инсталира основни инструменти и автоматични обновления за сигурност.</li>
+<li>Инсталира Docker Engine и Docker Compose.</li>
+<li>Сваля проекта в <code>/opt/gmsun</code> и създава <code>.env</code> със случайни пароли и ключове (достъп само за root).</li>
+<li>Стартира базата данни PostgreSQL 16, API, уеб сървъра и pgAdmin.</li>
+<li>Инсталира Tailscale и, при подаден ключ, свързва сървъра под името <code>gmsun</code>.</li>
+<li>Настройва защитна стена (SSH, HTTP, Tailscale), нощно резервно копие в 02:30 (пазят се последните 14) и ротация на логовете.</li>
+</ol>
+<p>Накрая скриптът отпечатва адресите и паролите — <strong>запишете ги</strong>. Може да ги видите и по-късно:</p>
+<pre><code>sudo cat /opt/gmsun/.env</code></pre>
+
+<h2>3. Първо отваряне</h2>
+<ol class="steps">
+<li>От компютър в същата мрежа отворете <code>http://192.168.1.50/</code> (IP адресът на сървъра).</li>
+<li>Влезте с <code>admin@gmsun.local</code> и паролата <code>ADMIN_PASSWORD</code> от <code>.env</code>.</li>
+<li>Веднага сменете паролата от <span class="path">Настройки → Потребители</span>.</li>
+<li>Продължете с <a href="@nastroiki">Настройки</a> — фирмени данни, лого, цени.</li>
+</ol>
+<p>Каталогът, типовете покриви, правилата за конструкция, матрицата за труд и фирмените настройки по подразбиране се зареждат автоматично при първото стартиране.</p>
+
+<h2>4. Файлът .env</h2>
+<table>
+<thead><tr><th>Променлива</th><th>По подразбиране</th><th>Значение</th></tr></thead>
+<tbody>
+<tr><td><code>HTTP_PORT</code></td><td>80</td><td>Порт на уеб интерфейса</td></tr>
+<tr><td><code>POSTGRES_DB / USER / PASSWORD</code></td><td>gmsun / gmsun / случайна</td><td>Достъп до базата данни</td></tr>
+<tr><td><code>SECRET_KEY</code></td><td>случаен</td><td>Ключ за подписване на входа (поне 32 знака)</td></tr>
+<tr><td><code>ACCESS_TOKEN_MINUTES</code></td><td>720</td><td>Продължителност на сесията (12 часа)</td></tr>
+<tr><td><code>ADMIN_EMAIL / ADMIN_PASSWORD</code></td><td>admin@gmsun.local / случайна</td><td>Първият администратор (създава се само веднъж)</td></tr>
+<tr><td><code>CORS_ORIGINS</code></td><td>*</td><td>Разрешени адреси за браузъра и Android</td></tr>
+<tr><td><code>SEED_DEMO</code></td><td>true</td><td>Зареждане на каталога и настройките при първи старт</td></tr>
+<tr><td><code>PGADMIN_EMAIL / PGADMIN_PASSWORD</code></td><td>admin@gmsun.local / случайна</td><td>Вход в pgAdmin</td></tr>
+<tr><td><code>TS_AUTHKEY</code></td><td>—</td><td>Ключ за автоматично свързване в Tailscale</td></tr>
+</tbody>
+</table>
+<p>След промяна на <code>.env</code>:</p>
+<pre><code>cd /opt/gmsun && sudo docker compose up -d</code></pre>
+
+<h2>5. Допълнителни настройки на инсталатора</h2>
+<table>
+<thead><tr><th>Променлива</th><th>Ефект</th></tr></thead>
+<tbody>
+<tr><td><code>GMSUN_DIR=/srv/gmsun</code></td><td>Друга папка за инсталацията</td></tr>
+<tr><td><code>GMSUN_PORT=8080</code></td><td>Друг порт (напр. ако на 80 има друг сайт)</td></tr>
+<tr><td><code>GMSUN_NO_TAILSCALE=1</code></td><td>Без Tailscale</td></tr>
+<tr><td><code>GMSUN_NO_UFW=1</code></td><td>Без настройка на защитната стена</td></tr>
+</tbody>
+</table>
+<pre><code>curl -fsSL https://raw.githubusercontent.com/SKuytov/gmsun/main/deploy/install.sh | sudo GMSUN_PORT=8080 bash</code></pre>
+
+<h2>6. Ръчна инсталация</h2>
+<p>Ако предпочитате да контролирате всяка стъпка:</p>
+<pre><code>sudo apt-get install -y git docker.io docker-compose-v2
+sudo git clone https://github.com/SKuytov/gmsun.git /opt/gmsun && cd /opt/gmsun
+sudo cp .env.example .env
+sudo nano .env        # SECRET_KEY (openssl rand -hex 32), POSTGRES_PASSWORD, ADMIN_PASSWORD, HTTP_PORT
+sudo docker compose up -d --build
+sudo docker compose logs -f api   # изчакайте "Application startup complete"</code></pre>
+<p>Проверка, че всичко работи:</p>
+<pre><code>curl http://localhost/api/health</code></pre>
+<p>Очакван отговор: <code>{"status":"ok", ...}</code>.</p>

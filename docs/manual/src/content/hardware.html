@@ -1,0 +1,32 @@
+<h1>Хардуер и интернет</h1>
+<p class="lead">gmsun работи на един компютър в офиса с Ubuntu Server 26.04. Не е нужен сървър в шкаф — тих настолен компютър от бизнес клас стига с голям запас.</p>
+
+<h2>Какво натоварва сървъра</h2>
+<p>Натоварването идва на кратки тласъци: препоръката за модул (около 1 секунда на стратегия), автоматичните предложения (около 4 секунди), генерирането на PDF документи и фотореалистичната визуализация върху снимката. 3D моделът се изчислява в браузъра на потребителя, не на сървъра.</p>
+<table>
+<thead><tr><th></th><th>Минимум (2–5 потребители)</th><th>Препоръчително</th></tr></thead>
+<tbody>
+<tr><td>Процесор</td><td>4 ядра / 8 нишки</td><td>6–8 ядра (Intel i5/i7 10-то поколение или по-ново)</td></tr>
+<tr><td>Памет</td><td>8 GB</td><td>16–32 GB</td></tr>
+<tr><td>Диск</td><td>256 GB SSD</td><td>512 GB NVMe + втори диск или външен USB за резервни копия</td></tr>
+<tr><td>Мрежа</td><td>кабел 1 Gbit към рутера</td><td>кабел 1 Gbit, без Wi-Fi</td></tr>
+<tr><td>Захранване</td><td>—</td><td>малък UPS, за да не се прекъсва базата при спиране на тока</td></tr>
+</tbody>
+</table>
+
+<h2>Препоръчани модели</h2>
+<p>Предложения от <a href="https://izotcomputers.com/bg/" target="_blank" rel="noopener">IZOT Computers</a> към ноември 2026 (втора употреба, с гаранция; цените и наличностите се менят).</p>
+<table>
+<thead><tr><th>Модел</th><th>Конфигурация</th><th class="num">Цена</th><th>Бележка</th></tr></thead>
+<tbody>
+<tr><td><a href="https://izotcomputers.com/bg/rabotni-stancii/rabotna-stanciya-vtora-upotreba-lenovo-thinkstation-p340-sff/10779-106816" target="_blank" rel="noopener">Lenovo ThinkStation P340 SFF</a></td><td>i7-10700 (8/16), 16 GB DDR4, 512 GB NVMe</td><td class="num">498 €</td><td><strong>Най-добър избор</strong>: 8 ядра, лесно разширение на паметта, място за втори диск</td></tr>
+<tr><td><a href="https://izotcomputers.com/bg/kompyutri-za-doma-i-ofisa/kompyutar-vtora-upotreba-dell-optiplex-5000-tower/10768-106790" target="_blank" rel="noopener">Dell Optiplex 5000 Tower</a></td><td>i5-12500 (6/12), 16 GB, 256 GB NVMe</td><td class="num">498 €</td><td>По-ново поколение, по-бърз на нишка</td></tr>
+<tr><td><a href="https://izotcomputers.com/bg/mini-kompyutri/kompyutar-vtora-upotreba-hp-elitedesk-800-g6-mini/9679-97904" target="_blank" rel="noopener">HP EliteDesk 800 G6 Mini</a></td><td>i5-10500 (6/12), 16 GB, 512 GB NVMe</td><td class="num">420 €</td><td>Бюджетен и много малък; бекъп само на външен диск</td></tr>
+<tr><td><a href="https://izotcomputers.com/bg/razprodazhba-kompyutri/rabotna-stanciya-vtora-upotreba-dell-precision-3630-tower/6861-69803" target="_blank" rel="noopener">Dell Precision 3630 Tower</a></td><td>Xeon E-2236 (6/12), 16 GB, 512 GB NVMe</td><td class="num">399 €</td><td>Работна станция; видеокартата не е нужна</td></tr>
+</tbody>
+</table>
+<div class="tip"><strong>Съвет</strong><p>Вземете машината „без ОС“ — Ubuntu Server е безплатен. Не купувайте сървъри за шкаф (шумни, скъпи за ток) и стари машини с HDD или 8 GB RAM.</p></div>
+
+<h2>Интернет</h2>
+<p>За работа в офиса интернет не е нужен. Връзка към интернет е нужна само за: инсталацията и обновяванията, синхронизацията на каталога с green-energy.bg, еднократното сваляне на datasheets и ръководствата на Aerocompact, и отдалечения достъп през Tailscale. При връзка около 300/290 Mbps със 8 ms отговор (както е в Русе) отдалеченият достъп е практически като в офиса — една оферта в PDF е под 1 MB.</p>
+<div class="note"><strong>Важно</strong><p>За отдалечен достъп решаваща е скоростта на качване (upload) на офиса. Под 20 Mbps качване снимките и визуализациите ще се отварят по-бавно от терен.</p></div>

@@ -1,0 +1,58 @@
+<h1>Отдалечен достъп и база данни</h1>
+<p class="lead">Сървърът е в офиса, но екипът работи от обекти. Tailscale дава сигурен достъп отвсякъде без отваряне на портове в рутера, а pgAdmin позволява директен преглед на базата.</p>
+
+<h2>Tailscale — достъп отвсякъде</h2>
+<p>Tailscale създава частна мрежа между вашите устройства. Сървърът получава постоянен адрес <code>100.x.y.z</code> и име <code>gmsun</code>, които работят от мобилни данни, домашен интернет или чужда Wi-Fi мрежа.</p>
+<ol class="steps">
+<li>Създайте безплатен акаунт на <a href="https://login.tailscale.com/" target="_blank" rel="noopener">login.tailscale.com</a> (с Google или Microsoft акаунт на фирмата).</li>
+<li>Ако не сте подали <code>TS_AUTHKEY</code> при инсталацията, на сървъра изпълнете командата и отворете показания линк в браузър:
+<pre><code>sudo tailscale up --hostname=gmsun --ssh</code></pre></li>
+<li>Инсталирайте приложението Tailscale на телефоните и лаптопите на екипа и влезте със същия акаунт (или ги поканете от администраторския панел на Tailscale).</li>
+<li>Адресът на сървъра вече е <code>http://gmsun/</code> или <code>http://100.x.y.z/</code>. Вижте IP адреса:
+<pre><code>tailscale ip -4</code></pre></li>
+<li>В Android приложението въведете този адрес като адрес на сървъра.</li>
+</ol>
+<div class="tip"><strong>Ключ за автоматично свързване</strong><p>В Tailscale → <span class="path">Settings → Keys → Generate auth key</span> създайте ключ (<code>tskey-auth-…</code>) и го подайте на инсталатора като <code>TS_AUTHKEY</code>. Така сървърът се свързва без вход през браузър.</p></div>
+<p>С опцията <code>--ssh</code> може да влизате в сървъра по SSH през Tailscale от всяко устройство в мрежата: <code>ssh потребител@gmsun</code>.</p>
+
+<h2>Адреси за достъп</h2>
+<table>
+<thead><tr><th>Откъде</th><th>Адрес</th></tr></thead>
+<tbody>
+<tr><td>Офис (локална мрежа)</td><td><code>http://192.168.1.50/</code></td></tr>
+<tr><td>Отвсякъде с Tailscale</td><td><code>http://gmsun/</code> или <code>http://100.x.y.z/</code></td></tr>
+<tr><td>Публичен домейн с HTTPS (по избор)</td><td><code>https://gmsun.вашият-домейн.bg/</code></td></tr>
+<tr><td>Редактор на базата</td><td>горните адреси + <code>/pgadmin/</code></td></tr>
+</tbody>
+</table>
+
+<h2>HTTPS (по избор)</h2>
+<p>В локалната мрежа и през Tailscale не е нужен HTTPS — връзката през Tailscale вече е криптирана, а Android приложението работи и с обикновен HTTP. HTTPS е нужен само ако искате публичен адрес в интернет или достъп до камерата от браузър на друго устройство. Най-лесно е с Caddy на сървъра:</p>
+<ol class="steps">
+<li>Насочете домейн (напр. <code>gmsun.вашият-домейн.bg</code>) към публичния IP на офиса и пренасочете портове 80 и 443 в рутера към сървъра.</li>
+<li>В <code>/opt/gmsun/.env</code> задайте <code>HTTP_PORT=8080</code> и рестартирайте: <code>sudo docker compose up -d</code>.</li>
+<li>Инсталирайте Caddy: <code>sudo apt install -y caddy</code>.</li>
+<li>В <code>/etc/caddy/Caddyfile</code>:
+<pre><code>gmsun.вашият-домейн.bg {
+    reverse_proxy 127.0.0.1:8080
+}</code></pre></li>
+<li><code>sudo systemctl reload caddy</code> — сертификатът от Let's Encrypt се взима автоматично.</li>
+</ol>
+<div class="warn"><strong>Сигурност</strong><p>Публичният адрес излага системата в интернет. Ако не е задължително, ползвайте само Tailscale.</p></div>
+
+<h2>pgAdmin — преглед и редакция на базата</h2>
+<ol class="steps">
+<li>Отворете <code>http://192.168.1.50/pgadmin/</code>.</li>
+<li>Влезте с <code>PGADMIN_EMAIL</code> и <code>PGADMIN_PASSWORD</code> от <code>.env</code>.</li>
+<li>Разгънете <span class="path">Servers → gmsun</span> и въведете веднъж <code>POSTGRES_PASSWORD</code> (запазва се).</li>
+<li>Таблиците са в <span class="path">Databases → gmsun → Schemas → public → Tables</span>: <code>catalog_items</code>, <code>projects</code>, <code>layouts</code>, <code>quotes</code>, <code>quote_lines</code>, <code>purchase_orders</code>, <code>settings</code>, <code>users</code> и др.</li>
+<li>Десен бутон върху таблица → <span class="ui">View/Edit Data</span> → <span class="ui">All Rows</span> — редакция като в Excel.</li>
+</ol>
+<div class="warn"><strong>Внимание</strong><p>Преди масови промени в базата направете резервно копие (<a href="@poddrajka">Резервни копия</a>). За цени и срокове е по-удобно и безопасно да ползвате <a href="@excel">Excel набора данни</a>.</p></div>
+
+<h2>Защитна стена</h2>
+<p>Инсталаторът я настройва автоматично. Ръчно:</p>
+<pre><code>sudo ufw allow OpenSSH
+sudo ufw allow 80/tcp
+sudo ufw allow in on tailscale0
+sudo ufw enable</code></pre>

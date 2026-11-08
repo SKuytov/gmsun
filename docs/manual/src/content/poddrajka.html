@@ -1,0 +1,57 @@
+<h1>Резервни копия и обновяване</h1>
+<p class="lead">Всички данни на фирмата са на един сървър. Резервните копия се правят автоматично всяка нощ, но копие извън сървъра е задължително.</p>
+
+<h2>Автоматично нощно копие</h2>
+<p>Инсталаторът настройва копие всяка нощ в 02:30. Всяко копие е един файл <code>/opt/gmsun/backups/gmsun-ГГГГММДД-ЧЧММ.tar.gz</code> с базата данни (pg_dump) и цялата папка с файлове (снимки, документи, лого, datasheets). Пазят се последните 14 копия. Логът е в <code>/var/log/gmsun-backup.log</code>.</p>
+<p>Ако автоматичното копие не е включено:</p>
+<pre><code>sudo cp /opt/gmsun/deploy/gmsun-backup.cron /etc/cron.d/gmsun-backup</code></pre>
+
+<h2>Ръчно копие</h2>
+<pre><code>sudo /opt/gmsun/deploy/backup.sh</code></pre>
+<p>Направете ръчно копие преди обновяване, масова редакция в pgAdmin или голям импорт от Excel.</p>
+
+<h2>Копие извън сървъра</h2>
+<p>Ако дискът на сървъра се повреди, копията на същия диск се губят заедно с него. Изберете поне един начин:</p>
+<ul>
+<li><strong>Втори диск или външен USB диск</strong>, монтиран например в <code>/mnt/backup</code>:
+<pre><code>sudo rsync -a /opt/gmsun/backups/ /mnt/backup/gmsun/</code></pre>
+Добавете реда в <code>/etc/cron.d/gmsun-backup</code>, за да става след нощното копие:
+<pre><code>0 3 * * * root rsync -a /opt/gmsun/backups/ /mnt/backup/gmsun/</code></pre></li>
+<li><strong>Друг компютър през Tailscale</strong>: <code>rsync -a потребител@gmsun:/opt/gmsun/backups/ ./gmsun-backups/</code></li>
+<li><strong>Облак</strong> (Dropbox, Google Drive, OneDrive) — копирайте файловете от <code>backups/</code> поне веднъж седмично.</li>
+</ul>
+
+<h2>Възстановяване</h2>
+<div class="warn"><strong>Внимание</strong><p>Възстановяването заменя цялата текуща база и файловете с тези от копието.</p></div>
+<pre><code>cd /opt/gmsun
+sudo deploy/restore.sh backups/gmsun-20261107-0230.tar.gz</code></pre>
+<p>На нов сървър: инсталирайте gmsun с командата от <a href="@instalacia">Инсталация</a>, копирайте файла с копието в <code>/opt/gmsun/backups/</code> и изпълнете горната команда.</p>
+
+<h2>Обновяване на системата</h2>
+<p>Най-лесно — същата команда като при инсталацията. Тя прави <code>git pull</code> и преизгражда, без да пипа <code>.env</code> и данните:</p>
+<pre><code>curl -fsSL https://raw.githubusercontent.com/SKuytov/gmsun/main/deploy/install.sh | sudo bash</code></pre>
+<p>Или ръчно:</p>
+<pre><code>cd /opt/gmsun && sudo deploy/backup.sh && sudo git pull && sudo docker compose up -d --build</code></pre>
+<p>Промените в базата (нови таблици и колони) се прилагат автоматично при стартиране. След обновяване: <span class="path">Каталог → Добави липсващи Aerocompact артикули</span>, ако в бележките към версията пише, че има нови елементи.</p>
+
+<h2>Обновяване на Ubuntu</h2>
+<p>Обновленията за сигурност се инсталират автоматично. Веднъж месечно:</p>
+<pre><code>sudo apt update && sudo apt upgrade -y
+sudo reboot</code></pre>
+<p>След рестарт контейнерите се стартират сами.</p>
+
+<h2>Полезни команди</h2>
+<table>
+<thead><tr><th>Команда</th><th>Действие</th></tr></thead>
+<tbody>
+<tr><td><code>sudo docker compose ps</code></td><td>Състояние на услугите</td></tr>
+<tr><td><code>sudo docker compose logs -f api web db</code></td><td>Логове (Ctrl C за изход)</td></tr>
+<tr><td><code>sudo docker compose restart api</code></td><td>Рестарт на приложението</td></tr>
+<tr><td><code>sudo docker compose exec db psql -U gmsun</code></td><td>SQL конзола</td></tr>
+<tr><td><code>sudo docker compose down</code></td><td>Спиране (данните остават)</td></tr>
+<tr><td><code>df -h</code></td><td>Свободно място на диска</td></tr>
+<tr><td><code>curl http://localhost/api/health</code></td><td>Проверка на приложението</td></tr>
+</tbody>
+</table>
+<p>Всички <code>docker compose</code> команди се изпълняват в папката <code>/opt/gmsun</code>.</p>
+<div class="warn"><strong>Никога</strong><p><code>docker compose down -v</code> — изтрива всички данни, включително базата.</p></div>
