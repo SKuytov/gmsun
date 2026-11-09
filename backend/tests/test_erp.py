@@ -79,7 +79,8 @@ def test_completeness_and_fixes(client, auth):
     codes = {i["code"]: i for i in c["items"]}
     assert codes["modules"]["level"] == "ok" and codes["inverter"]["level"] == "ok" and codes["labor"]["level"] == "ok"
     assert codes["survey"]["level"] == "warn"           # no survey yet
-    assert codes["grid_docs"]["level"] == "warn" and codes["grid_docs"]["fix"]["type"] == "add_item"
+    # the curated catalog has no service articles → the fix adds a manual line (price is entered in the quote)
+    assert codes["grid_docs"]["level"] == "warn" and codes["grid_docs"]["fix"]["type"] in ("add_item", "add_line")
     assert 0 <= c["score"] <= 100
     # survey: tall building without internet → scaffold + 4G router findings
     client.patch(f"/api/projects/{pid}", headers=auth, json={"params": {"survey": {"building_height_m": 9, "roof_access": "scaffold", "internet": "none", "roof_condition": "good", "surveyed_at": "2026-11-07"}}})
@@ -98,7 +99,12 @@ def test_completeness_and_fixes(client, auth):
     q2 = client.get(f"/api/quotes/{q['id']}", headers=auth).json()
     names = " ".join(l["name"] for l in q2["lines"] if not l["hidden"])
     assert "Скеле" in names and "4G" in names and "присъединяване" in names
-    assert q2["net_total"] > q["net_total"]
+    added = [l for l in q2["lines"] if (l["meta"] or {}).get("from_completeness")]
+    assert added and all(l["source"] == "manual" for l in added)
+    # the manual lines survive the automatic refresh triggered by a wizard change
+    client.patch(f"/api/projects/{pid}", headers=auth, json={"params": {"survey": {"building_height_m": 9, "roof_access": "scaffold", "internet": "none", "roof_condition": "good", "surveyed_at": "2026-11-07"}, "selections": q2["selections"] | {"transport_price": 150}}})
+    q3 = client.get(f"/api/quotes/{q['id']}", headers=auth).json()
+    assert len([l for l in q3["lines"] if (l["meta"] or {}).get("from_completeness")]) == len(added)
 
 
 def test_documents_upload_and_package(client, auth):
@@ -138,9 +144,9 @@ def test_documents_upload_and_package(client, auth):
 
 def test_datasheet_library_and_dashboard(client, auth):
     st = client.get("/api/catalog/datasheets/status", headers=auth).json()
-    assert st["items_with_url"] > 50 and st["library_total"] > 10
+    assert st["items_with_url"] >= 30
     lib = client.get("/api/catalog/datasheets/library", headers=auth).json()
     assert lib["items"] and lib["library"]
     d = client.get("/api/dashboard", headers=auth).json()
     assert "pipeline" in d and "deliveries" in d and "catalog" in d and "datasheets" in d
-    assert d["catalog"]["items"] > 100
+    assert d["catalog"]["items"] >= 56

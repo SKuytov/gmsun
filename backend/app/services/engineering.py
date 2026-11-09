@@ -85,7 +85,20 @@ def battery_compatibility(inverter: CatalogItem | None, battery: CatalogItem | N
     if ivc and bvc and ivc != bvc:
         w.append(f"Клас на напрежение: инверторът е за {ivc} батерии, а батерията е {bvc}.")
     vmin, vmax, vnom = _f(inv, "battery_v_min"), _f(inv, "battery_v_max"), _f(bs, "nominal_v")
-    if vmin and vmax and vnom:
+    if bvc == "HV" and _f(bs, "module_v_max"):
+        lo_n, hi_n = hv_series_range(inv, bs)
+        n = int(qty)
+        if hi_n < lo_n:
+            w.append(f"Батерийните модули не могат да се свържат към този инвертор — прозорецът {vmin:g}–{vmax:g} V не допуска нито един брой модули в серия.")
+        elif n < lo_n:
+            w.append(f"{n} модула в серия са под минимума за инвертора/BMS — нужни са поне {lo_n} модула (до {hi_n}).")
+        elif n > hi_n:
+            clusters = hv_clusters(inv, bs, n, 1)
+            if not clusters:
+                w.append(f"{n} модула надвишават допустимите {hi_n} в серия за този инвертор (прозорец {vmin:g}–{vmax:g} V).")
+        if bs.get("recommended_inverter_kw_min") and _f(inv, "ac_power_kw") < _f(bs, "recommended_inverter_kw_min"):
+            w.append(f"{battery.name} е предназначена основно за инвертори от {_f(bs, 'recommended_inverter_kw_min'):g} kW нагоре — проверете с доставчика.")
+    elif vmin and vmax and vnom:
         v_sys = vnom * qty if bvc == "HV" and bs.get("stackable") else vnom
         if not (vmin <= v_sys <= vmax):
             w.append(f"Напрежението на батерията ({v_sys:g} V) е извън прозореца на инвертора {vmin:g}–{vmax:g} V.")
@@ -106,6 +119,40 @@ def battery_compatibility(inverter: CatalogItem | None, battery: CatalogItem | N
     if isinstance(compat, list) and compat and bm and not any(bm in str(c).lower() for c in compat):
         w.append(f"Батерията не е в списъка със съвместими за инвертора: {', '.join(map(str, compat))}.")
     return w
+
+
+def hv_series_range(inv: dict[str, Any], bs: dict[str, Any]) -> tuple[int, int]:
+    """Modules allowed in ONE series string (cluster) of an HV stack on this inverter.
+
+    n × module_v_max must not exceed the inverter's battery_v_max, n × module_v_min must not fall below its
+    battery_v_min, and the BMS limits series_min / series_max apply (Deye BOS-G Pro 5–16, BOS-A 7–21)."""
+    vmin, vmax = _f(inv, "battery_v_min"), _f(inv, "battery_v_max")
+    mvmin, mvmax = _f(bs, "module_v_min"), _f(bs, "module_v_max")
+    lo = int(_f(bs, "series_min", 1)) or 1
+    hi = int(_f(bs, "series_max", 99)) or 99
+    if vmin and mvmin:
+        lo = max(lo, math.ceil(vmin / mvmin - 1e-9))
+    if vmax and mvmax:
+        hi = min(hi, math.floor(vmax / mvmax + 1e-9))
+    return lo, hi
+
+
+def hv_clusters(inv: dict[str, Any], bs: dict[str, Any], qty: int, n_inverters: int = 1) -> list[int] | None:
+    """Split ``qty`` HV modules into equal-ish series clusters, one per battery input (inverter battery_inputs × units).
+    Returns the module count per cluster or None if impossible."""
+    lo, hi = hv_series_range(inv, bs)
+    if qty <= 0 or hi < lo:
+        return None
+    max_clusters = max(1, int(_f(inv, "battery_inputs", 1))) * max(1, int(n_inverters))
+    k = max(1, math.ceil(qty / hi))
+    while k <= max_clusters:
+        base, rem = divmod(qty, k)
+        if base >= lo and base + (1 if rem else 0) <= hi:
+            if rem == 0:
+                return [base] * k
+            # Deye requires the same module count on every cluster of a parallel HV system
+        k += 1
+    return None
 
 
 def split_planes(planes: list[dict[str, Any]], n_inverters: int) -> list[list[dict[str, Any]]]:
@@ -198,15 +245,43 @@ def string_design(panel: CatalogItem | None, inverter: CatalogItem | None, plane
 VOC_MARGIN = 0.97  # Voc(cold) design headroom against the inverter's max DC voltage
 
 
-def _assign_mppts(strings: list[dict[str, Any]], mppts: int, spm: int) -> None:
+def mppt_capacities(inv: dict[str, Any], isc: float | None = None) -> list[int]:
+    """Strings per MPPT tracker. ``mppt_strings`` (datasheet, e.g. [2, 1] for Deye SUN-15K-SG01HP3-EU-AM2) wins over
+    the symmetric ``mppt_count`` × ``strings_per_mppt``. With the module ``isc`` an MPPT only takes as many parallel
+    strings as its max. short-circuit current allows (k × Isc ≤ Isc,max of the tracker); it may become 0."""
+    mppts = max(1, int(_f(inv, "mppt_count", 2)))
+    spm = max(1, int(_f(inv, "strings_per_mppt", 1)))
+    caps = [spm] * mppts
+    lst = inv.get("mppt_strings")
+    if isinstance(lst, list) and lst:
+        try:
+            c = [max(1, int(x)) for x in lst]
+            if len(c) == mppts or not inv.get("mppt_count"):
+                caps = c
+        except (TypeError, ValueError):
+            pass
+    if isc and isc > 0:
+        i_sc = [float(x) for x in (inv.get("mppt_isc_a") or []) if x]
+        if not i_sc and inv.get("max_isc_a"):
+            i_sc = [_f(inv, "max_isc_a")] * len(caps)
+        if len(i_sc) >= len(caps):
+            caps = [min(c, int(math.floor(i_sc[m] / isc + 1e-9))) for m, c in enumerate(caps)]
+    return caps
+
+
+def _assign_mppts(strings: list[dict[str, Any]], mppts: int, spm: int, caps: list[int] | None = None) -> None:
     """Assign strings to MPPT trackers/inputs in place.
 
     Rules (in order): strings of the same plane share an MPPT (same orientation in parallel), different planes get
-    separate MPPTs while any are free, a plane with more strings than `spm` spills over to the next free MPPT, and
-    only when every MPPT is used do planes get mixed (the caller warns about that). Each MPPT takes at most `spm`
-    strings; anything beyond the hardware inputs is still numbered so the warning can be shown.
+    separate MPPTs while any are free, a plane with more strings than the tracker takes spills over to the next free
+    MPPT, and only when every MPPT is used do planes get mixed (the caller warns about that). MPPT ``m`` takes at most
+    ``caps[m-1]`` strings (default ``spm`` each); anything beyond the hardware inputs is still numbered so the warning
+    can be shown.
     """
-    free = {m: spm for m in range(1, mppts + 1)}
+    caps = list(caps) if caps else [spm] * mppts
+    mppts = len(caps)
+    cap = {m: caps[m - 1] for m in range(1, mppts + 1)}
+    free = dict(cap)
     by_plane: dict[int, list[dict[str, Any]]] = {}
     for st in strings:
         by_plane.setdefault(int(st.get("plane_index") or 0), []).append(st)
@@ -214,8 +289,12 @@ def _assign_mppts(strings: list[dict[str, Any]], mppts: int, spm: int) -> None:
     for _pi, sts in sorted(by_plane.items(), key=lambda kv: -len(kv[1])):
         pending = list(sts)
         while pending:
-            # a fully free tracker first, then the one with the most free inputs
-            m = next((k for k, v in free.items() if v == spm), None)
+            # a fully free tracker that takes the whole plane, then any fully free one (biggest first), then the most free inputs
+            whole = [k for k, v in free.items() if v == cap[k] and v >= len(pending)]
+            m = min(whole, key=lambda k: (cap[k], k)) if whole else None
+            if m is None:
+                fully = [k for k, v in free.items() if v == cap[k] and v > 0]
+                m = max(fully, key=lambda k: (cap[k], -k)) if fully else None
             if m is None:
                 m = max(free, key=lambda k: free[k]) if free else None
             if m is None or free[m] <= 0:
@@ -224,12 +303,12 @@ def _assign_mppts(strings: list[dict[str, Any]], mppts: int, spm: int) -> None:
             pending = pending[free[m]:]
             for st in take:
                 st["mppt"] = m
-                st["input"] = spm - free[m] + 1
+                st["input"] = cap[m] - free[m] + 1
                 free[m] -= 1
         # hardware exhausted: number the rest round-robin so the UI can show them
         for j, st in enumerate(pending):
             st["mppt"] = (j % mppts) + 1
-            st["input"] = spm + 1 + j // mppts
+            st["input"] = cap[st["mppt"]] + 1 + j // mppts
 
 
 def _string_design_single(panel: CatalogItem | None, inverter: CatalogItem | None, planes: list[dict[str, Any]], design: dict[str, Any]) -> dict[str, Any]:
@@ -249,8 +328,12 @@ def _string_design_single(panel: CatalogItem | None, inverter: CatalogItem | Non
     start_v = _f(inv, "start_voltage", 0)
     mppt_min = _f(inv, "mppt_v_min", 150)
     mppt_max = _f(inv, "mppt_v_max", max_dc_v * 0.85)
-    mppts = max(1, int(_f(inv, "mppt_count", 2)))
-    spm = max(1, int(_f(inv, "strings_per_mppt", 1)))
+    caps = mppt_capacities(inv, isc)
+    if sum(caps) <= 0:
+        out["warnings"].append(f"Isc на модула ({isc:g} A) надвишава макс. ток на късо съединение на всички MPPT входове — панелът не може да се свърже към този инвертор.")
+        return out
+    mppts = len(caps)
+    spm = max(caps)
     i_op = _f(inv, "max_input_current_a", 0)  # per MPPT operating current
     i_sc_max = _f(inv, "max_isc_a", i_op * 1.5 if i_op else 0)
     # asymmetric MPPTs (e.g. Sungrow SH10RT 13.5 A / 27 A, Deye 2×26 A + 1×13 A): per-input lists from the datasheet
@@ -276,7 +359,7 @@ def _string_design_single(panel: CatalogItem | None, inverter: CatalogItem | Non
             "voc_stc": voc, "vmp_stc": vmp, "isc": isc, "imp": imp,
             "voc_cold": round(voc_cold, 1), "vmp_cold": round(vmp_cold, 1), "vmp_hot": round(vmp_hot, 1),
             "tmin_c": tmin, "tcell_max_c": tmax, "ns_max": ns_max, "ns_min": ns_min,
-            "mppts": mppts, "strings_per_mppt": spm, "inputs": mppts * spm,
+            "mppts": mppts, "strings_per_mppt": spm, "mppt_strings": caps, "inputs": sum(caps),
             "inv_max_dc_v": max_dc_v, "inv_mppt_min": mppt_min, "inv_mppt_max": mppt_max, "inv_i_op": i_op, "inv_i_sc": i_sc_max,
         }
     )
@@ -287,7 +370,7 @@ def _string_design_single(panel: CatalogItem | None, inverter: CatalogItem | Non
     # ---- allocate strings per plane
     strings: list[dict[str, Any]] = []
     active_planes = [p for p in planes if int(p.get("modules") or 0) > 0]
-    inputs = mppts * spm
+    inputs = sum(caps)
     for pi, pl in enumerate(planes):
         n = int(pl.get("modules") or 0)
         if n <= 0:
@@ -308,8 +391,9 @@ def _string_design_single(panel: CatalogItem | None, inverter: CatalogItem | Non
             strings.append({"plane": pl.get("name") or f"Плоскост {pi + 1}", "plane_index": pi, "modules": cnt, "span_m": round(cnt * _f(pl, "module_w_m", 1.134) + (cnt - 1) * 0.02, 2), "azimuth": pl.get("azimuth"), "tilt": pl.get("tilt")})
     # ---- assign to MPPT inputs: keep each plane on its own MPPT(s); parallel strings of one plane share an MPPT
     if len(strings) > inputs:
-        out["warnings"].append(f"{len(strings)} стринга надвишават входовете на инвертора ({mppts} MPPT × {spm}). Намалете стринговете или изберете по-голям инвертор.")
-    _assign_mppts(strings, mppts, spm)
+        lay_txt = f"{mppts} MPPT × {spm}" if len(set(caps)) == 1 else " + ".join(str(c) for c in caps) + f" на {mppts} MPPT"
+        out["warnings"].append(f"{len(strings)} стринга надвишават входовете на инвертора ({lay_txt}). Намалете стринговете или изберете по-голям инвертор.")
+    _assign_mppts(strings, mppts, spm, caps)
     for i, st in enumerate(strings):
         st["id"] = f"S{i + 1}"
         st["voc_cold_v"] = round(st["modules"] * voc_cold, 1)

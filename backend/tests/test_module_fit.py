@@ -27,9 +27,9 @@ def test_recommend_and_apply(client, auth):
     r = client.post(f"/api/projects/{pid}/module-recommendations", headers=auth, json={"scope": "auto", "strategy": "balanced", "top": 6})
     assert r.status_code == 200, r.text
     rec = r.json()
-    assert rec["scope"] == "target" and rec["target_kwp"] == 24.0 and rec["evaluated"] > 10
+    assert rec["scope"] == "target" and rec["target_kwp"] == 24.0 and rec["evaluated"] >= 4
     cands = rec["candidates"]
-    assert len(cands) == 6 and cands[0]["rank"] == 1
+    assert len(cands) == 4 and cands[0]["rank"] == 1  # the final catalog has exactly 4 modules
     for c in cands:
         # target mode: the recommended count meets the demand (within the 95 % rule) and fits the planes
         assert c["count_used"] <= c["count_max"]

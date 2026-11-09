@@ -33,7 +33,12 @@ def one(key: str, db: Session = Depends(get_db), _: User = Depends(get_current_u
 def update(key: str, body: SettingIn, db: Session = Depends(get_db), _: User = Depends(require_admin)):
     if key not in DEFAULT_SETTINGS:
         raise HTTPException(404)
-    return SettingOut(key=key, value=set_setting(db, key, body.value))
+    out = SettingOut(key=key, value=set_setting(db, key, body.value))
+    if key in ("pricing", "engineering", "procurement"):
+        from ..services import autosync
+
+        autosync.recalc_all_drafts(db)  # working quotes follow the new prices / rules immediately
+    return out
 
 
 @router.post("/company/logo", response_model=SettingOut)

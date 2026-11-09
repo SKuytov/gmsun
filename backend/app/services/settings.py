@@ -35,6 +35,8 @@ DEFAULT_SETTINGS: dict[str, dict[str, Any]] = {
         "delivery_fee_inverter": 60.0,
         "delivery_fee_construction": 40.0,
         "install_price_per_w": 0.118,
+        "labor_eur_per_inverter_kw": 118.0,  # Труд (СМР) = inverter AC kW × this rate (default labor mode)
+        "labor_mode_default": "per_inverter_kw",  # per_inverter_kw | matrix | per_w | manual
         "specific_yield_kwh_per_kwp": 1250,
         "dc_ac_ratio_max": 1.35,
         "quote_number_prefix": "",
@@ -110,7 +112,7 @@ def get_setting(db: Session, key: str) -> dict[str, Any]:
     return base
 
 
-def set_setting(db: Session, key: str, value: dict[str, Any]) -> dict[str, Any]:
+def set_setting(db: Session, key: str, value: dict[str, Any], *, commit: bool = True) -> dict[str, Any]:
     row = db.get(Setting, key)
     if row is None:
         row = Setting(key=key, value=value)
@@ -119,6 +121,9 @@ def set_setting(db: Session, key: str, value: dict[str, Any]) -> dict[str, Any]:
         merged = dict(row.value or {})
         merged.update(value)
         row.value = merged
-    db.commit()
-    db.refresh(row)
+    if commit:
+        db.commit()
+        db.refresh(row)
+    else:
+        db.flush()
     return get_setting(db, key)

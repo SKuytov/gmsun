@@ -16,7 +16,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from ..models import CatalogItem, LaborOption, Layout, Project, Quote, QuoteLine, RoofTypeConfig
-from . import bom, engineering
+from . import compat, bom, engineering
 from . import procurement
 from . import module_fit
 from .settings import get_setting
@@ -32,13 +32,17 @@ SECTIONS: list[tuple[str, str, str]] = [
 SECTION_ORDER = {s[0]: i for i, s in enumerate(SECTIONS)}
 
 
-def _item(db: Session, item_id: Any) -> CatalogItem | None:
+def _item(db: Session, item_id: Any, *, include_inactive: bool = False) -> CatalogItem | None:
+    """Catalog item by id – deleted or deactivated items are never quoted (returns None)."""
     if not item_id:
         return None
     try:
-        return db.get(CatalogItem, int(item_id))
+        it = db.get(CatalogItem, int(item_id))
     except (TypeError, ValueError):
         return None
+    if it is not None and not include_inactive and it.active is False:
+        return None
+    return it
 
 
 def _line(key: str, section: str, name: str, unit: str, qty: float, unit_price: float, purchase: float = 0.0, item: CatalogItem | None = None, meta: dict | None = None) -> dict[str, Any]:
@@ -201,10 +205,21 @@ def build_lines(db: Session, project: Project, quote: Quote) -> tuple[list[dict[
             if ivc and bvc and str(ivc).upper() != str(bvc).upper():
                 warnings.append(f"Батерията е {bvc}, а инверторът е {ivc} — несъвместими.")
         info["storage_kwh"] = kwh * bq
+    auto_acc = bool(battery) and str((battery.specs or {}).get("voltage_class") or "").upper() == "HV" and sel.get("battery_auto_accessories", True)
+    if auto_acc:
+        acc_items, acc_notes = compat.hv_accessories(db, inverter, battery, bq, inv_qty or 1)
+        for it, q, why in acc_items:
+            lines.append(_item_line(f"batt_auto:{it.id}", "inverter", it, q, markup, meta={"auto": why}))
+        info["battery_accessories_auto"] = [{"id": it.id, "name": it.name, "qty": q} for it, q, _w in acc_items]
+        warnings.extend(acc_notes)
     for i, acc in enumerate(sel.get("battery_accessories") or []):
         it = _item(db, acc.get("catalog_item_id"))
-        if it:
+        if it and not (auto_acc and (it.specs or {}).get("role") in ("hv_rack", "hv_bms")):
             lines.append(_item_line(f"batt_acc:{it.id}", "inverter", it, float(acc.get("qty") or 1), markup))
+    sysc = compat.system_issues(db, project, panel, panel_qty, inverter, inv_qty or 1, battery, bq)
+    info["compat"] = sysc
+    for b in sysc["blocked"]:
+        warnings.insert(0, f"НЕСЪВМЕСТИМО: {b}")
     if sel.get("delivery_fees", True) and inverter and float(pricing.get("delivery_fee_inverter", 0)) > 0:
         lines.append(_line("delivery:inverter", "inverter", "Доставка на оборудване", "бр.", 1, pricing["delivery_fee_inverter"]))
 
@@ -230,8 +245,21 @@ def build_lines(db: Session, project: Project, quote: Quote) -> tuple[list[dict[
 
     # --------------------------------------------------------------- electrical
     sb = _item(db, sel.get("switchboard_item_id"))
+    want_ph = int((inverter.specs or {}).get("phases") or project.phase or 3) if inverter else int(project.phase or 3)
+    if sb is None or (sb.specs or {}).get("phases") and int((sb.specs or {}).get("phases")) != want_ph:
+        boards = db.query(CatalogItem).filter(CatalogItem.category == "switchboard", CatalogItem.active.is_(True)).order_by(CatalogItem.sort_order, CatalogItem.id).all()
+        auto_sb = next((b for b in boards if int((b.specs or {}).get("phases") or 0) == want_ph), None)
+        if auto_sb is not None and sel.get("auto_switchboard", True):
+            if sb is not None:
+                warnings.append(f"Таблото „{sb.name}“ е за друг брой фази — автоматично е избрано „{auto_sb.name}“.")
+            sb = auto_sb
+            info["switchboard_auto"] = auto_sb.id
+    covered: set[str] = set()
     if sb:
-        lines.append(_item_line("switchboard", "electrical", sb, 1, markup))
+        sb_qty = max(1, inv_qty or 1)
+        lines.append(_item_line("switchboard", "electrical", sb, sb_qty, markup, name=f"{sb.name}" + (f" — по едно за всеки инвертор" if sb_qty > 1 else "")))
+        covered = {str(x) for x in ((sb.specs or {}).get("covers_roles") or [])}
+        info["switchboard_item_id"] = sb.id
     else:
         warnings.append("Не е избрано електрическо табло.")
     # engineering design: strings, protections, cables, earthing, consumables
@@ -271,8 +299,20 @@ def build_lines(db: Session, project: Project, quote: Quote) -> tuple[list[dict[
                 item = _item(db, sel.get("power_cable_item_id"))
             if isinstance(sel.get("power_cable_m"), (int, float)) and sel.get("power_cable_m") > 0:
                 qty = float(sel["power_cable_m"])
+        if item is None and rk in covered:
+            info.setdefault("covered_by_switchboard", []).append(r["name"])
+            info.setdefault("covered_roles", []).append(rk)
+            continue
         if item is None:
             item = engineering.find_item_for_role(all_items, r, pick)
+        if item is None and rk == "pv_cable":
+            pvc = [c for c in all_items if c.category == "solar_cable" or (c.specs or {}).get("role") == "pv_cable"]
+            if pvc:
+                item = min(pvc, key=lambda c: abs(float((c.specs or {}).get("cross_section_mm2") or 6) - float(r["spec"].get("cross_section_mm2") or 6)))
+                want = r["spec"].get("cross_section_mm2")
+                have = (item.specs or {}).get("cross_section_mm2")
+                if want and have and float(want) > float(have):
+                    warnings.append(f"Изчислено е {want:g} mm² соларен кабел, а в каталога има {have:g} mm² — проверете пада на напрежение за дългите стрингове.")
         meta = {"role": rk, "auto_qty": r["qty"], "spec": r["spec"], "role_name": r["name"]}
         if item:
             name = r["name"] if rk in ("pv_cable",) else item.name
@@ -282,18 +322,35 @@ def build_lines(db: Session, project: Project, quote: Quote) -> tuple[list[dict[
                     name = f"{name} ({m.group(1)})"
             lines.append(_item_line(key, r["section"], item, qty, markup, name=name, meta=meta))
         else:
+            # the curated catalog has no article for this role → not quoted (listed for information only)
             missing.append(r["name"])
-            lines.append(_line(key, r["section"], r["name"], r["unit"], qty, 0.0, meta={**meta, "missing_item": True}))
+            info.setdefault("not_quoted_roles", []).append(rk)
     if missing:
-        warnings.append(f"Няма артикул в каталога за {len(missing)} позиции (добавете ги в Каталог с роля): " + "; ".join(missing[:6]) + (" …" if len(missing) > 6 else ""))
+        info["not_quoted"] = missing
     for extra in sel.get("electrical_items") or []:
         it = _item(db, extra.get("catalog_item_id") or extra.get("item_id"))
         if it:
             lines.append(_item_line(f"elec:{it.id}", "electrical", it, float(extra.get("qty") or 1), markup))
 
     # -------------------------------------------------------------------- labor
-    labor_mode = sel.get("labor_mode", "matrix")
-    if labor_mode == "matrix" and sel.get("labor_option_id"):
+    labor_mode = sel.get("labor_mode") or pricing.get("labor_mode_default") or "per_inverter_kw"
+    if labor_mode == "per_inverter_kw":
+        rate = sel.get("labor_eur_per_kw")
+        rate = float(rate) if isinstance(rate, (int, float)) and not isinstance(rate, bool) and rate >= 0 else float(pricing.get("labor_eur_per_inverter_kw") or 0)
+        inv_kw = float(((inverter.specs or {}).get("ac_power_kw") or 0) if inverter else 0) * (inv_qty or 0)
+        info["labor"] = {"mode": "per_inverter_kw", "inverter_kw": round(inv_kw, 2), "rate": rate, "kwp": kwp}
+        if inv_kw > 0 and rate > 0:
+            lbl = f"{inv_qty} × {inv_kw / inv_qty:g} kW" if inv_qty > 1 else f"{inv_kw:g} kW"
+            lines.append(_line("labor", "labor", f"Монтаж, пуск и настройка — инвертор {lbl} × {rate:g} €/kW", "kW", round(inv_kw, 3), rate,
+                               meta={"mode": "per_inverter_kw", "rate": rate}))
+        elif inv_kw <= 0:
+            warnings.append("Трудът се изчислява по мощността на инвертора — изберете инвертор.")
+        else:
+            warnings.append("Не е зададена цена за труд €/kW (Настройки → Ценообразуване).")
+        lo = db.get(LaborOption, int(sel["labor_option_id"])) if sel.get("labor_option_id") else None
+        if lo:  # the matrix choice still gives the execution period / crew printed in the quote
+            info["execution_days"], info["workers"] = lo.days, lo.workers
+    elif labor_mode == "matrix" and sel.get("labor_option_id"):
         lo = db.get(LaborOption, int(sel["labor_option_id"]))
         if lo:
             name = f"Монтаж, пуск и настройка — {lo.days} {'ден' if lo.days == 1 else 'дни'}, {lo.workers} {'работник' if lo.workers == 1 else 'работници'}"

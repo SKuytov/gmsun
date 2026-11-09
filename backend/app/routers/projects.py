@@ -19,7 +19,7 @@ from ..db import get_db
 from ..models import CatalogItem, Layout, Project, Quote, RoofTypeConfig, User
 from ..schemas import LayoutIn, LayoutOut, ProjectCreate, ProjectListItem, ProjectOut, ProjectUpdate, RoofDetectOut
 from ..services import layout_engine as le
-from ..services import module_fit, proposals, scene, visual
+from ..services import autosync, module_fit, proposals, scene, visual
 from ..services.pricing import active_layout_summary
 from ..services.roof_detect import detect_obstacles, detect_roof
 
@@ -89,6 +89,8 @@ def update_project(pid: int, body: ProjectUpdate, db: Session = Depends(get_db),
         setattr(p, k, v)
     db.commit()
     db.refresh(p)
+    autosync.sync_project(db, p)  # the working (draft) quote follows the wizard automatically
+    db.refresh(p)
     return _project_out(db, p)
 
 
@@ -101,6 +103,18 @@ class ProposalsIn(BaseModel):
 class ProposalApplyIn(BaseModel):
     selections: dict[str, Any]
     strategy: str | None = None
+
+
+@router.get("/{pid}/compatibility")
+def project_compatibility(pid: int, panel_item_id: int | None = None, inverter_item_id: int | None = None, inverter_qty: int = 1,
+                          panel_qty: int = 0, battery_item_id: int | None = None, battery_qty: int = 0,
+                          db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    """ok / warn / blocked (with reasons) for every active inverter, panel and battery against the given selection."""
+    from ..services import compat
+
+    p = _get(db, pid)
+    return compat.matrix(db, p, panel_item_id=panel_item_id, inverter_item_id=inverter_item_id, inverter_qty=max(1, inverter_qty),
+                         panel_qty=max(0, panel_qty), battery_item_id=battery_item_id, battery_qty=max(0, battery_qty))
 
 
 @router.post("/{pid}/proposals")
@@ -136,6 +150,8 @@ def apply_proposal(pid: int, body: ProposalApplyIn, db: Session = Depends(get_db
         for lay in p.layouts:
             visual.render_all(db, lay)
         db.refresh(p)
+    autosync.sync_project(db, p)
+    db.refresh(p)
     return _project_out(db, p)
 
 
@@ -190,6 +206,8 @@ def create_layout(pid: int, body: LayoutIn, db: Session = Depends(get_db), _: Us
     db.add(lay)
     db.commit()
     db.refresh(lay)
+    autosync.sync_project(db, p)
+    db.refresh(lay)
     return lay
 
 
@@ -202,6 +220,8 @@ def update_layout(pid: int, lid: int, body: LayoutIn, db: Session = Depends(get_
     db.commit()
     db.refresh(lay)
     visual.render_all(db, lay)  # plan + photo overlay + 3D texture always follow the saved geometry
+    autosync.sync_project(db, _get(db, pid))
+    db.refresh(lay)
     return lay
 
 
@@ -210,6 +230,7 @@ def delete_layout(pid: int, lid: int, db: Session = Depends(get_db), _: User = D
     lay = _layout(db, pid, lid)
     db.delete(lay)
     db.commit()
+    autosync.sync_project(db, _get(db, pid))
     return Response(status_code=204)
 
 
@@ -323,6 +344,8 @@ def autofill(pid: int, lid: int, body: dict[str, Any] | None = None, db: Session
     db.commit()
     db.refresh(lay)
     visual.render_all(db, lay)
+    autosync.sync_project(db, _get(db, pid))
+    db.refresh(lay)
     return lay
 
 
@@ -359,6 +382,8 @@ def module_recommendations_apply(pid: int, body: ModuleApplyIn, db: Session = De
         raise HTTPException(400, str(e))
     for lay in p.layouts:
         visual.render_all(db, lay)
+    db.refresh(p)
+    autosync.sync_project(db, p)
     db.refresh(p)
     return _project_out(db, p)
 

@@ -51,7 +51,8 @@ def _find_item(items: list[CatalogItem], key: str) -> CatalogItem | None:
 def _fix_add(items: list[CatalogItem], key: str, qty: float = 1) -> dict[str, Any] | None:
     it = _find_item(items, key)
     if not it:
-        return None
+        # no such article in the (curated) catalog → offer a manual line; the price is entered in the quote
+        return {"type": "add_line", "name": SERVICE_ITEMS[key]["name"], "qty": qty, "target": SERVICE_ITEMS[key]["target"], "price": 0.0}
     return {"type": "add_item", "catalog_item_id": it.id, "qty": qty, "target": SERVICE_ITEMS[key]["target"], "name": it.name, "price": it.price_for(0)}
 
 
@@ -103,16 +104,29 @@ def check(db: Session, q: Quote) -> dict[str, Any]:
         add("mounting", "bad", "Няма монтажна конструкция", "Проверете типа покрив и правилата за конструкция.", {"type": "step", "step": "materials"})
     else:
         add("mounting", "ok", "Конструкция: включена")
+    compat_info = info.get("compat") or {}
+    for b in compat_info.get("blocked") or []:
+        add("compat", "bad", "Несъвместимо оборудване", b, {"type": "step", "step": "equipment"})
+    covered_roles = set(info.get("covered_roles") or [])
+    nq_roles = set(info.get("not_quoted_roles") or [])
+    roles = roles | covered_roles
     missing_roles = [l for l in lines if (l.meta or {}).get("missing_item")]
     if missing_roles:
         add("missing_items", "bad", f"{len(missing_roles)} инженерни позиции без артикул в каталога", "; ".join((l.name or "")[:60] for l in missing_roles[:5]) + (" …" if len(missing_roles) > 5 else "") + ". Добавете артикул с тази роля в Каталог.", {"type": "nav", "to": "/catalog"})
+    nq = info.get("not_quoted") or []
+    if nq:
+        add("not_quoted", "info", f"{len(nq)} инженерни позиции не се офертират (няма такъв артикул в каталога)", "; ".join(str(x)[:60] for x in nq[:6]) + (" …" if len(nq) > 6 else "") + ". Ако са нужни, добавете артикул с тази роля в Каталог.", {"type": "nav", "to": "/catalog"})
+    if covered_roles:
+        add("switchboard_cover", "ok", "AC/DC защитите са включени в окомплектованото табло")
     for rk, title in (("pv_cable", "Соларен кабел"), ("mc4_pair", "MC4 конектори"), ("ac_cable", "AC кабел"), ("ac_mcb", "AC прекъсвач"), ("ac_rcd", "Дефектнотокова защита"), ("pe_cable", "Заземителен проводник"), ("labels", "Предупредителни табели")):
+        if rk in nq_roles:
+            continue  # reported once above as "not quoted"
         if rk not in roles and not any((l.meta or {}).get("role") == rk for l in lines):
             add(f"role_{rk}", "warn", f"{title}: няма ред в офертата", "Автоматичното електро оборудване може да е изключено (Материали → Автоматично ел. оборудване).", {"type": "step", "step": "materials"})
     if not any(r in roles for r in ("dc_spd", "ac_spd")):
         add("spd", "warn", "Няма катоден отводител (SPD) DC/AC", "Ако инверторът няма вграден SPD тип II, добавете го — изисква се от ЕРП и застрахователите.", {"type": "step", "step": "materials"})
     if not any(r in roles for r in ("earth_rod", "earth_clamp", "bonding_clamp", "earth_tape")) and not _has(lines, r"заземител|заземяв|WCL|earth"):
-        add("earthing", "warn", "Няма заземяване на конструкцията", "Добавете заземителен кол/клеми за изравняване на потенциалите.", {"type": "step", "step": "materials"})
+        add("earthing", "info" if nq_roles & {"earth_rod", "bonding_clamp", "earth_strip", "pe_cable"} else "warn", "Няма заземяване на конструкцията", "Добавете заземителен кол/клеми за изравняване на потенциалите.", {"type": "step", "step": "materials"})
 
     # ------------------------------------------------------------------ monitoring / grid
     has_logger = _has(lines, SERVICE_ITEMS["logger"]["pattern"]) or any("wifi" in (l.name or "").lower() or "dongle" in (l.name or "").lower() for l in lines)
@@ -262,7 +276,21 @@ def apply_fixes(db: Session, q: Quote, fixes: list[dict[str, Any]]) -> None:
     sel = dict(q.selections or {})
     extra = list(sel.get("extra_items") or [])
     elec = list(sel.get("electrical_items") or [])
+    import uuid
+
+    from ..models import QuoteLine
+
     for f in fixes:
+        if f.get("type") == "add_line" and f.get("name"):
+            name = str(f["name"])[:250]
+            if any((l.name or "") == name and not l.hidden for l in q.lines):
+                continue
+            q.lines.append(QuoteLine(key=f"manual:{uuid.uuid4().hex[:8]}", section="electrical" if f.get("target") == "electrical" else "other",
+                                     position=max((l.position or 0 for l in q.lines), default=-1) + 1, name=name, unit="бр.",
+                                     qty=float(f.get("qty") or 1), unit_price=float(f.get("price") or 0), purchase_price=0.0,
+                                     total=round(float(f.get("qty") or 1) * float(f.get("price") or 0), 2), source="manual", locked=True,
+                                     hidden=False, meta={"from_completeness": True}))
+            continue
         if f.get("type") != "add_item" or not f.get("catalog_item_id"):
             continue
         cid, qty = int(f["catalog_item_id"]), float(f.get("qty") or 1)
@@ -274,3 +302,6 @@ def apply_fixes(db: Session, q: Quote, fixes: list[dict[str, Any]]) -> None:
             lst.append({"catalog_item_id": cid, "qty": qty})
     sel["extra_items"], sel["electrical_items"] = extra, elec
     q.selections = sel
+    from . import autosync
+
+    autosync.mirror_to_project(db, q, {"extra_items": extra, "electrical_items": elec})

@@ -98,12 +98,16 @@ def update_quote(qid: int, body: QuoteUpdate, db: Session = Depends(get_db), _: 
     q = _quote(db, qid)
     data = body.model_dump(exclude_unset=True)
     recalc = data.pop("recalc", True)
-    if "selections" in data and data["selections"] is not None:
+    new_sel = data.pop("selections", None)
+    if new_sel is not None:
         merged = {k: v for k, v in (q.selections or {}).items() if k.startswith("_")}
-        merged.update(data.pop("selections"))
+        merged.update(new_sel)
         q.selections = merged
     for k, v in data.items():
         setattr(q, k, v)
+    from ..services import autosync
+
+    autosync.mirror_to_project(db, q, new_sel, data)
     if recalc:
         pricing.recalculate(db, q)
     else:

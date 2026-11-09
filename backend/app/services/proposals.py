@@ -19,7 +19,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from ..models import CatalogItem, LaborOption, Project, Quote
-from . import pricing, procurement, sizing
+from . import compat, pricing, procurement, sizing
 from .settings import get_setting
 
 STRATEGIES = procurement.STRATEGIES
@@ -199,8 +199,12 @@ def evaluate(ctx: Ctx, sel: dict[str, Any]) -> dict[str, Any]:
 
 def _labor_for(ctx: Ctx, base_sel: dict[str, Any], kwp: float) -> dict[str, Any]:
     auto = base_sel.get("labor_auto", bool(base_sel.get("strategy")))  # legacy: selections applied from a proposal were automatic
-    if base_sel.get("labor_mode") in ("per_w", "manual") or (base_sel.get("labor_option_id") and not auto):
-        return {}  # the user chose the labour himself – keep it
+    if base_sel.get("labor_mode") in ("per_w", "manual", "per_inverter_kw") or (base_sel.get("labor_option_id") and not auto):
+        return {}  # the user chose the labour himself – keep it (per_inverter_kw follows the inverter automatically)
+    from .settings import get_setting
+
+    if (get_setting(ctx.db, "pricing").get("labor_mode_default") or "per_inverter_kw") == "per_inverter_kw" and not base_sel.get("labor_option_id"):
+        return {}  # default: labour = inverter kW × rate, computed by the quote itself
     # pick the matrix option closest to a rule of thumb: ~1 day per 4 kWp with 3 workers, min 2 days
     opts = ctx.db.query(LaborOption).all()
     if not opts:
@@ -335,11 +339,15 @@ def generate(db: Session, project: Project, strategies: list[str] | None = None,
             inv_items = [r["item"] for r in inv_rows if _has_price(r["item"])] or [r["item"] for r in inv_rows]
             # rank by the cost of the whole inverter pack per kW AC (+ a small premium per extra unit for wiring/commissioning)
             inv_cands = ctx.rank(strat, inv_items, lambda it: (it.price_for(ctx.markup) * qty_of.get(it.id, 1) * (1 + 0.03 * (qty_of.get(it.id, 1) - 1))) / max(0.5, _f(it.specs, "ac_power_kw", 1) * qty_of.get(it.id, 1)))[:n_i]
+            cfg_c = compat._design_cfg(ctx.db)
+            inv_cands = [i for i in inv_cands if compat.check_pair(panel, i, cfg_c, modules_per_inverter=math.ceil(panel_qty / max(1, qty_of.get(i.id, 1))), phase=project.phase)["status"] != compat.BLOCKED] or [
+                i for i in inv_items if compat.check_pair(panel, i, cfg_c, modules_per_inverter=math.ceil(panel_qty / max(1, qty_of.get(i.id, 1))), phase=project.phase)["status"] != compat.BLOCKED][:n_i]
             for inv in inv_cands:
                 inv_qty = qty_of.get(inv.id, 1)
                 bat_opts: list[tuple[CatalogItem | None, int, list[dict[str, Any]]]] = [(None, 0, [])]
                 if want_battery and target_kwh > 0:
                     rows = sizing.suggest_batteries(ctx.db, inv, target_kwh, project.voltage_class, ctx.markup)
+                    rows = [r for r in rows if compat.check_battery(inv, r["item"], int(r["qty"]), inv_qty)["status"] != compat.BLOCKED]
                     rows = [r for r in rows if not r["warnings"]] or rows
                     bitems = [r["item"] for r in rows if _has_price(r["item"])] or [r["item"] for r in rows]
                     rank_b = ctx.rank(strat, bitems, lambda it: it.price_for(ctx.markup) / max(0.5, _f(it.specs, "kwh", 1)))[:n_b]

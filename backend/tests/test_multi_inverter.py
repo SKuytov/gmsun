@@ -111,19 +111,14 @@ def test_proposals_target_vs_roof(client, auth):
         role = (l.get("meta") or {}).get("role")
         if role:
             by_role.setdefault(role, []).append(l)
-    assert "ac_combiner" in by_role and by_role["ac_combiner"][0]["qty"] == 1
-    assert "parallel_cable" in by_role and by_role["parallel_cable"][0]["qty"] == n - 1
-    mcbs = by_role["ac_mcb"]
-    assert any(l["qty"] == n for l in mcbs), [(l["name"], l["qty"]) for l in mcbs]
-    main = [l for l in mcbs if "Главен" in (l["meta"].get("role_name") or "")]
-    assert "ГРТ" in main[0]["name"]
-    assert main and main[0]["qty"] == 1
-    i_inv = float(next(l for l in mcbs if l["qty"] == n)["meta"]["spec"]["rating_a"])
-    i_main = float(main[0]["meta"]["spec"]["rating_a"])
-    assert i_main >= i_inv * n * 0.9  # main breaker sized for the sum of the inverters
-    assert by_role["ac_rcd"][0]["qty"] == n
-    assert len(by_role["ac_cable"]) >= 2  # per-inverter feeders + combiner → main board
-    assert not any(l.get("meta", {}).get("missing_item") for l in by_role["ac_combiner"] + by_role["parallel_cable"] + mcbs)
+    # one equipped AC/DC board per inverter covers its breakers / RCD / SPDs (final catalog)
+    sb = next(l for l in lines if l["key"] == "switchboard")
+    assert sb["qty"] == n and sb["unit_price"] > 0
+    info0 = q["selections"]["_info"]
+    assert {"ac_mcb", "ac_rcd"} <= set(info0["covered_roles"])
+    # engineering roles without an article are listed, never quoted at 0 €
+    assert not any((l.get("meta") or {}).get("missing_item") for l in lines)
+    assert "ac_combiner" in (info0.get("not_quoted_roles") or []) or "ac_combiner" in by_role
     info = q["selections"]["_info"]
     assert info["inverter_qty"] == n
     st = info["strings"]

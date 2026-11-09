@@ -6,22 +6,19 @@ from openpyxl import load_workbook
 
 
 def test_seeded_dataset_is_complete(client, auth):
-    # other tests may have imported unpriced supplier rows in the meantime → complete them first (as the admin button does)
+    """The final catalog (company dataset) is complete: every item has a price, SKU, supplier and manufacturer."""
+    items = client.get("/api/catalog/items?include_inactive=true", headers=auth).json()
+    final = [i for i in items if (i["supplier"] or "") == "green-energy.bg"]
+    assert len(final) >= 56
+    missing_price = [i for i in final if not i["purchase_price"]]
+    assert missing_price == [], [i["name"] for i in missing_price][:10]
+    for key in ("supplier", "sku", "manufacturer"):
+        assert all(i.get(key) not in (None, "") for i in final), key
+    st = client.get("/api/catalog/final/status", headers=auth).json()
+    assert st["done"] is True and st["curated"] is True
     r = client.post("/api/catalog/dataset/fill-missing", headers=auth)
     assert r.status_code == 200, r.text
     assert r.json()["unpriced_left"] == []
-    items = client.get("/api/catalog/items?include_inactive=true", headers=auth).json()
-    assert len(items) > 500
-    missing_price = [i for i in items if not i["purchase_price"]]
-    assert missing_price == [], [i["name"] for i in missing_price][:10]
-    for key in ("lead_time_days", "tier", "supplier", "sku", "manufacturer"):
-        assert all(i.get(key) not in (None, "") for i in items), key
-    # indicative prices are marked as such
-    marked = [i for i in items if (i["specs"] or {}).get("price_source") == "indicative"]
-    assert len(marked) > 100
-    # the seed itself already completed the dataset: a second run has nothing left to fill (idempotent, never overwrites)
-    r = client.post("/api/catalog/dataset/fill-missing", headers=auth)
-    assert r.json()["price"] == 0 and r.json()["lead_time"] == 0 and r.json()["tier"] == 0
 
 
 def test_dataset_export_and_import_roundtrip(client, auth):

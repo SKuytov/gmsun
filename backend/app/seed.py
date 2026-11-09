@@ -305,16 +305,30 @@ LABOR: list[tuple[int, int, float]] = [
 
 
 def seed(db: Session) -> None:
+    """Startup data. Users, roof types and the labor matrix are created when missing; the catalog is the GM SUN final
+    catalog (``seed_data/gmsun_final.py``), applied once by ``catalog_final.apply`` – on a fresh install as well as on
+    an existing database (which is backed up first). Legacy demo catalogs are never re-seeded afterwards."""
     s = get_settings()
     if not db.query(User).first():
         db.add(User(email=s.admin_email, name="Администратор", password_hash=hash_password(s.admin_password), role="admin"))
     existing_roofs = {r.code for r in db.query(RoofTypeConfig.code).all()}
     for rt in ROOF_TYPES:  # additive: new roof/terrain types appear after upgrade, edited ones are kept
         if rt["code"] not in existing_roofs:
-            db.add(RoofTypeConfig(**rt))
+            db.add(RoofTypeConfig(**{**rt, "pricing_mode": "lump"}))
     if not db.query(LaborOption).first():
         for d, w, p in LABOR:
             db.add(LaborOption(days=d, workers=w, price=p))
+    db.commit()
+    from .services import catalog_final
+
+    if not catalog_final.is_done(db):
+        catalog_final.apply(db, s.data_dir)
+
+
+def seed_legacy_catalog(db: Session) -> None:
+    """Previous demo catalog (Deye/LONGi/Aerocompact + supplier snapshot). Not used at startup any more; kept for
+    reference and for tests that need the full legacy dataset."""
+    s = get_settings()
     db.flush()
     # Catalog seeding is additive: items/rules that already exist (by name) are never touched, so user edits and
     # imported prices survive upgrades, while new role-tagged items (protection, earthing, …) appear after a restart.

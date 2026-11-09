@@ -70,6 +70,13 @@ def list_items(
     return _outs(db, items)
 
 
+def _resync(db: Session) -> None:
+    """Prices / items / labor / roof data changed → every working (draft) quote is refreshed automatically."""
+    from ..services import autosync
+
+    autosync.recalc_all_drafts(db)
+
+
 @router.post("/items", response_model=CatalogItemOut, status_code=201)
 def create_item(body: CatalogItemCreate, db: Session = Depends(get_db), _: User = Depends(require_admin)):
     if body.category not in CATEGORIES:
@@ -80,6 +87,7 @@ def create_item(body: CatalogItemCreate, db: Session = Depends(get_db), _: User 
     db.add(it)
     db.commit()
     db.refresh(it)
+    _resync(db)
     return _out(db, it)
 
 
@@ -103,6 +111,7 @@ def update_item(item_id: int, body: CatalogItemUpdate, db: Session = Depends(get
         setattr(it, k, v)
     db.commit()
     db.refresh(it)
+    _resync(db)
     return _out(db, it)
 
 
@@ -112,11 +121,14 @@ def deactivate_item(item_id: int, hard: bool = False, db: Session = Depends(get_
     if not it:
         raise HTTPException(404)
     if hard:
-        db.query(MountingRule).filter(MountingRule.catalog_item_id == item_id).update({MountingRule.catalog_item_id: None})
-        db.delete(it)
+        from ..services.catalog_final import remove_items
+
+        keep = {i for (i,) in db.query(CatalogItem.id).filter(CatalogItem.id != item_id).all()}
+        remove_items(db, [it], keep)  # quote/order lines keep their text, rules and selections are cleaned
     else:
         it.active = False
     db.commit()
+    _resync(db)
     return Response(status_code=204)
 
 
@@ -173,11 +185,17 @@ def dataset_zip(db: Session = Depends(get_db), _: User = Depends(get_current_use
 
 
 @router.post("/dataset/import")
-async def dataset_import(file: UploadFile = File(...), db: Session = Depends(get_db), _: User = Depends(require_admin)):
+async def dataset_import(file: UploadFile = File(...), replace_items: bool = Query(False, description="delete catalog items that are not in the file"),
+                         db: Session = Depends(get_db), _: User = Depends(require_admin)):
     """Import an edited dataset workbook (.xlsx) or a .zip of per-table workbooks. Only filled cells are applied."""
     data = await file.read()
     try:
-        return dataset_io.import_dataset(db, data, file.filename or "")
+        rep = dataset_io.import_dataset(db, data, file.filename or "", replace_items=replace_items)
+        from ..services import autosync
+
+        rep["quotes_updated"] = autosync.recalc_all_drafts(db)
+        db.commit()
+        return rep
     except Exception as e:  # noqa: BLE001
         db.rollback()
         raise HTTPException(400, f"Импортът е неуспешен: {e}")
@@ -205,6 +223,7 @@ def create_labor(body: LaborOptionIn, db: Session = Depends(get_db), _: User = D
     db.add(lo)
     db.commit()
     db.refresh(lo)
+    _resync(db)
     return lo
 
 
@@ -217,6 +236,7 @@ def update_labor(lid: int, body: LaborOptionIn, db: Session = Depends(get_db), _
         setattr(lo, k, v)
     db.commit()
     db.refresh(lo)
+    _resync(db)
     return lo
 
 
@@ -226,6 +246,7 @@ def delete_labor(lid: int, db: Session = Depends(get_db), _: User = Depends(requ
     if lo:
         db.delete(lo)
         db.commit()
+        _resync(db)
     return Response(status_code=204)
 
 
@@ -246,6 +267,7 @@ def upsert_roof_type(code: str, body: RoofTypeIn, db: Session = Depends(get_db),
             setattr(rt, k, v)
     db.commit()
     db.refresh(rt)
+    _resync(db)
     return rt
 
 
@@ -266,6 +288,7 @@ def create_rule(body: MountingRuleIn, db: Session = Depends(get_db), _: User = D
     db.add(r)
     db.commit()
     db.refresh(r)
+    _resync(db)
     return r
 
 
@@ -278,6 +301,7 @@ def update_rule(rid: int, body: MountingRuleIn, db: Session = Depends(get_db), _
         setattr(r, k, v)
     db.commit()
     db.refresh(r)
+    _resync(db)
     return r
 
 
@@ -287,6 +311,7 @@ def delete_rule(rid: int, db: Session = Depends(get_db), _: User = Depends(requi
     if r:
         db.delete(r)
         db.commit()
+        _resync(db)
     return Response(status_code=204)
 
 
@@ -301,12 +326,45 @@ def mounting_systems(_: User = Depends(get_current_user)):
 
 @router.post("/mounting/reseed", status_code=200)
 def mounting_reseed(db: Session = Depends(get_db), _: User = Depends(require_admin)):
-    """Add any missing Aerocompact items / roof types / rules from the built-in catalogue (never overwrites edits)."""
-    from ..seed import seed
+    """Legacy: added the built-in Aerocompact catalogue. Disabled once the GM SUN final catalog is active – the system
+    may only quote the curated items (add new ones manually or via the dataset import)."""
+    from ..services import catalog_final
+
+    if catalog_final.is_curated(db):
+        raise HTTPException(409, "Каталогът е фиксиран към финалния набор артикули на GM SUN — вграденият каталог Aerocompact не се добавя. Добавете нови артикули ръчно или чрез импорт на набора данни.")
+    from ..seed import seed_legacy_catalog
 
     before = db.query(CatalogItem).count()
-    seed(db)
+    seed_legacy_catalog(db)
     return {"added_items": db.query(CatalogItem).count() - before}
+
+
+@router.get("/final/status")
+def final_status(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    """State of the GM SUN final catalog migration (when, how many items were kept / deleted, backup file)."""
+    from ..services import catalog_final
+    from ..seed_data import gmsun_final as F
+
+    mig = get_setting(db, "migrations").get(F.MIGRATION_KEY) or {}
+    skus = {d["sku"] for d in F.ITEMS}
+    present = {r.sku for r in db.query(CatalogItem).filter(CatalogItem.sku.in_(skus)).all()}
+    return {"curated": catalog_final.is_curated(db), "done": catalog_final.is_done(db), "migration": mig, "final_items": len(skus), "final_present": len(present),
+            "items_total": db.query(CatalogItem).count(), "missing": sorted(skus - present)}
+
+
+@router.post("/final/reapply")
+def final_reapply(db: Session = Depends(get_db), _: User = Depends(require_admin)):
+    """Restore the GM SUN final catalog: re-applies the 56 items with their datasheet specs and prices and deletes
+    every other item (backup first). Use after experiments in the catalog."""
+    from ..config import get_settings
+    from ..services import catalog_final
+
+    res = catalog_final.apply(db, get_settings().data_dir, force=True)
+    from ..services import autosync
+
+    res["quotes_updated"] = autosync.recalc_all_drafts(db)
+    db.commit()
+    return res
 
 
 # ----------------------------------------------------------------------------- supplier portfolio & datasheets
@@ -338,7 +396,11 @@ def sync_green_energy(
 ):
     """Re-import the supplier portfolio from the live green-energy.bg Store API (prices, links, new products)."""
     from ..config import get_settings
+    from ..services import catalog_final
     from ..services.supplier_sync import sync_from_site
+
+    if catalog_final.is_curated(db):
+        raise HTTPException(409, "Каталогът е фиксиран към финалния набор артикули на GM SUN — синхронизацията с green-energy.bg би добавила други артикули и е изключена. Цените се редактират в каталога или чрез импорт на набора данни.")
 
     try:
         return sync_from_site(db, get_settings().data_dir, parse_datasheets=parse_datasheets, overwrite_specs=overwrite_specs)

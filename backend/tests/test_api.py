@@ -11,7 +11,10 @@ def test_login_rejects_bad_password(client):
 def test_catalog_seeded(client, auth):
     items = client.get("/api/catalog/items", headers=auth).json()
     cats = {i["category"] for i in items}
-    assert {"panel", "inverter", "battery", "switchboard", "solar_cable", "power_cable", "mounting"} <= cats
+    # the curated final catalog (gmsun-dataset.xlsx of the company) – nothing else
+    assert {"panel", "inverter", "battery", "battery_accessory", "switchboard", "solar_cable", "monitoring"} <= cats
+    assert "mounting" not in cats and "power_cable" not in cats
+    assert len(items) == 56
     meta = client.get("/api/catalog/meta", headers=auth).json()
     assert "categories" in meta
 
@@ -62,8 +65,6 @@ def test_project_layout_quote_flow(client, auth):
         "solar_cable_item_id": find("solar_cable", "KBE")["id"],
         "solar_cable_red_m": 50,
         "solar_cable_black_m": 50,
-        "power_cable_item_id": find("power_cable", "4×16")["id"],
-        "power_cable_m": 40,
         "labor_mode": "per_w",
     }
     q = client.post(f"/api/projects/{pid}/quotes", headers=auth, json={"selections": sel})
@@ -77,7 +78,8 @@ def test_project_layout_quote_flow(client, auth):
     sections = {l["section"] for l in q["lines"]}
     assert {"modules", "inverter", "construction", "electrical", "labor"} <= sections
     labor = next(l for l in q["lines"] if l["section"] == "labor")
-    assert labor["total"] == round(9100 * 0.118, 2)
+    kwp = q["selections"]["_info"]["kwp"]
+    assert labor["total"] == round(kwp * 1000 * 0.118, 2)
 
     # lock a manual price and make sure recalculation keeps it
     ln = q["lines"][0]
@@ -147,7 +149,7 @@ def test_engineering_design_and_techfile(client, auth):
     """Automatic electrical design (IEC 62548 string check + roles BOM) and the technical file PDF."""
     p = _make_project(client, auth)
     pid = p["id"]
-    client.patch(f"/api/projects/{pid}", headers=auth, json={"params": {"dc_run_m": 18, "ac_run_m": 15}})
+    client.patch(f"/api/projects/{pid}", headers=auth, json={"phase": 3, "params": {"dc_run_m": 18, "ac_run_m": 15}})
     lay = client.post(f"/api/projects/{pid}/layouts", headers=auth, json={"name": "Юг", "plane_w_m": 15.0, "plane_h_m": 6.5, "orientation": "landscape", "setback_m": 0.3}).json()
     lay = client.post(f"/api/projects/{pid}/layouts/{lay['id']}/autofill", headers=auth, json={}).json()
     assert lay["summary"]["count"] >= 18
@@ -172,8 +174,8 @@ def test_engineering_design_and_techfile(client, auth):
     assert sum(1 for r in d["roles"] if r["role"] == "pv_cable") == 2  # red + black
     for must in ("pv_cable", "mc4_pair", "ac_mcb", "ac_rcd", "ac_cable", "pe_cable", "battery_cable", "battery_breaker", "bonding_clamp", "dc_spd", "cable_tie_uv"):
         assert must in roles, must
-    assert roles["ac_mcb"]["spec"]["rating_a"] >= 100 and roles["ac_mcb"]["spec"]["poles"] == "4P"
-    assert roles["ac_cable"]["spec"]["cross_section_mm2"] >= 10
+    assert roles["ac_mcb"]["spec"]["rating_a"] >= 32 and roles["ac_mcb"]["spec"]["poles"] in ("3P", "4P")
+    assert roles["ac_cable"]["spec"]["cross_section_mm2"] >= 6
     assert roles["battery_cable"]["spec"]["cross_section_mm2"] >= 50
     # margins applied: red cable qty is the rounded-up length with the cable margin
     assert roles["pv_cable"]["qty"] >= d["dc"]["red_m"] or roles["pv_cable"]["qty"] >= d["dc"]["black_m"]
@@ -182,11 +184,15 @@ def test_engineering_design_and_techfile(client, auth):
     assert q.status_code == 201, q.text
     q = q.json()
     elec = [l for l in q["lines"] if l["section"] == "electrical"]
-    assert len(elec) >= 15
-    assert any((l["meta"] or {}).get("role") == "ac_rcd" for l in elec)
+    # the equipped AC/DC board (3-phase, auto-picked) covers breakers, RCD and SPDs; roles without an article are not quoted
+    assert any(l["key"] == "switchboard" and "Трифазно" in l["name"] for l in elec)
+    assert any((l["meta"] or {}).get("role") == "pv_cable" for l in elec)
+    info = q["selections"]["_info"]
+    assert "ac_rcd" in info["covered_roles"] and "ac_mcb" in info["covered_roles"]
+    assert all(l["unit_price"] > 0 for l in q["lines"] if l["catalog_item_id"]), "no zero-price placeholder lines"
+    assert not [l for l in q["lines"] if (l["meta"] or {}).get("missing_item")]
     cons = [l for l in q["lines"] if l["section"] == "construction"]
-    small = [l for l in cons if (l["meta"] or {}).get("margin_pct")]
-    assert small, "fastener margin must be applied to small parts"
+    assert any(l["key"] == "mount:lump" for l in cons)
 
     tf = client.get(f"/api/quotes/{q['id']}/techfile.pdf", headers=auth)
     assert tf.status_code == 200 and tf.content[:4] == b"%PDF"
@@ -220,14 +226,17 @@ def test_recalculate_after_project_change_adds_new_lines(client, auth):
     q2 = r.json()
     assert "Непознат тип покрив." not in q2["selections"]["_warnings"]
     constr = [l for l in q2["lines"] if l["section"] == "construction"]
-    assert len(constr) > 3
+    assert any(l["key"] == "mount:lump" for l in constr)
     positions = [l["position"] for l in q2["lines"]]
     assert sorted(positions) == list(range(len(positions)))
 
 
-def test_trapezoidal_sheet_rules_include_bridges_and_screws(client, auth):
-    """Regression: the TL25 bridges and MSS screws for LT sheet were deactivated by the retired-rules upgrade step."""
+def test_final_catalog_has_no_mounting_rules_and_lump_roofs(client, auth):
+    """Aerocompact items were removed with the final catalog → every roof type is priced per module (lump)."""
     rules = client.get("/api/catalog/mounting-rules", headers=auth).json()
-    lt = {r["name"]: r for r in rules if r["roof_type"] == "lt_sheet"}
-    assert lt["CompactMETAL TL25 трапецовиден мост 250 mm с EPDM"]["active"] is True
-    assert lt["MSS 6×25 самопробивен винт с EPDM шайба (ламарина)"]["active"] is True
+    assert rules == []
+    roofs = client.get("/api/catalog/roof-types", headers=auth).json()
+    assert roofs and all(r["pricing_mode"] == "lump" and r["lump_price_per_module"] > 0 for r in roofs)
+    tile = next(r for r in roofs if r["code"] == "tile")
+    assert tile["lump_price_per_module"] == 124
+

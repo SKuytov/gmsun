@@ -145,20 +145,25 @@ def suggest_batteries(
         if kwh <= 0:
             continue
         qty = max(1, math.ceil(target_kwh / kwh)) if target_kwh > 0 else 1
-        reasons = [f"{qty} × {kwh:g} kWh = {qty * kwh:g} kWh"]
         warnings: list[str] = []
+        note = ""
+        if inverter is not None:
+            from . import compat
+
+            if compat.check_battery(inverter, it, 0)["status"] == compat.BLOCKED:
+                continue  # never offer a battery that cannot be connected to this inverter
+            fixed = compat.best_battery_qty(inverter, it, qty)
+            if fixed is None:
+                continue
+            if fixed != qty:
+                note = f"количеството е коригирано {qty} → {fixed} бр. (допустими серии/клъстери за инвертора)"
+                qty = fixed
+        reasons = [f"{qty} × {kwh:g} kWh = {qty * kwh:g} kWh"] + ([note] if note else [])
         max_par = int(_f(sp, "max_parallel", 0))
-        if max_par and qty > max_par:
+        if vc != "HV" and max_par and qty > max_par:
             warnings.append(f"макс. {max_par} бр. паралелно за този модел")
         if inv_max_parallel and qty > inv_max_parallel:
             warnings.append(f"инверторът поддържа макс. {inv_max_parallel} батерийни модула")
-        if vc == "HV" and inverter is not None:
-            # HV stacks: check voltage window if given
-            vmin, vmax = _f(inv_sp, "battery_v_min"), _f(inv_sp, "battery_v_max")
-            vnom = _f(sp, "nominal_v")
-            if vmin and vmax and vnom:
-                if not (vmin <= vnom * qty <= vmax) and not (vmin <= vnom <= vmax):
-                    warnings.append("напрежението на батерията е извън прозореца на инвертора — проверете")
         if it.purchase_price <= 0 and it.sell_price is None:
             warnings.append("няма цена в каталога")
         if not sp.get("specs_verified") and sp.get("spec_source"):

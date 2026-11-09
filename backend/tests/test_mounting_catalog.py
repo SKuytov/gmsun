@@ -1,9 +1,38 @@
-"""Aerocompact mounting catalogue: every roof/terrain type must yield a complete, priced,
-orderable component list, with quantities matching the manufacturer's assembly rules."""
-from app.db import SessionLocal
+"""Aerocompact mounting catalogue (legacy "detailed" construction mode): every roof/terrain type must yield a complete,
+priced, orderable component list, with quantities matching the manufacturer's assembly rules.
+
+The production catalog is the curated GM SUN final catalog (no Aerocompact items, construction priced per module), so
+the detailed engine is verified on a separate database seeded with the legacy catalog."""
+import tempfile
+
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from app.db import Base
 from app.models import CatalogItem, MountingRule, RoofTypeConfig
 from app.seed_data.aerocompact import DOCS, ITEMS, ROOF_SYSTEM, ROOF_TYPES, RULES, SYSTEMS, system_for_roof
 from app.services import bom
+
+
+_LEGACY = {}
+
+
+def SessionLocal():  # noqa: N802 - legacy database for this module
+    if "maker" not in _LEGACY:
+        from app import seed as S
+
+        eng = create_engine(f"sqlite:///{tempfile.mkdtemp(prefix='gmsun_legacy_')}/legacy.db")
+        Base.metadata.create_all(eng)
+        _LEGACY["maker"] = sessionmaker(bind=eng, autoflush=False, expire_on_commit=False)
+        db = _LEGACY["maker"]()
+        for rt in S.ROOF_TYPES:
+            db.add(RoofTypeConfig(**rt))
+        db.commit()
+        S.seed_legacy_catalog(db)
+        db.commit()
+        db.close()
+    return _LEGACY["maker"]()
 
 
 def _summary(n_modules: int, rows: int = 1) -> dict:
@@ -85,11 +114,13 @@ def test_mounting_systems_endpoint(client, auth):
     data = r.json()
     assert len(data["systems"]) >= 14 and len(data["documents"]) >= 60
     assert data["roof_system"]["standing_seam"] == "TM"
+    # the curated production catalog has no Aerocompact items and refuses to re-seed them
     items = client.get("/api/catalog/items", params={"category": "mounting"}, headers=auth).json()
-    aero = [i for i in items if i["manufacturer"] == "Aerocompact"]
-    assert len(aero) >= 150
-    assert all(i["specs"].get("datasheet_url") for i in aero)
+    assert items == []
+    assert client.post("/api/catalog/mounting/reseed", headers=auth).status_code == 409
     db = SessionLocal()
+    aero = db.query(CatalogItem).filter(CatalogItem.manufacturer == "Aerocompact").all()
+    assert len(aero) >= 150 and all((i.specs or {}).get("datasheet_url") for i in aero)
     try:
         assert db.query(CatalogItem).filter(CatalogItem.name.like("TMDS08%")).count() == 1
     finally:

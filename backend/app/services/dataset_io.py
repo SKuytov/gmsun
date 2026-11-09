@@ -387,6 +387,7 @@ def _import_catalog(db: Session, data: list[tuple[int, dict[str, Any]]], rep: di
             it = CatalogItem(category=str(cat), name=str(name).strip(), specs={})
             db.add(it)
             rep["created"] += 1
+            rep.setdefault("_new", []).append(it)
         cat_v = row.get("category")
         if isinstance(cat_v, str) and cat_v.strip() and cat_v.strip() not in CATEGORIES:
             rep["errors"].append(f"ред {rownum}: непозната категория '{cat_v}'")
@@ -395,6 +396,8 @@ def _import_catalog(db: Session, data: list[tuple[int, dict[str, Any]]], rep: di
         if isinstance(tier_v, str) and tier_v.strip() and tier_v.strip() not in (*TIERS, CLEAR):
             rep["errors"].append(f"ред {rownum}: непознат клас '{tier_v}'")
             continue
+        if it.id is not None:
+            rep.setdefault("_seen", set()).add(it.id)
         old_price, old_lead = it.purchase_price, it.lead_time_days
         base_cols = [c for c in CATALOG_COLUMNS if c[0] not in SPEC_KEYS and c[0] != "specs_json"]
         changed, errs = _apply_columns(it, row, base_cols, set())
@@ -545,7 +548,7 @@ def _import_settings(db: Session, data: list[tuple[int, dict[str, Any]]], rep: d
         else:
             rep["skipped"] += 1
     for group, vals in updates.items():
-        set_setting(db, group, vals)
+        set_setting(db, group, vals, commit=False)  # the whole import is one transaction
 
 
 def _import_sheet(db: Session, ws: Worksheet, report: dict[str, Any]) -> None:
@@ -575,7 +578,10 @@ def _import_sheet(db: Session, ws: Worksheet, report: dict[str, Any]) -> None:
     db.flush()
 
 
-def import_dataset(db: Session, data: bytes, filename: str = "") -> dict[str, Any]:
+def import_dataset(db: Session, data: bytes, filename: str = "", replace_items: bool = False) -> dict[str, Any]:
+    """Apply an edited dataset. With ``replace_items`` every catalog item that is NOT a row of the Items sheet is
+    deleted afterwards (the file becomes the complete catalog). Replacing is refused when the Items sheet is missing
+    or has row errors, so a broken file can never wipe the catalog."""
     report: dict[str, Any] = {"files": [], "tables": {}, "ignored_sheets": [], "created": 0, "updated": 0, "skipped": 0, "errors": 0}
     blobs: list[tuple[str, bytes]] = []
     if filename.lower().endswith(".zip") or data[:2] == b"PK" and not filename.lower().endswith(".xlsx") and b"[Content_Types].xml" not in data[:4000]:
@@ -592,6 +598,27 @@ def import_dataset(db: Session, data: bytes, filename: str = "") -> dict[str, An
         report["files"].append(name)
         for ws in wb.worksheets:
             _import_sheet(db, ws, report)
+    if replace_items:
+        cat = report["tables"].get("catalog_items")
+        if not cat:
+            db.rollback()
+            raise ValueError("Режим „замени“: във файла няма лист Артикули — нищо не е изтрито.")
+        if cat["errors"]:
+            db.rollback()
+            raise ValueError("Режим „замени“: листът Артикули има грешки — поправете ги, нищо не е променено. " + "; ".join(cat["errors"][:5]))
+        db.flush()
+        keep = set(cat.get("_seen") or set()) | {it.id for it in (cat.get("_new") or [])}
+        if not keep:
+            db.rollback()
+            raise ValueError("Режим „замени“: листът Артикули е празен — нищо не е изтрито.")
+        from .catalog_final import remove_items
+
+        others = [r for r in db.query(CatalogItem).all() if r.id not in keep]
+        res = remove_items(db, others, keep)
+        report["deleted"] = res["deleted"]
+    for t in report["tables"].values():
+        t.pop("_seen", None)
+        t.pop("_new", None)
     db.commit()
     for t in report["tables"].values():
         report["created"] += t["created"]
