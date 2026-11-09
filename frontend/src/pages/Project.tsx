@@ -55,25 +55,43 @@ export default function ProjectPage() {
   // selections draft persisted in project.params.selections
   const [sel, setSelState] = useState<Selections>({})
   const loaded = useRef(false)
+  // local edits not yet confirmed by the server; while there are none, the local draft follows the server copy
+  // (quote-level edits and one-click fixes are written back into the project selections by the server)
+  const editSeq = useRef(0)
+  const savedSeq = useRef(0)
   useEffect(() => {
-    if (project.data && !loaded.current) {
+    if (!project.data) return
+    if (!loaded.current || editSeq.current === savedSeq.current) {
       setSelState((project.data.params?.selections as Selections) || {})
       loaded.current = true
     }
   }, [project.data])
 
   const saveSel = useMutation({
-    mutationFn: (s: Selections) => patch<Project>(`/api/projects/${pid}`, { params: { ...(project.data?.params || {}), selections: s } }),
-    onSuccess: (p) => qc.setQueryData(['project', pid], p),
-    onError: (e) => toast.push(errMsg(e), 'bad'),
+    mutationFn: async ({ s, seq }: { s: Selections; seq: number }) => {
+      const res = await patch<Project>(`/api/projects/${pid}`, { params: { ...(project.data?.params || {}), selections: s } })
+      savedSeq.current = Math.max(savedSeq.current, seq)
+      return res
+    },
+    onSuccess: (p) => {
+      qc.setQueryData(['project', pid], p)
+      // the server re-prices the working (draft) quote on every change -> refresh it everywhere
+      qc.invalidateQueries({ queryKey: ['quotes', pid] })
+      qc.invalidateQueries({ queryKey: ['compat', pid] })
+    },
+    onError: (e, v) => {
+      savedSeq.current = Math.max(savedSeq.current, v.seq) // keep the local draft, but let the server copy win again
+      toast.push(errMsg(e), 'bad')
+    },
   })
   const timer = useRef<number | undefined>(undefined)
   const setSel = useCallback(
     (p: Partial<Selections>) => {
       setSelState((prev) => {
         const next = { ...prev, ...p }
+        const seq = ++editSeq.current
         window.clearTimeout(timer.current)
-        timer.current = window.setTimeout(() => saveSel.mutate(next), 600)
+        timer.current = window.setTimeout(() => saveSel.mutate({ s: next, seq }), 600)
         return next
       })
     },
@@ -83,6 +101,7 @@ export default function ProjectPage() {
 
   const replaceSel = useCallback((s: Selections) => {
     window.clearTimeout(timer.current)
+    savedSeq.current = editSeq.current
     setSelState(s || {})
   }, [])
 
@@ -92,6 +111,8 @@ export default function ProjectPage() {
         const res = await patch<Project>(`/api/projects/${pid}`, p)
         qc.setQueryData(['project', pid], res)
         qc.invalidateQueries({ queryKey: ['projects'] })
+        qc.invalidateQueries({ queryKey: ['quotes', pid] })
+        qc.invalidateQueries({ queryKey: ['compat', pid] })
       } catch (e) {
         toast.push(errMsg(e), 'bad')
       }
@@ -177,7 +198,9 @@ export default function ProjectPage() {
         <button type="button" className="btn-ghost" disabled={idx === 0} onClick={() => go(STEPS[idx - 1])}>
           <ChevronLeft className="h-4 w-4" /> {t('back')}
         </button>
-        <span className="text-xs text-ink-3">{saveSel.isPending ? '…' : lang === 'bg' ? 'Промените се запазват автоматично' : 'Changes are saved automatically'}</span>
+        <span className="text-xs text-ink-3" data-testid="text-autosave">
+          {saveSel.isPending ? '…' : lang === 'bg' ? 'Промените се запазват и офертата се обновява автоматично' : 'Changes are saved and the quote updates automatically'}
+        </span>
         {idx < STEPS.length - 1 ? (
           <button type="button" className="btn-primary" onClick={() => go(STEPS[idx + 1])} data-testid="button-next">
             {t('next')} <ChevronRight className="h-4 w-4" />

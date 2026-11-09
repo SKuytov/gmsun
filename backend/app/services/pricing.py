@@ -230,6 +230,7 @@ def build_lines(db: Session, project: Project, quote: Quote) -> tuple[list[dict[
         eff_mode = roof.pricing_mode if mode == "auto" else mode
         stats = bom.compute_stats(layout_sum, roof, modules_override=panel_qty, strings=int((info.get("strings") or {}).get("strings") or 1))
         info["mounting_stats"] = stats.as_dict()
+        info["mounting_mode"] = eff_mode
         if eff_mode == "lump":
             price = float(sel.get("lump_price_per_module") or roof.lump_price_per_module or 0)
             lines.append(_line("mount:lump", "construction", f"Модулна алуминиева конструкция за {roof.label_bg.lower()}", "бр.", panel_qty, price, meta={"mode": "lump"}))

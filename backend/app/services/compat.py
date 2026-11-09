@@ -90,10 +90,21 @@ def check_pair(panel: CatalogItem | None, inverter: CatalogItem | None, cfg: dic
         reasons.append(f"Isc {isc:g} A: входовете се намаляват от {sum(nominal)} на {sum(caps)} (ток на късо съединение на MPPT).")
     i_op = [float(x) for x in (inv.get("mppt_input_current_a") or []) if x] or ([_f(inv, "max_input_current_a")] * len(nominal) if inv.get("max_input_current_a") else [])
     if imp and i_op and len(i_op) >= len(nominal):
-        clip = [m + 1 for m in range(len(nominal)) if caps[m] > 0 and caps[m] * imp > i_op[m] + 1e-6]
-        if clip:
+        # strings a tracker carries without clipping (the string planner spreads strings over trackers first)
+        soft = [min(caps[m], int((i_op[m] + 1e-6) // imp)) if caps[m] > 0 else 0 for m in range(len(nominal))]
+        single = [m + 1 for m in range(len(nominal)) if caps[m] > 0 and imp > i_op[m] + 1e-6]
+        win["strings_no_clip"] = sum(soft)
+        if single:
             status = _worst(status, WARN)
-            reasons.append(f"MPPT {', '.join(map(str, clip))}: {max(caps)} × Imp {imp:g} A > работния ток на входа — лек clipping при пълно слънце (допустимо).")
+            reasons.append(f"MPPT {', '.join(map(str, single))}: Imp {imp:g} A на модула > работния ток на входа — лек clipping при пълно слънце (допустимо).")
+        elif modules_per_inverter > 0 and win["ns_max"] >= 1:
+            need = math.ceil(modules_per_inverter / win["ns_max"])
+            n_trk = len([c for c in caps if c > 0])
+            if need < n_trk and modules_per_inverter // n_trk >= win["ns_min"]:
+                need = n_trk  # same rule as the string planner: use every tracker when the strings stay long enough
+            if need > sum(soft):
+                status = _worst(status, WARN)
+                reasons.append(f"{need} стринга × Imp {imp:g} A: някои MPPT носят паралелни стрингове над работния си ток — лек clipping при пълно слънце (допустимо).")
     if phase and int(_f(inv, "phases", phase)) != int(phase):
         if int(_f(inv, "phases", phase)) == 3 and int(phase) == 1:
             status = BLOCKED
@@ -187,7 +198,16 @@ def matrix(db: Session, project: Project, *, panel_item_id: Any = None, inverter
     phase = int(project.phase or 3)
     out: dict[str, Any] = {"inverters": {}, "panels": {}, "batteries": {}}
     for inv in _active(db, "inverter"):
+        qty = n_inv
         r = check_pair(panel, inv, cfg, modules_per_inverter=per_inv, phase=phase) if panel else check_pair(None, None, cfg)
+        if panel and panel_qty and r["status"] == BLOCKED and (inverter is None or inv.id != inverter.id):
+            # another model may work with a different number of units in parallel – report the smallest one
+            max_units = max(1, int(_f(inv.specs, "max_parallel_units", 1)))
+            for n in range(1, min(16, max_units) + 1):
+                rr = check_pair(panel, inv, cfg, modules_per_inverter=int(math.ceil(panel_qty / n)), phase=phase)
+                if rr["status"] != BLOCKED:
+                    r, qty = rr, n
+                    break
         if not panel and int(_f(inv.specs, "phases", phase)) == 3 and phase == 1:
             r = {"status": BLOCKED, "reasons": ["Трифазен инвертор на монофазна инсталация — невъзможно."], "window": None}
         if battery:
@@ -195,7 +215,7 @@ def matrix(db: Session, project: Project, *, panel_item_id: Any = None, inverter
             if b["status"] != OK:
                 r = {**r, "status": _worst(r["status"], b["status"] if b["status"] == WARN else WARN),
                      "reasons": r["reasons"] + [f"Батерия: {x}" for x in b["reasons"]]}
-        out["inverters"][inv.id] = {"status": r["status"], "reasons": r["reasons"], "window": r.get("window")}
+        out["inverters"][inv.id] = {"status": r["status"], "reasons": r["reasons"], "window": r.get("window"), "qty": qty}
     for p in _active(db, "panel"):
         r = check_pair(p, inverter, cfg, modules_per_inverter=per_inv if inverter else 0, phase=None)
         out["panels"][p.id] = {"status": r["status"], "reasons": r["reasons"], "window": r.get("window")}

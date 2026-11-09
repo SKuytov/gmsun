@@ -6,7 +6,7 @@ import { Badge, ErrorBox, Field, Input, Loading, Modal, NumInput, Select, Textar
 import { api, errMsg, fileUrl, get, getServerUrl, patch, post, put, setServerUrl } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import { useT } from '@/lib/i18n'
-import type { CompanySettings, PricingSettings, ProcurementSettings, SupplierCfg, SuppliersSettings, TextsSettings, User } from '@/lib/types'
+import type { CompanySettings, LaborMode, PricingSettings, ProcurementSettings, SupplierCfg, SuppliersSettings, TextsSettings, User } from '@/lib/types'
 
 const TABS = ['company', 'pricing', 'suppliers', 'texts', 'users', 'server'] as const
 type Tab = (typeof TABS)[number]
@@ -45,7 +45,7 @@ function useSetting<T extends object>(key: string) {
   const qc = useQueryClient()
   const toast = useToast()
   const { t } = useT()
-  const q = useQuery({ queryKey: ['settings', key], queryFn: () => get<{ key: string; value: T }>(`/api/settings/${key}`).then((r) => r.value) })
+  const q = useQuery({ queryKey: ['settings', key, 'value'], queryFn: () => get<{ key: string; value: T }>(`/api/settings/${key}`).then((r) => r.value) })
   const [draft, setDraft] = useState<T | null>(null)
   useEffect(() => {
     if (q.data) setDraft(q.data)
@@ -53,8 +53,9 @@ function useSetting<T extends object>(key: string) {
   const save = useMutation({
     mutationFn: (v: T) => put<{ key: string; value: T }>(`/api/settings/${key}`, { value: v }),
     onSuccess: (r) => {
-      qc.setQueryData(['settings', key], r.value)
+      qc.setQueryData(['settings', key, 'value'], r.value)
       qc.invalidateQueries({ queryKey: ['settings'] })
+      qc.invalidateQueries({ queryKey: ['quotes'] })
       toast.push(t('saved'), 'ok')
     },
     onError: (e) => toast.push(errMsg(e), 'bad'),
@@ -90,7 +91,7 @@ function CompanyTab() {
       const fd = new FormData()
       fd.append('file', file)
       const r = await api<{ value: CompanySettings }>('/api/settings/company/logo', { form: fd })
-      qc.setQueryData(['settings', 'company'], r.value)
+      qc.setQueryData(['settings', 'company', 'value'], r.value)
       toast.push(t('saved'), 'ok')
     } catch (e) {
       toast.push(errMsg(e), 'bad')
@@ -192,7 +193,27 @@ function PricingTab() {
           <Input value={draft.quote_number_prefix} onChange={(e) => setDraft({ ...draft, quote_number_prefix: e.target.value })} />
         </Field>
       </div>
-      <div className="card grid grid-cols-2 gap-3 p-4 sm:grid-cols-3">
+      <div className="card grid grid-cols-2 gap-3 p-4 sm:grid-cols-3" data-testid="settings-labor">
+        <div className="col-span-2 sm:col-span-3">
+          <h3 className="text-sm font-semibold">{bg ? 'Труд (СМР)' : 'Labor (installation)'}</h3>
+          <p className="text-xs text-ink-3">
+            {bg
+              ? 'По подразбиране трудът = мощност на инвертора (kW AC × брой) × ставката. Пример: модули 10,67 kWp с инвертор 16 kW → 16 × ставката. Всяка промяна обновява автоматично черновите оферти.'
+              : 'By default labor = inverter power (kW AC × units) × the rate. Example: 10.67 kWp of modules on a 16 kW inverter → 16 × the rate. Every change updates draft quotes automatically.'}
+          </p>
+        </div>
+        <Field label={bg ? 'Ставка труд, € / kW инвертор' : 'Labor rate, € / inverter kW'}>
+          <NumInput value={draft.labor_eur_per_inverter_kw ?? 0} min={0} step={1} onChange={(v) => setDraft({ ...draft, labor_eur_per_inverter_kw: v })} data-testid="input-labor-eur-per-kw" />
+        </Field>
+        <Field label={bg ? 'Режим на труда по подразбиране' : 'Default labor mode'}>
+          <Select value={draft.labor_mode_default || 'per_inverter_kw'} onChange={(e) => setDraft({ ...draft, labor_mode_default: e.target.value as LaborMode })} data-testid="select-labor-mode-default">
+            <option value="per_inverter_kw">{bg ? 'По kW инвертор' : 'Per inverter kW'}</option>
+            <option value="matrix">{bg ? 'Дни × хора (таблица)' : 'Days × workers (matrix)'}</option>
+            <option value="per_w">{bg ? 'Цена на W модули' : 'Price per module W'}</option>
+            <option value="manual">{bg ? 'Ръчна сума' : 'Manual amount'}</option>
+          </Select>
+        </Field>
+        <span />
         {num('install_price_per_w', `${t('labor')} €/W`, bg ? 'за режим „по мощност“' : 'for "per W" labor mode', 0.001)}
         {num('delivery_fee_equipment', bg ? 'Доставка оборудване' : 'Delivery: equipment')}
         {num('delivery_fee_inverter', bg ? 'Доставка инвертор' : 'Delivery: inverter')}

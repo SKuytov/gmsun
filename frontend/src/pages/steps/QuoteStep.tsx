@@ -74,12 +74,20 @@ export function QuoteStep({ ctx }: { ctx: StepCtx }) {
           </button>
         </Empty>
       )}
-      {quote && <QuoteEditor key={quote.id} quote={quote} ctx={ctx} lang={lang} />}
+      {quote && (
+        <QuoteEditor
+          key={quote.id}
+          quote={quote}
+          ctx={ctx}
+          lang={lang}
+          isLatest={!!quotes.data && quote.version === Math.max(...quotes.data.map((x) => x.version))}
+        />
+      )}
     </div>
   )
 }
 
-function QuoteEditor({ quote: q0, ctx, lang }: { quote: Quote; ctx: StepCtx; lang: string }) {
+function QuoteEditor({ quote: q0, ctx, lang, isLatest }: { quote: Quote; ctx: StepCtx; lang: string; isLatest: boolean }) {
   const { t } = useT()
   const qc = useQueryClient()
   const toast = useToast()
@@ -94,6 +102,7 @@ function QuoteEditor({ quote: q0, ctx, lang }: { quote: Quote; ctx: StepCtx; lan
     setQ(nq)
     qc.setQueryData<Quote[]>(['quotes', ctx.project.id], (old) => old?.map((x) => (x.id === nq.id ? nq : x)))
     qc.invalidateQueries({ queryKey: ['projects'] })
+    qc.invalidateQueries({ queryKey: ['project', ctx.project.id] }) // the server mirrors quote edits into the project
   }
   const useMut = <A,>(fn: (a: A) => Promise<Quote>) =>
     useMutation({
@@ -107,6 +116,11 @@ function QuoteEditor({ quote: q0, ctx, lang }: { quote: Quote; ctx: StepCtx; lan
   const addLine = useMut((body: typeof newLine) => post<Quote>(`/api/quotes/${q.id}/lines`, body))
   const recalc = useMut(() => post<Quote>(`/api/quotes/${q.id}/recalculate`))
   const resync = useMut(() => patch<Quote>(`/api/quotes/${q.id}`, { selections: cleanSel(ctx.sel), ...quoteFieldsFromSel(ctx.sel) }))
+  const setAutoSync = useMut((on: boolean) =>
+    patch<Quote>(`/api/quotes/${q.id}`, on ? { selections: { ...cleanSel(ctx.sel), auto_sync: true }, ...quoteFieldsFromSel(ctx.sel) } : { selections: { auto_sync: false } }),
+  )
+  const autoSync = (q.selections as Record<string, unknown>).auto_sync !== false
+  const live = isLatest && q.status === 'draft' && autoSync
 
   const rfqQ = useQuery({ queryKey: ['rfq', q.id, q.updated_at], queryFn: () => get<RfqSupplier[]>(`/api/quotes/${q.id}/rfq`) })
 
@@ -170,6 +184,33 @@ function QuoteEditor({ quote: q0, ctx, lang }: { quote: Quote; ctx: StepCtx; lan
               <RefreshCw className={cx('h-4 w-4', resync.isPending && 'animate-spin')} /> {t('recalculate')}
             </button>
           </div>
+        </div>
+
+        <div className={cx('card flex flex-wrap items-center gap-2 px-3 py-2 text-sm', live ? 'border-ok/30' : 'border-line/10')} data-testid="autosync-status">
+          <span className={cx('h-2 w-2 shrink-0 rounded-full', live ? 'bg-ok' : 'bg-ink-3')} aria-hidden />
+          <span className="min-w-0 flex-1 text-ink-2">
+            {live
+              ? lang === 'bg'
+                ? 'Автоматично обновяване: тази чернова следва всяка промяна в проекта, каталога и настройките — не е нужно „Преизчисли“.'
+                : 'Live: this draft follows every change in the project, catalog and settings — no need to press Recalculate.'
+              : q.status !== 'draft'
+                ? lang === 'bg'
+                  ? 'Офертата не е чернова — цените и количествата са замразени. За промени създайте нова версия.'
+                  : 'This quote is not a draft — prices and quantities are frozen. Create a new version to change it.'
+                : !isLatest
+                  ? lang === 'bg'
+                    ? 'По-стара версия — автоматично се обновява само последната чернова.'
+                    : 'Older version — only the latest draft updates automatically.'
+                  : lang === 'bg'
+                    ? 'Автоматичното обновяване е изключено за тази оферта.'
+                    : 'Automatic updates are switched off for this quote.'}
+          </span>
+          {isLatest && q.status === 'draft' && (
+            <label className="flex items-center gap-1.5 text-xs text-ink-2">
+              <input type="checkbox" checked={autoSync} onChange={(e) => setAutoSync.mutate(e.target.checked)} disabled={setAutoSync.isPending} data-testid="checkbox-autosync" />
+              {lang === 'bg' ? 'Автоматично' : 'Automatic'}
+            </label>
+          )}
         </div>
 
         <CompletenessPanel quote={q} projectId={ctx.project.id} />
@@ -277,7 +318,8 @@ function QuoteEditor({ quote: q0, ctx, lang }: { quote: Quote; ctx: StepCtx; lan
         <div className="grid grid-cols-2 gap-2">
           <Stat label={t('modules')} value={String(info.panel_qty ?? ctx.panelQty)} sub={`${fmtNum(Number(info.kwp ?? ctx.kwp), 2)} kWp`} />
           <Stat label={t('battery')} value={info.storage_kwh ? `${fmtNum(Number(info.storage_kwh), 1)} kWh` : '—'} />
-          {stats && <Stat label={t('rails')} value={`${stats.rail_pieces} × ${fmtNum(stats.rail_m, 0)} m`} sub={`${stats.fixations} ${lang === 'bg' ? 'куки' : 'hooks'} · ${stats.mid_clamps + stats.end_clamps} ${lang === 'bg' ? 'скоби' : 'clamps'}`} />}
+          {info.labor && (info.labor as { inverter_kw?: number }).inverter_kw ? <Stat label={lang === 'bg' ? 'Инвертор (за труд)' : 'Inverter (labour)'} value={`${fmtNum(Number((info.labor as { inverter_kw: number }).inverter_kw), 1)} kW`} sub={`× ${fmtNum(Number((info.labor as { rate: number }).rate), 2)} €/kW`} /> : null}
+          {stats && !!info.mounting_mode && info.mounting_mode !== 'lump' && <Stat label={t('rails')} value={`${stats.rail_pieces} × ${fmtNum(stats.rail_m, 0)} m`} sub={`${stats.fixations} ${lang === 'bg' ? 'куки' : 'hooks'} · ${stats.mid_clamps + stats.end_clamps} ${lang === 'bg' ? 'скоби' : 'clamps'}`} />}
           {q.execution_days && <Stat label={t('days')} value={`${q.execution_days} × ${q.workers}`} />}
           {!!info.lead_time_days && <Stat label={t('lead_time')} value={`${String(info.lead_time_days)} ${lang === 'bg' ? 'раб. дни' : 'wd'}`} sub={typeof info.lead_bottleneck === 'string' ? info.lead_bottleneck : undefined} />}
         </div>

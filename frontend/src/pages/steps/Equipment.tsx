@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect } from 'react'
-import { Check, ExternalLink, FileText } from 'lucide-react'
+import { useEffect, useRef } from 'react'
+import { Ban, Check, ExternalLink, FileText, ShieldCheck, TriangleAlert } from 'lucide-react'
 import { Badge, Field, Loading, NumInput, Select, Toggle, Warn, cx, useToast } from '@/components/ui'
 import { downloadFile, errMsg, get } from '@/lib/api'
 import { fmtMoney, fmtNum, useT } from '@/lib/i18n'
-import type { BatterySuggestion, CatalogItem, InverterSuggestion } from '@/lib/types'
+import type { BatterySuggestion, CatalogItem, CompatEntry, CompatMatrix, InverterSuggestion } from '@/lib/types'
 import type { StepCtx } from '../Project'
 import { Proposals } from './Proposals'
 import { ModuleAdvisor } from '@/components/ModuleAdvisor'
@@ -40,23 +40,60 @@ function ItemLinks({ item }: { item: CatalogItem | undefined }) {
   )
 }
 
-function ItemCard({ item, selected, onSelect, lines, warnings, extra }: { item: CatalogItem; selected: boolean; onSelect: () => void; lines: string[]; warnings: string[]; extra?: React.ReactNode }) {
+/** ok / warn / blocked marker from the compatibility engine (reasons in the tooltip and below the card). */
+export function CompatBadge({ c, compact }: { c: CompatEntry | undefined; compact?: boolean }) {
+  const { lang } = useT()
+  if (!c) return null
+  const label =
+    c.status === 'blocked' ? (lang === 'bg' ? 'Несъвместимо' : 'Incompatible') : c.status === 'warn' ? (lang === 'bg' ? 'С бележки' : 'With notes') : lang === 'bg' ? 'Съвместимо' : 'Compatible'
+  const Icon = c.status === 'blocked' ? Ban : c.status === 'warn' ? TriangleAlert : ShieldCheck
+  return (
+    <span
+      className={cx(
+        'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium',
+        c.status === 'blocked' ? 'bg-bad/10 text-bad' : c.status === 'warn' ? 'bg-warn/10 text-warn' : 'bg-ok/10 text-ok',
+      )}
+      title={c.reasons.join('\n') || label}
+      data-testid={`compat-${c.status}`}
+    >
+      <Icon className="h-3.5 w-3.5" />
+      {!compact && label}
+    </span>
+  )
+}
+
+function ItemCard({ item, selected, onSelect, lines, warnings, extra, compat }: { item: CatalogItem; selected: boolean; onSelect: () => void; lines: string[]; warnings: string[]; extra?: React.ReactNode; compat?: CompatEntry }) {
+  const blocked = compat?.status === 'blocked'
+  const pick = () => {
+    if (!blocked) onSelect()
+  }
   return (
     <div
       role="button"
-      tabIndex={0}
-      onClick={onSelect}
-      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onSelect())}
-      className={cx('card flex w-full cursor-pointer items-start gap-3 p-3 text-left transition hover:border-ink/30', selected && 'border-sun ring-2 ring-sun/30')}
+      tabIndex={blocked ? -1 : 0}
+      onClick={pick}
+      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), pick())}
+      className={cx(
+        'card flex w-full items-start gap-3 p-3 text-left transition',
+        blocked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:border-ink/30',
+        selected && (blocked ? 'border-bad ring-2 ring-bad/30 opacity-100' : 'border-sun ring-2 ring-sun/30'),
+      )}
       aria-pressed={selected}
+      aria-disabled={blocked || undefined}
       data-testid={`card-item-${item.id}`}
     >
       <span className={cx('mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border', selected ? 'border-sun bg-sun text-ink' : 'border-line/30')}>{selected && <Check className="h-3.5 w-3.5" />}</span>
       <span className="min-w-0 flex-1">
-        <span className="block font-medium leading-tight">{item.name}</span>
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="font-medium leading-tight">{item.name}</span>
+          {item.id ? <CompatBadge c={compat} /> : null}
+        </span>
         <span className="mt-0.5 block text-xs text-ink-3">{lines.join(' · ')}</span>
         {extra}
         {warnings.length > 0 && <span className="mt-1 block text-xs text-warn">{warnings.join('; ')}</span>}
+        {compat && compat.status !== 'ok' && compat.reasons.length > 0 && (
+          <span className={cx('mt-1 block text-xs', compat.status === 'blocked' ? 'text-bad' : 'text-warn')}>{compat.reasons.join(' ')}</span>
+        )}
         {item.id ? <ItemLinks item={item} /> : null}
       </span>
       <span className="num shrink-0 text-right text-sm font-semibold">{item.effective_price > 0 ? fmtMoney(item.effective_price) : <span className="text-ink-3">—</span>}</span>
@@ -93,18 +130,88 @@ export function EquipmentStep({ ctx }: { ctx: StepCtx }) {
     enabled: !!panelId && !!sel.inverter_item_id && ctx.panelQty > 0,
   })
 
+  const batQty = Math.max(0, Math.round(sel.battery_qty || 0))
+  const compatQ = useQuery({
+    queryKey: ['compat', p.id, panelId, sel.inverter_item_id, invQty, ctx.panelQty, sel.battery_item_id, batQty, p.phase],
+    queryFn: () => {
+      const q = new URLSearchParams()
+      if (panelId) q.set('panel_item_id', String(panelId))
+      if (sel.inverter_item_id) q.set('inverter_item_id', String(sel.inverter_item_id))
+      q.set('inverter_qty', String(invQty))
+      q.set('panel_qty', String(ctx.panelQty || 0))
+      if (sel.battery_item_id) q.set('battery_item_id', String(sel.battery_item_id))
+      q.set('battery_qty', String(batQty))
+      return get<CompatMatrix>(`/api/projects/${p.id}/compatibility?${q}`)
+    },
+  })
+  const cm = compatQ.data
+  const cInv = (id: number) => cm?.inverters[String(id)]
+  const cPanel = (id: number) => cm?.panels[String(id)]
+  const cBat = (id: number) => cm?.batteries[String(id)]
+  const toast = useToast()
+
+  // Keep the system connectable: after an inverter change an incompatible battery is replaced by the best compatible
+  // suggestion, and the battery count is clamped to what the inverter / BMS accepts. (Runs once per compat result.)
+  const fixedFor = useRef('')
+  useEffect(() => {
+    if (!cm || compatQ.isFetching || !sel.battery_item_id || !batQ.data) return
+    const key = `${sel.inverter_item_id}|${sel.battery_item_id}|${batQty}|${invQty}`
+    if (fixedFor.current === key) return
+    const c = cm.batteries[String(sel.battery_item_id)]
+    if (!c || c.status !== 'blocked') return
+    fixedFor.current = key
+    const r = c.range
+    const name = batteries.find((b) => b.id === sel.battery_item_id)?.name || ''
+    if (r && r.max >= r.min && r.max > 0) {
+      // the model is usable, only the count is wrong -> clamp to the allowed range
+      const allowed = r.max
+      const q = Math.min(Math.max(batQty, r.min), allowed)
+      if (q !== batQty && q > 0) {
+        setSel({ battery_qty: q })
+        toast.push(lang === 'bg' ? `Брой батерии коригиран на ${q} (допустимо ${r.min}–${allowed} за този инвертор).` : `Battery count set to ${q} (allowed ${r.min}–${allowed} for this inverter).`, 'ok')
+        return
+      }
+    }
+    const best = (batQ.data || []).find((b) => cBat(b.item.id)?.status !== 'blocked')
+    if (best) {
+      setSel({ battery_item_id: best.item.id, battery_qty: best.qty, battery_accessories: best.accessories.map((a) => ({ item_id: a.item_id, qty: a.qty })) })
+      toast.push(lang === 'bg' ? `„${name}“ не е съвместима с инвертора — заменена с „${best.item.name}“ × ${best.qty}.` : `"${name}" is not compatible with the inverter — replaced by "${best.item.name}" × ${best.qty}.`, 'ok')
+    } else {
+      setSel({ battery_item_id: null, battery_qty: 0, battery_accessories: [] })
+      toast.push(lang === 'bg' ? `„${name}“ не е съвместима с инвертора и е премахната.` : `"${name}" is not compatible with the inverter and was removed.`, 'bad')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cm, compatQ.isFetching, batQ.data, sel.battery_item_id, sel.inverter_item_id, batQty, invQty])
+
+  const pickInverter = (id: number, suggestedQty?: number) => {
+    const c = cInv(id)
+    const qty = Math.max(1, suggestedQty || 1, c?.qty || 1)
+    // keep the battery; the effect above swaps it only if it cannot work with the new inverter
+    setSel({ inverter_item_id: id, inverter_qty: qty })
+  }
+
   const invSug = invQ.data || []
-  const shownInv: InverterSuggestion[] = invSug.length ? invSug : inverters.map((item) => ({ item, qty: 1, ac_total_kw: Number(item.specs.ac_power_kw || 0), ratio: 0, score: 0, reasons: [], warnings: [] }))
+  const asSug = (item: CatalogItem): InverterSuggestion => ({ item, qty: 1, ac_total_kw: Number(item.specs.ac_power_kw || 0), ratio: 0, score: 0, reasons: [], warnings: [] })
   const selInv = inverters.find((i) => i.id === sel.inverter_item_id)
-  const selInvSug = shownInv.find((s) => s.item.id === sel.inverter_item_id)
+  // the chosen inverter is always shown as a card, even when it is outside the suggestions (e.g. HV on an LV project)
+  const shownInv: InverterSuggestion[] = invSug.length
+    ? (selInv && !invSug.some((s) => s.item.id === selInv.id) ? [asSug(selInv), ...invSug] : invSug)
+    : inverters.map(asSug)
+  const selInvSug = invSug.find((s) => s.item.id === sel.inverter_item_id)
   const invAc = Number(selInv?.specs?.ac_power_kw || 0)
   const dcAc = invAc > 0 ? ctx.kwp / (invAc * invQty) : 0
   const otherInv = inverters.filter((i) => !shownInv.some((s) => s.item.id === i.id))
-  const batSug = batQ.data || []
+  const batSugRaw = batQ.data || []
+  const selBatItem = batteries.find((b) => b.id === sel.battery_item_id)
+  // keep the chosen battery visible as a card even when it is not among the suggestions
+  const batSug: BatterySuggestion[] =
+    selBatItem && !batSugRaw.some((s) => s.item.id === selBatItem.id)
+      ? [{ item: selBatItem, qty: sel.battery_qty || 1, total_kwh: Number(selBatItem.specs.kwh || 0) * (sel.battery_qty || 1), reasons: [], warnings: [], accessories: [] }, ...batSugRaw]
+      : batSugRaw
   const otherBat = batteries.filter((i) => !batSug.some((s) => s.item.id === i.id))
   const selBat = batteries.find((b) => b.id === sel.battery_item_id)
   const batKwh = Number(selBat?.specs?.kwh || 0)
-  const selSug = batSug.find((b) => b.item.id === sel.battery_item_id)
+  const selSug = batSugRaw.find((b) => b.item.id === sel.battery_item_id)
 
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
@@ -122,13 +229,31 @@ export function EquipmentStep({ ctx }: { ctx: StepCtx }) {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_auto]">
           <Field label={t('panel_model')}>
             <Select value={panelId ?? ''} onChange={(e) => setSel({ panel_item_id: Number(e.target.value) })} data-testid="select-panel">
-              {panels.map((x) => (
-                <option key={x.id} value={x.id}>
-                  {x.name} — {fmtMoney(x.effective_price)}
-                </option>
-              ))}
+              {panels.map((x) => {
+                const c = cPanel(x.id)
+                const bad = c?.status === 'blocked' && x.id !== panelId
+                return (
+                  <option key={x.id} value={x.id} disabled={bad}>
+                    {x.name} — {fmtMoney(x.effective_price)}
+                    {c?.status === 'blocked' ? (lang === 'bg' ? ' — несъвместим с инвертора' : ' — incompatible with the inverter') : c?.status === 'warn' ? ' — !' : ''}
+                  </option>
+                )
+              })}
             </Select>
             <ItemLinks item={panels.find((x) => x.id === panelId)} />
+            {panelId && sel.inverter_item_id && cPanel(panelId) && (
+              <span className="mt-1 flex flex-wrap items-center gap-2">
+                <CompatBadge c={cPanel(panelId)} />
+                {cPanel(panelId)!.window && (
+                  <span className="text-xs text-ink-3">
+                    {lang === 'bg' ? 'Стринг' : 'String'} {cPanel(panelId)!.window!.ns_min}–{cPanel(panelId)!.window!.ns_max} {lang === 'bg' ? 'модула' : 'modules'} · Voc(−) {fmtNum(cPanel(panelId)!.window!.voc_cold, 0)} V
+                  </span>
+                )}
+              </span>
+            )}
+            {panelId && cPanel(panelId)?.status !== 'ok' && (cPanel(panelId)?.reasons.length || 0) > 0 && (
+              <span className={cx('mt-1 block text-xs', cPanel(panelId)!.status === 'blocked' ? 'text-bad' : 'text-warn')}>{cPanel(panelId)!.reasons.join(' ')}</span>
+            )}
           </Field>
           <Field label={t('panel_count')}>
             <div className="flex items-center gap-2">
@@ -157,12 +282,15 @@ export function EquipmentStep({ ctx }: { ctx: StepCtx }) {
         </div>
         {invQ.isLoading && <Loading />}
         <div className="flex flex-col gap-2">
-          {shownInv.map((s) => (
+          {[...shownInv]
+            .sort((a, b) => Number(cInv(a.item.id)?.status === 'blocked') - Number(cInv(b.item.id)?.status === 'blocked'))
+            .map((s) => (
             <ItemCard
               key={s.item.id}
               item={s.item}
+              compat={cInv(s.item.id)}
               selected={sel.inverter_item_id === s.item.id}
-              onSelect={() => setSel({ inverter_item_id: s.item.id, inverter_qty: s.qty || 1, battery_item_id: null, battery_accessories: [] })}
+              onSelect={() => pickInverter(s.item.id, s.qty)}
               extra={s.qty > 1 ? <span className="mt-1 inline-block rounded bg-sun-soft px-1.5 py-0.5 text-xs font-medium text-sun-ink" data-testid={`inv-qty-${s.item.id}`}>{s.qty} × {lang === 'bg' ? 'в паралел' : 'in parallel'} = {fmtNum(s.ac_total_kw, 1)} kW AC</span> : undefined}
               lines={[
                 `${s.item.specs.ac_power_kw ?? '?'} kW AC`,
@@ -176,13 +304,17 @@ export function EquipmentStep({ ctx }: { ctx: StepCtx }) {
           ))}
           {otherInv.length > 0 && (
             <Field label={lang === 'bg' ? 'Други инвертори' : 'Other inverters'}>
-              <Select value="" onChange={(e) => e.target.value && setSel({ inverter_item_id: Number(e.target.value), battery_item_id: null })}>
+              <Select value="" onChange={(e) => e.target.value && pickInverter(Number(e.target.value))} data-testid="select-other-inverter">
                 <option value="">{t('none')}</option>
-                {otherInv.map((x) => (
-                  <option key={x.id} value={x.id}>
-                    {x.name}
-                  </option>
-                ))}
+                {otherInv.map((x) => {
+                  const c = cInv(x.id)
+                  return (
+                    <option key={x.id} value={x.id} disabled={c?.status === 'blocked'}>
+                      {x.name}
+                      {c?.status === 'blocked' ? ` — ${c.reasons[0] || (lang === 'bg' ? 'несъвместим' : 'incompatible')}` : c?.qty && c.qty > 1 ? ` — ${c.qty} ×` : ''}
+                    </option>
+                  )
+                })}
               </Select>
             </Field>
           )}
@@ -209,6 +341,16 @@ export function EquipmentStep({ ctx }: { ctx: StepCtx }) {
                 </>
               )}
             </div>
+          </div>
+        )}
+        {cm?.selected && cm.selected.blocked.length > 0 && (
+          <div className="mt-3 rounded border border-bad/30 bg-bad/5 p-2 text-xs text-bad" data-testid="compat-system-blocked">
+            <div className="mb-1 font-semibold">{lang === 'bg' ? 'Системата не може да бъде свързана така:' : 'This system cannot be connected:'}</div>
+            <ul className="list-disc pl-4">
+              {cm.selected.blocked.map((w) => (
+                <li key={w}>{w}</li>
+              ))}
+            </ul>
           </div>
         )}
         {stringsQ.data && (
@@ -251,21 +393,36 @@ export function EquipmentStep({ ctx }: { ctx: StepCtx }) {
             <ItemCard
               key={s.item.id}
               item={s.item}
+              compat={cBat(s.item.id)}
               selected={sel.battery_item_id === s.item.id}
-              onSelect={() => setSel({ battery_item_id: s.item.id, battery_qty: s.qty, battery_accessories: s.accessories.map((a) => ({ item_id: a.item_id, qty: a.qty })) })}
+              onSelect={() => sel.battery_item_id !== s.item.id && setSel({ battery_item_id: s.item.id, battery_qty: s.qty, battery_accessories: (s.accessories || []).map((a) => ({ item_id: a.item_id, qty: a.qty })) })}
               lines={[`${s.item.specs.kwh} kWh`, String(s.item.specs.voltage_class || ''), `${s.qty} × = ${fmtNum(s.total_kwh, 1)} kWh`, ...s.reasons].filter(Boolean)}
               warnings={s.warnings}
             />
           ))}
           {otherBat.length > 0 && (
             <Field label={lang === 'bg' ? 'Други батерии' : 'Other batteries'}>
-              <Select value="" onChange={(e) => e.target.value && setSel({ battery_item_id: Number(e.target.value), battery_qty: sel.battery_qty || 1 })}>
+              <Select
+                value=""
+                onChange={(e) => {
+                  if (!e.target.value) return
+                  const id = Number(e.target.value)
+                  const r = cBat(id)?.range
+                  const q = Math.max(r?.min || 1, Math.min(sel.battery_qty || 1, r?.max || 99))
+                  setSel({ battery_item_id: id, battery_qty: q, battery_accessories: [] })
+                }}
+                data-testid="select-other-battery"
+              >
                 <option value="">{t('none')}</option>
-                {otherBat.map((x) => (
-                  <option key={x.id} value={x.id}>
-                    {x.name} ({String(x.specs.kwh)} kWh, {String(x.specs.voltage_class)})
-                  </option>
-                ))}
+                {otherBat.map((x) => {
+                  const c = cBat(x.id)
+                  return (
+                    <option key={x.id} value={x.id} disabled={c?.status === 'blocked' && !c.range}>
+                      {x.name} ({String(x.specs.kwh)} kWh, {String(x.specs.voltage_class)})
+                      {c?.status === 'blocked' ? ` — ${c.reasons[0] || ''}` : ''}
+                    </option>
+                  )
+                })}
               </Select>
             </Field>
           )}
@@ -273,7 +430,22 @@ export function EquipmentStep({ ctx }: { ctx: StepCtx }) {
         {sel.battery_item_id ? (
           <div className="mt-3 grid grid-cols-2 gap-3">
             <Field label={t('battery_qty')}>
-              <NumInput value={sel.battery_qty || 1} min={1} onChange={(v) => setSel({ battery_qty: Math.round(v) })} data-testid="input-battery-qty" />
+              <NumInput
+                value={sel.battery_qty || 1}
+                min={cBat(sel.battery_item_id)?.range?.min || 1}
+                max={cBat(sel.battery_item_id)?.range?.max || undefined}
+                onChange={(v) => setSel({ battery_qty: Math.round(v) })}
+                data-testid="input-battery-qty"
+              />
+              {cBat(sel.battery_item_id)?.range && (
+                <span className="mt-1 block text-xs text-ink-3">
+                  {lang === 'bg' ? 'Допустимо' : 'Allowed'}: {cBat(sel.battery_item_id)!.range!.min}–{cBat(sel.battery_item_id)!.range!.max}
+                  {(cBat(sel.battery_item_id)!.range!.clusters?.length || 0) > 1 ? ` · ${cBat(sel.battery_item_id)!.range!.clusters!.join(' + ')}` : ''}
+                </span>
+              )}
+              {cBat(sel.battery_item_id) && cBat(sel.battery_item_id)!.status !== 'ok' && (
+                <span className={cx('mt-1 block text-xs', cBat(sel.battery_item_id)!.status === 'blocked' ? 'text-bad' : 'text-warn')}>{cBat(sel.battery_item_id)!.reasons.join(' ')}</span>
+              )}
             </Field>
             <div className="self-end pb-2 text-sm text-ink-2">
               = <span className="num font-semibold">{fmtNum(batKwh * (sel.battery_qty || 1), 1)} kWh</span>

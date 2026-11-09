@@ -290,9 +290,14 @@ def apply(db: Session, data_dir: Path | None = None, *, force: bool = False) -> 
         if key not in seen:
             db.add(LaborOption(days=key[0], workers=key[1], price=float(price), active=True))
 
-    # --- settings
+    # --- settings: the first migration writes GM SUN's values; a later "restore" (force) only fills keys that are
+    # missing, so company data and pricing changed in Settings afterwards are never reset
     for key, patch in F.SETTINGS.items():
-        _put_setting(db, key, patch)
+        if force and db.get(Setting, key) is not None:
+            cur = dict(db.get(Setting, key).value or {})
+            _put_setting(db, key, {k: v for k, v in patch.items() if k not in cur})
+        else:
+            _put_setting(db, key, patch)
     _put_setting(db, "datafill", {"done": True, "at": datetime.now(timezone.utc).isoformat(), "stats": {"note": "final catalog"}})
     _put_setting(db, "catalog", {"curated": True, "profile": "gmsun_final"})
     result = {

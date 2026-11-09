@@ -269,46 +269,82 @@ def mppt_capacities(inv: dict[str, Any], isc: float | None = None) -> list[int]:
     return caps
 
 
-def _assign_mppts(strings: list[dict[str, Any]], mppts: int, spm: int, caps: list[int] | None = None) -> None:
+def _assign_mppts(strings: list[dict[str, Any]], mppts: int, spm: int, caps: list[int] | None = None,
+                  imp: float = 0.0, i_ops: list[float] | None = None) -> None:
     """Assign strings to MPPT trackers/inputs in place.
 
-    Rules (in order): strings of the same plane share an MPPT (same orientation in parallel), different planes get
-    separate MPPTs while any are free, a plane with more strings than the tracker takes spills over to the next free
-    MPPT, and only when every MPPT is used do planes get mixed (the caller warns about that). MPPT ``m`` takes at most
+    Rules (in order): strings of the same plane share an MPPT (same orientation in parallel) as long as the tracker's
+    operating current allows it (``imp`` × strings ≤ ``i_ops[m-1]``), different planes get separate MPPTs while any are
+    free, a plane with more strings than the tracker takes spills over to the next free MPPT, and only when every MPPT
+    is used do planes get mixed or trackers get overloaded (the caller warns about that). MPPT ``m`` takes at most
     ``caps[m-1]`` strings (default ``spm`` each); anything beyond the hardware inputs is still numbered so the warning
     can be shown.
     """
     caps = list(caps) if caps else [spm] * mppts
     mppts = len(caps)
     cap = {m: caps[m - 1] for m in range(1, mppts + 1)}
+    # current-limited capacity: how many parallel strings a tracker carries without clipping
+    soft = dict(cap)
+    if imp and i_ops:
+        for m in cap:
+            lim = i_ops[m - 1] if len(i_ops) >= m else 0
+            if lim:
+                soft[m] = max(1, min(cap[m], int((lim + 1e-6) // imp)))
     free = dict(cap)
     by_plane: dict[int, list[dict[str, Any]]] = {}
     for st in strings:
         by_plane.setdefault(int(st.get("plane_index") or 0), []).append(st)
-    # largest planes first so they get whole trackers
-    for _pi, sts in sorted(by_plane.items(), key=lambda kv: -len(kv[1])):
-        pending = list(sts)
+
+    def _place(pending: list[dict[str, Any]], limit: dict[int, int]) -> list[dict[str, Any]]:
         while pending:
-            # a fully free tracker that takes the whole plane, then any fully free one (biggest first), then the most free inputs
-            whole = [k for k, v in free.items() if v == cap[k] and v >= len(pending)]
+            used = {k: cap[k] - free[k] for k in cap}
+            room = {k: max(0, limit[k] - used[k]) for k in cap}
+            # a fully free tracker that takes the whole plane, then any fully free one (biggest first), then the most room
+            whole = [k for k in cap if used[k] == 0 and room[k] >= len(pending)]
             m = min(whole, key=lambda k: (cap[k], k)) if whole else None
             if m is None:
-                fully = [k for k, v in free.items() if v == cap[k] and v > 0]
-                m = max(fully, key=lambda k: (cap[k], -k)) if fully else None
+                fully = [k for k in cap if used[k] == 0 and room[k] > 0]
+                m = max(fully, key=lambda k: (room[k], -k)) if fully else None
             if m is None:
-                m = max(free, key=lambda k: free[k]) if free else None
-            if m is None or free[m] <= 0:
+                cand = [k for k in cap if room[k] > 0]
+                m = max(cand, key=lambda k: room[k]) if cand else None
+            if m is None:
                 break
-            take = pending[: free[m]]
-            pending = pending[free[m]:]
+            take, pending = pending[: room[m]], pending[room[m]:]
             for st in take:
                 st["mppt"] = m
                 st["input"] = cap[m] - free[m] + 1
                 free[m] -= 1
-        # hardware exhausted: number the rest round-robin so the UI can show them
-        for j, st in enumerate(pending):
-            st["mppt"] = (j % mppts) + 1
-            st["input"] = cap[st["mppt"]] + 1 + j // mppts
+        return pending
+
+    def _run(limit: dict[int, int]) -> None:
+        free.clear()
+        free.update(cap)
+        # largest planes first so they get whole trackers
+        for _pi, sts in sorted(by_plane.items(), key=lambda kv: -len(kv[1])):
+            pending = _place(list(sts), limit)
+            pending = _place(pending, cap)  # no current headroom left anywhere: use the remaining physical inputs
+            # hardware exhausted: number the rest round-robin so the UI can show them
+            for j, st in enumerate(pending):
+                st["mppt"] = (j % mppts) + 1
+                st["input"] = cap[st["mppt"]] + 1 + j // mppts
+
+    def _mixed() -> bool:
+        seen: dict[int, set[int]] = {}
+        for st in strings:
+            seen.setdefault(st["mppt"], set()).add(int(st.get("plane_index") or 0))
+        return any(len(v) > 1 for v in seen.values())
+
+    if soft != cap:
+        _run(soft)
+        if not _mixed():
+            return
+        # spreading for current would put different orientations on one tracker: mild clipping is the lesser evil
+        _run(cap)
+        if _mixed():
+            _run(soft)
+        return
+    _run(cap)
 
 
 def _string_design_single(panel: CatalogItem | None, inverter: CatalogItem | None, planes: list[dict[str, Any]], design: dict[str, Any]) -> dict[str, Any]:
@@ -393,7 +429,7 @@ def _string_design_single(panel: CatalogItem | None, inverter: CatalogItem | Non
     if len(strings) > inputs:
         lay_txt = f"{mppts} MPPT × {spm}" if len(set(caps)) == 1 else " + ".join(str(c) for c in caps) + f" на {mppts} MPPT"
         out["warnings"].append(f"{len(strings)} стринга надвишават входовете на инвертора ({lay_txt}). Намалете стринговете или изберете по-голям инвертор.")
-    _assign_mppts(strings, mppts, spm, caps)
+    _assign_mppts(strings, mppts, spm, caps, imp=imp, i_ops=i_op_list or ([i_op] * mppts if i_op else None))
     for i, st in enumerate(strings):
         st["id"] = f"S{i + 1}"
         st["voc_cold_v"] = round(st["modules"] * voc_cold, 1)

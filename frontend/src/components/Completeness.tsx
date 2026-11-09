@@ -22,6 +22,7 @@ export function CompletenessPanel({ quote, projectId, onApplied }: { quote: Quot
     mutationFn: (fixes: CompletenessFix[]) => post<Completeness>(`/api/quotes/${quote.id}/completeness/apply`, { fixes }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['quotes', projectId] })
+      qc.invalidateQueries({ queryKey: ['project', projectId] })
       qc.invalidateQueries({ queryKey: ['completeness', quote.id] })
       onApplied?.()
       toast.push(lang === 'bg' ? 'Позициите са добавени и офертата е преизчислена' : 'Items added, quote recalculated', 'ok')

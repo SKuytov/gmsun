@@ -365,6 +365,24 @@ export interface QuoteLine {
   meta: Record<string, unknown>
 }
 
+export type LaborMode = 'per_inverter_kw' | 'matrix' | 'per_w' | 'manual'
+
+export type CompatStatus = 'ok' | 'warn' | 'blocked'
+export interface CompatEntry {
+  status: CompatStatus
+  reasons: string[]
+  /** inverters: number of parallel units the status was computed for */
+  qty?: number
+  window?: { ns_min: number; ns_max: number; inputs: number; mppt_strings: number[]; voc_cold: number; vmp_hot: number } | null
+  range?: { min: number; max: number; max_per_cluster?: number; clusters_max?: number; clusters?: number[] } | null
+}
+export interface CompatMatrix {
+  inverters: Record<string, CompatEntry>
+  panels: Record<string, CompatEntry>
+  batteries: Record<string, CompatEntry>
+  selected?: { blocked: string[]; warnings: string[]; ok: boolean }
+}
+
 export interface Selections {
   panel_item_id?: number | null
   panel_qty?: number
@@ -394,7 +412,15 @@ export interface Selections {
   electrical_items?: { item_id: number; qty: number }[]
   mounting_mode?: 'auto' | 'detailed' | 'lump' | 'none'
   lump_price_per_module?: number
-  labor_mode?: 'matrix' | 'per_w' | 'manual'
+  labor_mode?: LaborMode
+  /** per-quote override of the labor rate (EUR per kW of installed inverter AC power) */
+  labor_eur_per_kw?: number | null
+  /** automatic BMS / racks for HV battery stacks (default true) */
+  battery_accessories_auto?: boolean
+  /** pick the AC/DC board by inverter phases automatically (default true) */
+  auto_switchboard?: boolean
+  /** false = this quote no longer follows project / catalog changes */
+  auto_sync?: boolean
   strategy?: Strategy | null
   labor_option_id?: number | null
   labor_auto?: boolean
@@ -499,6 +525,9 @@ export interface PricingSettings {
   delivery_fee_inverter: number
   delivery_fee_construction: number
   install_price_per_w: number
+  /** labor = installed inverter AC kW × this rate (default mode) */
+  labor_eur_per_inverter_kw?: number
+  labor_mode_default?: LaborMode
   specific_yield_kwh_per_kwp: number
   dc_ac_ratio_max: number
   quote_number_prefix: string
@@ -525,6 +554,8 @@ export interface DesignRole {
   item_id: number | null
   item_name: string | null
   unit_price: number | null
+  /** quoted = has a catalog article; covered = included in the equipped AC/DC board; not_quoted = listed only */
+  status?: 'quoted' | 'covered' | 'not_quoted'
 }
 
 export interface DesignString {
@@ -545,6 +576,7 @@ export interface DesignString {
 
 export interface Design {
   inverters?: number
+  switchboard?: { item_id: number; name: string; qty: number; covers_roles: string[] } | null
   strings: { strings: DesignString[]; warnings: string[]; checks: { ok: boolean; text: string }[]; modules_per_string: number; fuses_required: boolean; fuse_a: number; inverters?: number }
   dc: Record<string, number | string | boolean>
   ac: Record<string, number | string | boolean>

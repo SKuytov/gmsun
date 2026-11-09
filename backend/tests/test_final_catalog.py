@@ -127,6 +127,28 @@ def test_am2_mppt_layout_is_two_plus_one():
         db.close()
 
 
+def test_strings_spread_over_mppts_before_paralleling():
+    """26 × Longi 485 (Imp 14.53 A) on a 20K AM2 (26 A per MPPT): one string per tracker, no clipping warning."""
+    db = SessionLocal()
+    try:
+        panel, inv = _db_item(db, "Himo 10 485"), _db_item(db, "SUN-20K-SG01HP3 -EU-AM2")
+        planes = [{"name": "Плоскост 1", "modules": 26}]
+        sd = engineering.string_design(panel, inv, planes, {})
+        assert sorted(s["mppt"] for s in sd["strings"]) == [1, 2]
+        assert not any("работен ток" in w for w in sd["warnings"])
+        pair = compat.check_pair(panel, inv, {}, modules_per_inverter=26, phase=3)
+        assert not any("clipping" in r for r in pair["reasons"])
+        # two planes with 2 + 1 strings: orientations are never mixed on one tracker just to avoid clipping
+        strings = [{"plane_index": 0}, {"plane_index": 0}, {"plane_index": 1}]
+        engineering._assign_mppts(strings, 2, 2, [2, 2], imp=14.53, i_ops=[26, 26])
+        per = {}
+        for st in strings:
+            per.setdefault(st["mppt"], set()).add(st["plane_index"])
+        assert all(len(v) == 1 for v in per.values())
+    finally:
+        db.close()
+
+
 def test_impossible_combinations_are_blocked(client, auth):
     db = SessionLocal()
     try:

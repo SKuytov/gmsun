@@ -126,7 +126,19 @@ function ItemsTab({ lang }: { lang: string }) {
   const [datasetOpen, setDatasetOpen] = useState(false)
   const [syncOpen, setSyncOpen] = useState(false)
   const [reseedOpen, setReseedOpen] = useState(false)
-  const status = useQuery({ queryKey: ['catalog', 'supplier-status'], queryFn: () => get<SupplierStatus>('/api/catalog/supplier/status'), enabled: admin })
+  const final = useQuery({ queryKey: ['catalog', 'final-status'], queryFn: () => get<FinalStatus>('/api/catalog/final/status') })
+  const curated = !!final.data?.curated
+  const status = useQuery({ queryKey: ['catalog', 'supplier-status'], queryFn: () => get<SupplierStatus>('/api/catalog/supplier/status'), enabled: admin && final.isSuccess && !curated })
+  const [reapplyOpen, setReapplyOpen] = useState(false)
+  const reapply = useMutation({
+    mutationFn: () => post<{ kept?: number; deleted?: number; quotes_updated?: number }>('/api/catalog/final/reapply'),
+    onSuccess: (r) => {
+      qc.invalidateQueries()
+      setReapplyOpen(false)
+      toast.push(lang === 'bg' ? `Финалният каталог е възстановен${r.deleted != null ? ` · изтрити ${r.deleted}` : ''}${r.quotes_updated != null ? ` · обновени оферти ${r.quotes_updated}` : ''}` : 'Final catalog restored', 'ok')
+    },
+    onError: (e) => toast.push(errMsg(e), 'bad'),
+  })
   const reseed = useMutation({
     mutationFn: () => post<{ added_items: number }>('/api/catalog/mounting/reseed'),
     onSuccess: (r) => {
@@ -138,7 +150,11 @@ function ItemsTab({ lang }: { lang: string }) {
   })
   const items = useQuery({ queryKey: ['catalog', 'items', inactive], queryFn: () => get<CatalogItem[]>(`/api/catalog/items${inactive ? '?include_inactive=true' : ''}`) })
   const meta = useQuery({ queryKey: ['catalog', 'meta'], queryFn: () => get<Meta>('/api/catalog/meta') })
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['catalog'] })
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['catalog'] })
+    qc.invalidateQueries({ queryKey: ['quotes'] })
+    qc.invalidateQueries({ queryKey: ['compat'] })
+  }
 
   const save = useMutation({
     mutationFn: (it: Partial<CatalogItem>) => (it.id ? patch<CatalogItem>(`/api/catalog/items/${it.id}`, it) : post<CatalogItem>('/api/catalog/items', it)),
@@ -176,12 +192,22 @@ function ItemsTab({ lang }: { lang: string }) {
         <Toggle checked={inactive} onChange={setInactive} label={t('show_inactive')} />
         {admin && (
           <div className="ml-auto flex flex-wrap gap-1">
-            <button type="button" className="btn-ghost btn-sm" onClick={() => setSyncOpen(true)} data-testid="button-supplier-sync" title={t('supplier_sync_hint')}>
-              <RefreshCw className="h-4 w-4" /> {t('supplier_sync')}
-            </button>
-            <button type="button" className="btn-ghost btn-sm" onClick={() => setReseedOpen(true)} data-testid="button-aero-reseed" title={t('aero_reseed_hint')}>
-              <RefreshCw className="h-4 w-4" /> {t('aero_reseed')}
-            </button>
+            {curated ? (
+              <button type="button" className="btn-ghost btn-sm" onClick={() => setReapplyOpen(true)} data-testid="button-final-reapply" title={lang === 'bg' ? 'Връща 56-те артикула на GM SUN с цените и данните от финалния набор' : 'Restores the 56 GM SUN items with the prices and data of the final set'}>
+                <RefreshCw className="h-4 w-4" /> {lang === 'bg' ? 'Възстанови финалния каталог' : 'Restore final catalog'}
+              </button>
+            ) : (
+              final.isSuccess && (
+                <>
+                  <button type="button" className="btn-ghost btn-sm" onClick={() => setSyncOpen(true)} data-testid="button-supplier-sync" title={t('supplier_sync_hint')}>
+                    <RefreshCw className="h-4 w-4" /> {t('supplier_sync')}
+                  </button>
+                  <button type="button" className="btn-ghost btn-sm" onClick={() => setReseedOpen(true)} data-testid="button-aero-reseed" title={t('aero_reseed_hint')}>
+                    <RefreshCw className="h-4 w-4" /> {t('aero_reseed')}
+                  </button>
+                </>
+              )
+            )}
             <button type="button" className="btn-ghost btn-sm" onClick={() => setImportOpen(true)} data-testid="button-import">
               <Upload className="h-4 w-4" /> {t('import_xlsx')}
             </button>
@@ -197,7 +223,15 @@ function ItemsTab({ lang }: { lang: string }) {
           </div>
         )}
       </div>
-      {admin && status.data && (
+      {curated && final.data && (
+        <p className="text-xs text-ink-3" data-testid="text-final-status">
+          {lang === 'bg'
+            ? `Финален каталог на GM SUN: ${final.data.final_present} от ${final.data.final_items} артикула · общо в каталога ${final.data.items_total}. Системата предлага и офертира само тези артикули.`
+            : `GM SUN final catalog: ${final.data.final_present} of ${final.data.final_items} items · ${final.data.items_total} in the catalog. The system only suggests and quotes these items.`}
+          {final.data.missing.length > 0 && <span className="text-warn"> {lang === 'bg' ? `Липсват: ${final.data.missing.join(', ')}` : `Missing: ${final.data.missing.join(', ')}`}</span>}
+        </p>
+      )}
+      {admin && !curated && status.data && (
         <p className="text-xs text-ink-3" data-testid="text-supplier-status">
           {t('supplier_status')} {status.data.supplier}: {status.data.linked_items} {t('supplier_linked')} · {status.data.with_datasheet} {t('supplier_with_ds')} · {status.data.unverified_items} {t('supplier_unverified')}
           {status.data.snapshot_file ? ` · ${status.data.snapshot_file} (${status.data.snapshot_items})` : ''}
@@ -291,6 +325,18 @@ function ItemsTab({ lang }: { lang: string }) {
       <ImportModal open={importOpen} onClose={() => setImportOpen(false)} categories={meta.data?.categories || []} lang={lang} onDone={invalidate} />
       <DatasetModal open={datasetOpen} onClose={() => setDatasetOpen(false)} onDone={() => qc.invalidateQueries()} />
       <SyncModal open={syncOpen} onClose={() => setSyncOpen(false)} onDone={() => qc.invalidateQueries()} />
+      <Confirm
+        open={reapplyOpen}
+        onClose={() => setReapplyOpen(false)}
+        onConfirm={() => reapply.mutate()}
+        title={lang === 'bg' ? 'Възстанови финалния каталог' : 'Restore final catalog'}
+        text={
+          lang === 'bg'
+            ? 'Цените и данните на 56-те артикула, цените на конструкциите по тип покрив и таблицата труд се връщат към финалния набор, а всички други артикули (вкл. ръчно добавени) се изтриват. Настройките (фирма, ценообразуване, ставка труд) не се променят. Преди това се прави резервно копие. Черновите оферти се преизчисляват автоматично; изпратените остават непроменени.'
+            : 'Prices and data of the 56 items, roof construction prices and the labor matrix are reset to the final set and every other item (including manually added ones) is deleted. Settings (company, pricing, labor rate) are kept. A backup is made first. Draft quotes are recalculated automatically; sent quotes stay unchanged.'
+        }
+        danger
+      />
       <Confirm open={reseedOpen} onClose={() => setReseedOpen(false)} onConfirm={() => reseed.mutate()} title={t('aero_reseed')} text={t('aero_reseed_hint')} />
       <Confirm open={!!toDelete} onClose={() => setToDelete(null)} onConfirm={() => toDelete && remove.mutate(toDelete.id)} title={t('delete')} text={`${t('confirm_delete')} ${toDelete?.name}`} danger />
     </div>
@@ -318,6 +364,7 @@ function ItemModal({ item, meta, onClose, onSave, busy }: { item: Partial<Catalo
       setF((cur) => ({ ...cur, specs: it.specs }))
       setSpecs(JSON.stringify(it.specs || {}, null, 2))
       qc.invalidateQueries({ queryKey: ['catalog'] })
+      qc.invalidateQueries({ queryKey: ['quotes'] })
       toast.push(t('saved'), 'ok')
     },
     onError: (e) => toast.push(errMsg(e), 'bad'),
@@ -564,13 +611,18 @@ type DatasetReport = {
   updated: number
   skipped: number
   errors: number
+  deleted?: number
+  quotes_updated?: number
 }
+
+type FinalStatus = { curated: boolean; done: boolean; final_items: number; final_present: number; items_total: number; missing: string[]; migration: { at?: string; backup?: string; deleted?: number } }
 
 /** Whole-dataset round trip: every editable table as Excel (one workbook or a .zip of workbooks) and back. */
 function DatasetModal({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
   const { t, lang } = useT()
   const toast = useToast()
   const [res, setRes] = useState<DatasetReport | null>(null)
+  const [replace, setReplace] = useState(false)
   const [fill, setFill] = useState<Record<string, number> | null>(null)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
@@ -583,7 +635,7 @@ function DatasetModal({ open, onClose, onDone }: { open: boolean; onClose: () =>
     try {
       const fd = new FormData()
       fd.append('file', file)
-      setRes(await api<DatasetReport>('/api/catalog/dataset/import', { form: fd }))
+      setRes(await api<DatasetReport>(`/api/catalog/dataset/import${replace ? '?replace_items=true' : ''}`, { form: fd }))
       onDone()
     } catch (e) {
       setErr(errMsg(e))
@@ -625,6 +677,17 @@ function DatasetModal({ open, onClose, onDone }: { open: boolean; onClose: () =>
           <h4 className="text-sm font-semibold">{t('dataset_import')}</h4>
           <p className="text-sm text-ink-2">{t('dataset_import_hint')}</p>
           <input ref={ref} type="file" accept=".xlsx,.zip" className="hidden" onChange={(e) => e.target.files?.[0] && run(e.target.files[0])} data-testid="input-dataset-file" />
+          <label className="flex items-start gap-2 rounded-md border border-line/15 p-2 text-sm">
+            <input type="checkbox" className="mt-1" checked={replace} onChange={(e) => setReplace(e.target.checked)} data-testid="checkbox-dataset-replace" />
+            <span>
+              <span className="font-medium">{lang === 'bg' ? 'Замени каталога (изтрий артикулите, които липсват във файла)' : 'Replace the catalog (delete items missing from the file)'}</span>
+              <span className="block text-xs text-ink-3">
+                {lang === 'bg'
+                  ? 'Файлът става единственият списък с артикули. Преди това се прави резервно копие; импортът се отказва изцяло, ако листът „Артикули“ липсва или има грешки. Офертите остават, но редовете им губят връзката с изтритите артикули.'
+                  : 'The file becomes the only item list. A backup is made first; the import is refused entirely if the "Артикули" sheet is missing or has errors. Quotes are kept, their lines lose the link to deleted items.'}
+              </span>
+            </span>
+          </label>
           <div>
             <button type="button" className="btn-accent btn-sm" onClick={() => ref.current?.click()} disabled={busy} data-testid="button-dataset-import">
               <Upload className="h-4 w-4" /> {busy ? '…' : t('dataset_choose_file')}
@@ -635,6 +698,16 @@ function DatasetModal({ open, onClose, onDone }: { open: boolean; onClose: () =>
               <p>
                 {lang === 'bg' ? 'Файлове' : 'Files'}: {res.files.length} · {lang === 'bg' ? 'Създадени' : 'Created'}: <b>{res.created}</b> · {lang === 'bg' ? 'Обновени' : 'Updated'}: <b>{res.updated}</b> ·{' '}
                 {lang === 'bg' ? 'Без промяна' : 'Unchanged'}: <b>{res.skipped}</b> · {lang === 'bg' ? 'Грешки' : 'Errors'}: <b className={res.errors ? 'text-bad' : ''}>{res.errors}</b>
+                {res.deleted != null && (
+                  <>
+                    {' '}· {lang === 'bg' ? 'Изтрити' : 'Deleted'}: <b>{res.deleted}</b>
+                  </>
+                )}
+                {res.quotes_updated != null && (
+                  <>
+                    {' '}· {lang === 'bg' ? 'Обновени чернови оферти' : 'Draft quotes updated'}: <b>{res.quotes_updated}</b>
+                  </>
+                )}
               </p>
               <ul className="mt-2 flex flex-col gap-1">
                 {Object.values(res.tables).map((tb) => (
@@ -736,6 +809,7 @@ function LaborTab() {
   const labor = useQuery({ queryKey: ['labor', 'all'], queryFn: () => get<LaborOption[]>('/api/catalog/labor?include_inactive=true') })
   const inv = () => {
     qc.invalidateQueries({ queryKey: ['labor'] })
+    qc.invalidateQueries({ queryKey: ['quotes'] })
   }
   const save = useMutation({
     mutationFn: (o: Partial<LaborOption>) => (o.id ? put(`/api/catalog/labor/${o.id}`, o) : post('/api/catalog/labor', o)),
@@ -821,6 +895,7 @@ function RoofsTab({ lang }: { lang: string }) {
     mutationFn: (r: RoofType) => put(`/api/catalog/roof-types/${r.code}`, r),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['roof-types'] })
+      qc.invalidateQueries({ queryKey: ['quotes'] })
       toast.push(t('saved'), 'ok')
     },
     onError: (e) => toast.push(errMsg(e), 'bad'),
@@ -985,7 +1060,10 @@ function RulesTab({ lang }: { lang: string }) {
   const items = useQuery({ queryKey: ['catalog', 'items', false], queryFn: () => get<CatalogItem[]>('/api/catalog/items') })
   const meta = useQuery({ queryKey: ['catalog', 'meta'], queryFn: () => get<Meta>('/api/catalog/meta') })
   const mounting = (items.data || []).filter((i) => i.category === 'mounting')
-  const inv = () => qc.invalidateQueries({ queryKey: ['mounting-rules'] })
+  const inv = () => {
+    qc.invalidateQueries({ queryKey: ['mounting-rules'] })
+    qc.invalidateQueries({ queryKey: ['quotes'] })
+  }
   const save = useMutation({
     mutationFn: (r: Partial<MountingRule>) => (r.id ? put(`/api/catalog/mounting-rules/${r.id}`, r) : post('/api/catalog/mounting-rules', r)),
     onSuccess: inv,

@@ -37,7 +37,8 @@ function DesignPanel({ ctx }: { ctx: StepCtx }) {
       <span className="num text-right">{String(v ?? '—')}</span>
     </div>
   )
-  const missing = d.roles.filter((r) => !r.item_id)
+  const covered = d.roles.filter((r) => r.status === 'covered')
+  const notQuoted = d.roles.filter((r) => !r.item_id && r.status !== 'covered')
   const sorted = [...d.roles].sort((a, b) => SECTION_ORDER.indexOf(a.section) - SECTION_ORDER.indexOf(b.section))
   const warnings = Array.from(new Set([...(d.warnings || []), ...(d.strings?.warnings || [])]))
   return (
@@ -139,19 +140,28 @@ function DesignPanel({ ctx }: { ctx: StepCtx }) {
       </div>
       <details className="rounded-md border border-line/15">
         <summary className="cursor-pointer px-3 py-2 text-sm font-medium">
-          {t('design_bom')} ({d.roles.length}){missing.length > 0 && <span className="ml-2 text-bad">· {missing.length} {t('missing_item')}</span>}
+          {t('design_bom')} ({d.roles.length})
+          {covered.length > 0 && <span className="ml-2 text-ok">· {covered.length} {lang === 'bg' ? 'в таблото' : 'in the board'}</span>}
+          {notQuoted.length > 0 && <span className="ml-2 text-ink-3">· {notQuoted.length} {lang === 'bg' ? 'само за справка (без артикул)' : 'reference only (no article)'}</span>}
         </summary>
+        <p className="px-3 pb-2 text-xs text-ink-3">
+          {lang === 'bg'
+            ? `Инженерният списък показва всичко нужно за монтажа. В офертата влизат само артикулите от каталога; защитите и кутиите са включени в оборудваното AC/DC табло${d.switchboard ? ` („${d.switchboard.name}“ × ${d.switchboard.qty})` : ''}, а позициите без артикул са само за справка.`
+            : `The engineering list shows everything the installation needs. Only catalog articles are quoted; protections and enclosures are part of the equipped AC/DC board${d.switchboard ? ` ("${d.switchboard.name}" × ${d.switchboard.qty})` : ''}, rows without an article are for reference only.`}
+        </p>
         <div className="max-h-80 overflow-auto">
           <table className="tbl text-xs">
             <tbody>
               {sorted.map((r, i) => (
-                <tr key={i} className={r.item_id ? '' : 'text-bad'}>
+                <tr key={i} className={r.item_id ? '' : 'text-ink-3'} data-testid={`design-role-${r.role}`}>
                   <td className="text-ink-3">{r.section}</td>
                   <td>{r.role === 'pv_cable' ? r.name : r.item_name || r.name}</td>
                   <td className="num whitespace-nowrap text-right">
                     {fmtNum(r.qty, 0)} {r.unit}
                   </td>
-                  <td className="num whitespace-nowrap text-right">{r.unit_price != null ? fmtMoney(r.unit_price) : t('missing_item')}</td>
+                  <td className="num whitespace-nowrap text-right">
+                    {r.unit_price != null ? fmtMoney(r.unit_price) : r.status === 'covered' ? (lang === 'bg' ? 'в таблото' : 'in board') : lang === 'bg' ? 'не се офертира' : 'not quoted'}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -185,7 +195,10 @@ export function MaterialsStep({ ctx }: { ctx: StepCtx }) {
   const { t, lang } = useT()
   const { sel, setSel, items, project: p } = ctx
   const by = (cat: string) => items.filter((i) => i.category === cat && i.active)
-  const sb = by('switchboard').filter((x) => !x.specs.phases || Number(x.specs.phases) === p.phase)
+  const selInv = items.find((i) => i.id === sel.inverter_item_id)
+  const boardPhase = Number(selInv?.specs?.phases || p.phase || 3)
+  const sb = by('switchboard').filter((x) => !x.specs.phases || Number(x.specs.phases) === boardPhase)
+  const invQtyM = Math.max(1, Number(sel.inverter_qty || 1))
   const roof = ctx.roofTypes.find((r) => r.code === p.roof_type)
   const electrical = by('electrical')
   const mc4Items = items.filter((i) => i.active && /mc4/i.test(i.name))
@@ -200,14 +213,13 @@ export function MaterialsStep({ ctx }: { ctx: StepCtx }) {
 
   // Smart defaults: pre-select the first matching catalog item and estimate cable lengths once.
   // Explicit "none" is stored as null and is never overridden.
+  // The AC/DC board follows the inverter: empty = automatic by inverter phases (1 board per inverter). A board picked
+  // for the wrong number of phases (e.g. after switching the inverter) is reset to automatic.
   useEffect(() => {
-    if (!items.length) return
-    const d: Partial<Selections> = {}
-    const first = (xs: CatalogItem[]) => xs[0]?.id ?? null
-    if (sel.switchboard_item_id === undefined) d.switchboard_item_id = first(sb.length ? sb : by('switchboard'))
-    if (Object.keys(d).length) setSel(d)
+    const cur = items.find((i) => i.id === sel.switchboard_item_id)
+    if (cur && cur.specs.phases && Number(cur.specs.phases) !== boardPhase) setSel({ switchboard_item_id: null })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items.length])
+  }, [boardPhase, sel.switchboard_item_id])
 
   const setExtra = (i: number, patch: Partial<NonNullable<Selections['extra_items']>[number]>) => setSel({ extra_items: extras.map((x, j) => (j === i ? { ...x, ...patch } : x)) })
 
@@ -215,7 +227,14 @@ export function MaterialsStep({ ctx }: { ctx: StepCtx }) {
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
       <div className="card flex flex-col gap-3 p-4">
         <h2>{t('section_electrical')}</h2>
-        <ItemSelect label={`${t('switchboard')} (${t(p.phase === 1 ? 'phase_1' : 'phase_3')})`} items={sb.length ? sb : by('switchboard')} value={sel.switchboard_item_id} onChange={(v) => setSel({ switchboard_item_id: v })} testId="select-switchboard" />
+        <ItemSelect
+          label={`${t('switchboard')} (${t(boardPhase === 1 ? 'phase_1' : 'phase_3')}${invQtyM > 1 ? ` · ${invQtyM} ${lang === 'bg' ? 'бр. — по едно на инвертор' : 'pcs — one per inverter'}` : ''})`}
+          items={sb.length ? sb : by('switchboard')}
+          value={sel.switchboard_item_id}
+          onChange={(v) => setSel({ switchboard_item_id: v })}
+          testId="select-switchboard"
+          noneLabel={lang === 'bg' ? '— автоматично по инвертора —' : '— automatic by inverter —'}
+        />
         <ItemSelect label={t('solar_cable')} items={by('solar_cable')} value={sel.solar_cable_item_id} onChange={(v) => setSel({ solar_cable_item_id: v })} testId="select-solar-cable" noneLabel={autoLabel} />
         <div className="grid grid-cols-2 gap-3">
           <Field label={t('red_m')} hint={autoHint}>
@@ -225,18 +244,18 @@ export function MaterialsStep({ ctx }: { ctx: StepCtx }) {
             <NumInput value={sel.solar_cable_black_m ?? null} min={0} placeholder={t('auto')} onChange={(v) => setSel({ solar_cable_black_m: v > 0 ? v : null })} />
           </Field>
         </div>
-        <div className="grid grid-cols-[1fr_7rem] gap-3">
+        {mc4Items.length > 0 && <div className="grid grid-cols-[1fr_7rem] gap-3">
           <ItemSelect label={t('mc4')} items={mc4Items} value={sel.mc4_item_id} onChange={(v) => setSel({ mc4_item_id: v })} noneLabel={autoLabel} />
           <Field label={t('qty')} hint={autoHint}>
             <NumInput value={sel.mc4_qty ?? null} min={0} placeholder={t('auto')} onChange={(v) => setSel({ mc4_qty: v > 0 ? v : null })} />
           </Field>
-        </div>
-        <div className="grid grid-cols-[1fr_7rem] gap-3">
+        </div>}
+        {by('power_cable').length > 0 && <div className="grid grid-cols-[1fr_7rem] gap-3">
           <ItemSelect label={t('power_cable')} items={by('power_cable')} value={sel.power_cable_item_id} onChange={(v) => setSel({ power_cable_item_id: v })} testId="select-power-cable" noneLabel={autoLabel} />
           <Field label={t('length_m')} hint={autoHint}>
             <NumInput value={sel.power_cable_m ?? null} min={0} placeholder={t('auto')} onChange={(v) => setSel({ power_cable_m: v > 0 ? v : null })} />
           </Field>
-        </div>
+        </div>}
 
         <h2 className="mt-2 text-base">{t('distances')}</h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -291,6 +310,7 @@ export function MaterialsStep({ ctx }: { ctx: StepCtx }) {
           <Toggle checked={sel.auto_electrical !== false} onChange={(v) => setSel({ auto_electrical: v })} label={t('auto_electrical')} />
         </div>
 
+        {(electrical.length > 0 || el.length > 0) && <>
         <h2 className="mt-2 text-base">{t('other_electrical')}</h2>
         <ul className="flex flex-col gap-2">
           {el.map((x, i) => {
@@ -318,6 +338,7 @@ export function MaterialsStep({ ctx }: { ctx: StepCtx }) {
         <button type="button" className="btn-ghost btn-sm self-start" onClick={() => electrical[0] && setSel({ electrical_items: [...el, { item_id: electrical[0].id, qty: 1 }] })}>
           <Plus className="h-4 w-4" /> {t('add')}
         </button>
+        </>}
       </div>
 
       <div className="flex flex-col gap-5">
@@ -337,7 +358,7 @@ export function MaterialsStep({ ctx }: { ctx: StepCtx }) {
             onChange={(v) => setSel({ mounting_mode: v })}
             options={[
               { value: 'auto', label: t('mounting_auto') },
-              { value: 'detailed', label: t('mounting_detailed') },
+              ...(mounting.length > 0 ? [{ value: 'detailed' as const, label: t('mounting_detailed') }] : []),
               { value: 'lump', label: t('mounting_lump') },
               { value: 'none', label: t('mounting_none') },
             ]}
@@ -352,7 +373,7 @@ export function MaterialsStep({ ctx }: { ctx: StepCtx }) {
               {mounting.length} {lang === 'bg' ? 'артикула конструкция в каталога; количествата се изчисляват от разположението (шини, куки, скоби).' : 'mounting items in the catalog; quantities are derived from the layout (rails, hooks, clamps).'}
             </p>
           )}
-          {sel.mounting_mode !== 'none' && <MountingSystemCard roofType={p.roof_type} />}
+          {sel.mounting_mode !== 'none' && mounting.length > 0 && <MountingSystemCard roofType={p.roof_type} />}
         </div>
 
         <div className="card flex flex-col gap-3 p-4">
@@ -382,7 +403,12 @@ export function MaterialsStep({ ctx }: { ctx: StepCtx }) {
 export function LaborStep({ ctx }: { ctx: StepCtx }) {
   const { t, lang } = useT()
   const { sel, setSel, labor, pricing } = ctx
-  const mode = sel.labor_mode || 'matrix'
+  const mode = sel.labor_mode || pricing.labor_mode_default || 'per_inverter_kw'
+  const inv = ctx.items.find((i) => i.id === sel.inverter_item_id)
+  const invQty = Math.max(1, Number(sel.inverter_qty || 1))
+  const invKw = Number(inv?.specs?.ac_power_kw || 0) * invQty
+  const rateDefault = Number(pricing.labor_eur_per_inverter_kw ?? 0)
+  const rate = sel.labor_eur_per_kw ?? rateDefault
   const days = Array.from(new Set(labor.map((l) => l.days))).sort((a, b) => a - b)
   const workers = Array.from(new Set(labor.map((l) => l.workers))).sort((a, b) => a - b)
   const ppw = sel.install_price_per_w ?? pricing.install_price_per_w
@@ -396,13 +422,52 @@ export function LaborStep({ ctx }: { ctx: StepCtx }) {
           value={mode}
           onChange={(v) => setSel({ labor_mode: v, labor_auto: false })}
           options={[
+            { value: 'per_inverter_kw', label: t('labor_per_inv_kw') },
             { value: 'matrix', label: t('labor_matrix') },
             { value: 'per_w', label: t('labor_per_w') },
             { value: 'manual', label: t('labor_manual') },
           ]}
         />
-        {mode === 'matrix' && (
+        {mode === 'per_inverter_kw' && (
+          <div className="flex flex-col gap-3" data-testid="labor-per-inverter-kw">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label={`${t('labor_rate_kw')} (EUR/kW)`} hint={lang === 'bg' ? `По подразбиране от Настройки: ${fmtNum(rateDefault, 2)} €/kW` : `Default from Settings: ${fmtNum(rateDefault, 2)} €/kW`}>
+                <NumInput
+                  value={rate}
+                  min={0}
+                  step={1}
+                  onChange={(v) => setSel({ labor_eur_per_kw: v })}
+                  data-testid="input-labor-rate-kw"
+                />
+              </Field>
+              <div className="self-end pb-2 text-sm text-ink-2">
+                {inv ? (
+                  <>
+                    {invQty > 1 ? `${invQty} × ${fmtNum(Number(inv.specs?.ac_power_kw || 0), 0)} kW` : `${fmtNum(invKw, 0)} kW`} × {fmtNum(rate, 2)} ={' '}
+                    <span className="num font-semibold" data-testid="text-labor-total">
+                      {fmtMoney(invKw * rate)}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-warn">{lang === 'bg' ? 'Изберете инвертор в стъпка „Оборудване“.' : 'Select an inverter in the Equipment step.'}</span>
+                )}
+              </div>
+            </div>
+            {sel.labor_eur_per_kw != null && sel.labor_eur_per_kw !== rateDefault && (
+              <button type="button" className="btn-quiet btn-sm self-start" onClick={() => setSel({ labor_eur_per_kw: null })} data-testid="button-labor-rate-reset">
+                {lang === 'bg' ? 'Върни ставката от Настройки' : 'Use the rate from Settings'}
+              </button>
+            )}
+            <p className="text-xs text-ink-3">
+              {lang === 'bg'
+                ? `Трудът се изчислява по мощността на инвертора, не на модулите (${fmtNum(ctx.kwp, 2)} kWp). Матрицата дни × хора се използва само за графика на монтажа.`
+                : `Labor is based on the inverter power, not the module power (${fmtNum(ctx.kwp, 2)} kWp). The days × workers matrix is only used for the installation schedule.`}
+            </p>
+          </div>
+        )}
+        {(mode === 'matrix' || mode === 'per_inverter_kw') && (
           <div className="overflow-x-auto">
+            {mode === 'per_inverter_kw' && <div className="mb-1 text-xs font-medium text-ink-2">{lang === 'bg' ? 'График (дни × хора)' : 'Schedule (days × workers)'}</div>}
             <table className="tbl">
               <thead>
                 <tr>

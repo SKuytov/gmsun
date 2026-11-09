@@ -428,6 +428,8 @@ const dict = {
   // labor
   labor: ['Труд (СМР)', 'Labor'],
   labor_matrix: ['Дни × хора (таблица)', 'Days × workers (matrix)'],
+  labor_per_inv_kw: ['По kW инвертор', 'Per inverter kW'],
+  labor_rate_kw: ['Ставка труд', 'Labor rate'],
   labor_per_w: ['Цена на W', 'Price per W'],
   labor_manual: ['Ръчна сума', 'Manual amount'],
   days: ['Дни', 'Days'],

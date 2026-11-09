@@ -25,6 +25,7 @@ export function LayoutStep({ ctx }: { ctx: StepCtx }) {
     mutationFn: () => post<Layout>(`/api/projects/${p.id}/layouts`, { name: `${t('layouts').split(' ')[0]} ${p.layouts.length + 1}`, plane_w_m: 10, plane_h_m: 6, panel_item_id: ctx.sel.panel_item_id || undefined }),
     onSuccess: (l) => {
       qc.setQueryData<Project>(['project', p.id], (old) => (old ? { ...old, layouts: [...old.layouts, l] } : old))
+      qc.invalidateQueries({ queryKey: ['quotes', p.id] })
       setSelId(l.id)
     },
     onError: (e) => toast.push(errMsg(e), 'bad'),
@@ -34,6 +35,7 @@ export function LayoutStep({ ctx }: { ctx: StepCtx }) {
     onSuccess: (_, lid) => {
       qc.setQueryData<Project>(['project', p.id], (old) => (old ? { ...old, layouts: old.layouts.filter((l) => l.id !== lid) } : old))
       qc.invalidateQueries({ queryKey: ['project', p.id] })
+      qc.invalidateQueries({ queryKey: ['quotes', p.id] })
     },
     onError: (e) => toast.push(errMsg(e), 'bad'),
   })
@@ -83,6 +85,7 @@ export function LayoutStep({ ctx }: { ctx: StepCtx }) {
           onSaved={(l) => {
             qc.setQueryData<Project>(['project', p.id], (old) => (old ? { ...old, layouts: old.layouts.map((x) => (x.id === l.id ? l : x)) } : old))
             qc.invalidateQueries({ queryKey: ['projects'] })
+            qc.invalidateQueries({ queryKey: ['quotes', p.id] })
           }}
         />
       )}
