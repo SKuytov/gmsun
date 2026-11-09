@@ -71,7 +71,7 @@ def strings(panel_id: int, inverter_id: int, n_panels: int, n_inverters: int = 1
 def project_design(pid: int, body: dict[str, Any] | None = None, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     """Run the full engineering design for a project with the given (draft) selections —
     used by the Materials step to preview quantities before a quote exists."""
-    from ..models import Project
+    from ..models import Project, RoofTypeConfig
     from ..services import pricing as pricing_svc
 
     project = db.get(Project, pid)
@@ -103,12 +103,20 @@ def project_design(pid: int, body: dict[str, Any] | None = None, db: Session = D
         sb = next((b for b in sorted(items, key=lambda x: (x.sort_order or 0, x.id)) if b.category == "switchboard"
                    and int((b.specs or {}).get("phases") or 0) == want_ph), sb)
     covered = {str(x) for x in ((sb.specs or {}).get("covers_roles") or [])} if sb else set()
+    roof = db.get(RoofTypeConfig, project.roof_type) if project.roof_type else None
+    mmode = sel.get("mounting_mode", "auto")
+    lump = bool(roof) and (roof.pricing_mode if mmode == "auto" else mmode) == "lump"
     d["switchboard"] = {"item_id": sb.id, "name": sb.name, "qty": inv_qty, "covers_roles": sorted(covered)} if sb else None
     for r in d.get("roles") or []:
         if r.get("role") in covered:
             r["item_id"], r["item_name"], r["unit_price"], r["status"] = None, None, None, "covered"
             continue
         it = engineering.find_item_for_role(items, r)
+        if it is not None and lump and it.category == "mounting":
+            # per-module construction price already includes fixings / earthing clamps (same rule as the quote)
+            r["item_id"], r["item_name"], r["unit_price"], r["status"] = None, None, None, "covered"
+            r["covered_by"] = "construction"
+            continue
         r["item_id"] = it.id if it else None
         r["item_name"] = it.name if it else None
         r["unit_price"] = it.price_for(float(pr.get("default_markup_pct", 0))) if it else None

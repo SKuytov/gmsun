@@ -37,7 +37,7 @@ function DesignPanel({ ctx }: { ctx: StepCtx }) {
       <span className="num text-right">{String(v ?? '—')}</span>
     </div>
   )
-  const covered = d.roles.filter((r) => r.status === 'covered')
+  const covered = d.roles.filter((r) => r.status === 'covered' && r.covered_by !== 'construction')
   const notQuoted = d.roles.filter((r) => !r.item_id && r.status !== 'covered')
   const sorted = [...d.roles].sort((a, b) => SECTION_ORDER.indexOf(a.section) - SECTION_ORDER.indexOf(b.section))
   const warnings = Array.from(new Set([...(d.warnings || []), ...(d.strings?.warnings || [])]))
@@ -160,7 +160,7 @@ function DesignPanel({ ctx }: { ctx: StepCtx }) {
                     {fmtNum(r.qty, 0)} {r.unit}
                   </td>
                   <td className="num whitespace-nowrap text-right">
-                    {r.unit_price != null ? fmtMoney(r.unit_price) : r.status === 'covered' ? (lang === 'bg' ? 'в таблото' : 'in board') : lang === 'bg' ? 'не се офертира' : 'not quoted'}
+                    {r.unit_price != null ? fmtMoney(r.unit_price) : r.status === 'covered' ? (r.covered_by === 'construction' ? (lang === 'bg' ? 'в цената на конструкцията' : 'in construction price') : lang === 'bg' ? 'в таблото' : 'in board') : lang === 'bg' ? 'не се офертира' : 'not quoted'}
                   </td>
                 </tr>
               ))}

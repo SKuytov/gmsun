@@ -92,7 +92,7 @@ def demand_kwp(ctx: Ctx) -> tuple[float, str]:
     explicit = _f(params, "target_kwp", 0)
     if explicit > 0:
         return round(explicit, 2), "target"
-    sy = float(ctx.pricing.get("specific_yield", 1250) or 1250)
+    sy = float(ctx.pricing.get("specific_yield_kwh_per_kwp", ctx.pricing.get("specific_yield", 1250)) or 1250)
     if p.annual_consumption_kwh and p.annual_consumption_kwh > 0:
         kwp = p.annual_consumption_kwh / sy
         if p.connected_power_kw > 0:
@@ -387,7 +387,7 @@ def generate(db: Session, project: Project, strategies: list[str] | None = None,
             "subtotal": ev["subtotal"], "vat": ev["vat"], "total": ev["total"], "cost": ev["cost"], "margin": ev["margin"],
             "lead_time_days": ev["lead_time_days"], "lead_bottleneck": ev["lead_bottleneck"], "suppliers": ev["suppliers"],
             "by_section": ev["by_section"], "execution_days": ev["info"].get("execution_days"),
-            "yield_kwh": round(pricing.estimate_yield(float(ev["info"].get("kwp") or 0), float(ctx.pricing.get("specific_yield", 1250)))),
+            "yield_kwh": round(pricing.estimate_yield(float(ev["info"].get("kwp") or 0), float(ctx.pricing.get("specific_yield_kwh_per_kwp", ctx.pricing.get("specific_yield", 1250)) or 1250))),
             "key_items": _key_items(ctx, best["sel"], ev),
             "warnings": [w for w in ev["warnings"] if "Липсва цена" not in w][:8],
             "missing_price": ev["missing_price"][:8],

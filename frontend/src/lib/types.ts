@@ -556,6 +556,7 @@ export interface DesignRole {
   unit_price: number | null
   /** quoted = has a catalog article; covered = included in the equipped AC/DC board; not_quoted = listed only */
   status?: 'quoted' | 'covered' | 'not_quoted'
+  covered_by?: 'construction'
 }
 
 export interface DesignString {
