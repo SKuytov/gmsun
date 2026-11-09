@@ -323,6 +323,9 @@ def seed(db: Session) -> None:
 
     if not catalog_final.is_done(db):
         catalog_final.apply(db, s.data_dir)
+    from .services import catalog_packs
+
+    catalog_packs.migrate(db)  # once: Aerocompact + cable databases next to the final catalog
 
 
 def seed_legacy_catalog(db: Session) -> None:

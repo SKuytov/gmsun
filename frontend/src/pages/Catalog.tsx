@@ -13,6 +13,71 @@ import { DocsTab } from './CatalogDocs'
 const TABS = ['items', 'labor', 'roofs', 'rules', 'docs'] as const
 type Tab = (typeof TABS)[number]
 
+interface CatalogPack {
+  key: string
+  label_bg: string
+  label_en: string
+  description_bg: string
+  enabled: boolean
+  items: number
+  indicative: number
+}
+
+type PackResult = { added?: number; deleted?: number; rules?: number; quotes_updated?: number }
+
+/** Optional reference databases next to the GM SUN final catalog (Aerocompact mounting, cables). */
+function PacksBar({ admin }: { admin: boolean }) {
+  const { lang } = useT()
+  const qc = useQueryClient()
+  const toast = useToast()
+  const packs = useQuery({ queryKey: ['catalog', 'packs'], queryFn: () => get<CatalogPack[]>('/api/catalog/packs') })
+  const [off, setOff] = useState<CatalogPack | null>(null)
+  const toggle = useMutation({
+    mutationFn: (p: CatalogPack) => (p.enabled ? del<PackResult>(`/api/catalog/packs/${p.key}`) : post<PackResult>(`/api/catalog/packs/${p.key}`)),
+    onSuccess: (r: PackResult, p) => {
+      qc.invalidateQueries()
+      setOff(null)
+      const name = lang === 'bg' ? p.label_bg : p.label_en
+      toast.push(
+        lang === 'bg'
+          ? p.enabled ? `${name}: изтрити ${r.deleted ?? 0} артикула` : `${name}: добавени ${r.added ?? 0} артикула${r.rules ? ` и ${r.rules} правила` : ''}`
+          : p.enabled ? `${name}: ${r.deleted ?? 0} items removed` : `${name}: ${r.added ?? 0} items added`,
+        'ok',
+      )
+    },
+    onError: (e) => toast.push(errMsg(e), 'bad'),
+  })
+  if (!packs.data?.length) return null
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs" data-testid="catalog-packs">
+      <span className="text-ink-3">{lang === 'bg' ? 'Допълнителни бази:' : 'Extra databases:'}</span>
+      {packs.data.map((p) => (
+        <span key={p.key} className={cx('inline-flex items-center gap-2 rounded-md border px-2 py-1', p.enabled ? 'border-ok/40 bg-ok/5' : 'border-line')} title={p.description_bg} data-testid={`pack-${p.key}`}>
+          <span className="font-medium text-ink">{lang === 'bg' ? p.label_bg : p.label_en}</span>
+          <span className="text-ink-3">{p.enabled ? `${p.items} ${lang === 'bg' ? 'арт.' : 'items'}` : lang === 'bg' ? 'изключена' : 'off'}</span>
+          {admin && (
+            <button type="button" className="btn-ghost btn-sm !px-1.5 !py-0.5" disabled={toggle.isPending} onClick={() => (p.enabled ? setOff(p) : toggle.mutate(p))} data-testid={`button-pack-${p.key}`}>
+              {p.enabled ? (lang === 'bg' ? 'Премахни' : 'Remove') : lang === 'bg' ? 'Добави' : 'Add'}
+            </button>
+          )}
+        </span>
+      ))}
+      <Confirm
+        open={!!off}
+        onClose={() => setOff(null)}
+        onConfirm={() => off && toggle.mutate(off)}
+        title={off ? (lang === 'bg' ? `Премахни „${off.label_bg}“` : `Remove ${off.label_en}`) : ''}
+        text={
+          lang === 'bg'
+            ? 'Артикулите от тази база се изтриват (редовете в изпратени оферти и поръчки запазват текста си). Артикулите на GM SUN не се засягат. Базата може да се добави отново по всяко време.'
+            : 'The items of this database are deleted (lines of sent quotes and orders keep their text). GM SUN items are not affected. It can be added again at any time.'
+        }
+        danger
+      />
+    </div>
+  )
+}
+
 interface Meta {
   categories: string[]
   mounting_bases: string[]
@@ -226,11 +291,12 @@ function ItemsTab({ lang }: { lang: string }) {
       {curated && final.data && (
         <p className="text-xs text-ink-3" data-testid="text-final-status">
           {lang === 'bg'
-            ? `Финален каталог на GM SUN: ${final.data.final_present} от ${final.data.final_items} артикула · общо в каталога ${final.data.items_total}. Системата предлага и офертира само тези артикули.`
-            : `GM SUN final catalog: ${final.data.final_present} of ${final.data.final_items} items · ${final.data.items_total} in the catalog. The system only suggests and quotes these items.`}
+            ? `Финален каталог на GM SUN: ${final.data.final_present} от ${final.data.final_items} артикула · общо в каталога ${final.data.items_total}. Панели, инвертори и батерии се предлагат само от тези артикули.`
+            : `GM SUN final catalog: ${final.data.final_present} of ${final.data.final_items} items · ${final.data.items_total} in the catalog. Panels, inverters and batteries are suggested only from these items.`}
           {final.data.missing.length > 0 && <span className="text-warn"> {lang === 'bg' ? `Липсват: ${final.data.missing.join(', ')}` : `Missing: ${final.data.missing.join(', ')}`}</span>}
         </p>
       )}
+      {curated && <PacksBar admin={admin} />}
       {admin && !curated && status.data && (
         <p className="text-xs text-ink-3" data-testid="text-supplier-status">
           {t('supplier_status')} {status.data.supplier}: {status.data.linked_items} {t('supplier_linked')} · {status.data.with_datasheet} {t('supplier_with_ds')} · {status.data.unverified_items} {t('supplier_unverified')}

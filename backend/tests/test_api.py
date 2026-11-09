@@ -7,14 +7,20 @@ def test_login_rejects_bad_password(client):
     r = client.post("/api/auth/login-json", json={"email": "admin@gmsun.local", "password": "nope"})
     assert r.status_code == 401
 
+from app.seed_data import gmsun_final as F
+
 
 def test_catalog_seeded(client, auth):
     items = client.get("/api/catalog/items", headers=auth).json()
     cats = {i["category"] for i in items}
-    # the curated final catalog (gmsun-dataset.xlsx of the company) – nothing else
-    assert {"panel", "inverter", "battery", "battery_accessory", "switchboard", "solar_cable", "monitoring"} <= cats
-    assert "mounting" not in cats and "power_cable" not in cats
-    assert len(items) == 56
+    # the curated final catalog (gmsun-dataset.xlsx of the company) + the Aerocompact and cable reference packs;
+    # main equipment (panels, inverters, batteries) comes only from the final catalog
+    assert {"panel", "inverter", "battery", "battery_accessory", "switchboard", "solar_cable", "monitoring", "mounting", "power_cable"} <= cats
+    final_names = {d["name"] for d in F.ITEMS}
+    main = [i for i in items if i["category"] in ("panel", "inverter", "battery")]
+    assert main and all(i["name"] in final_names for i in main)
+    extra = [i for i in items if i["name"] not in final_names]
+    assert extra and all((i["specs"] or {}).get("pack") in ("aerocompact", "cables") for i in extra)
     meta = client.get("/api/catalog/meta", headers=auth).json()
     assert "categories" in meta
 
@@ -231,10 +237,11 @@ def test_recalculate_after_project_change_adds_new_lines(client, auth):
     assert sorted(positions) == list(range(len(positions)))
 
 
-def test_final_catalog_has_no_mounting_rules_and_lump_roofs(client, auth):
-    """Aerocompact items were removed with the final catalog → every roof type is priced per module (lump)."""
+def test_final_catalog_lump_roofs_and_aerocompact_rules(client, auth):
+    """Roof types are priced per module (GM SUN prices) by default; the Aerocompact pack brings its rules back so
+    "detailed" can be chosen per project / roof type."""
     rules = client.get("/api/catalog/mounting-rules", headers=auth).json()
-    assert rules == []
+    assert len(rules) >= 100 and all(r["catalog_item_id"] for r in rules)
     roofs = client.get("/api/catalog/roof-types", headers=auth).json()
     assert roofs and all(r["pricing_mode"] == "lump" and r["lump_price_per_module"] > 0 for r in roofs)
     tile = next(r for r in roofs if r["code"] == "tile")

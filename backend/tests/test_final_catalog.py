@@ -36,11 +36,42 @@ def test_final_catalog_is_the_only_catalog(client, auth):
     db = SessionLocal()
     try:
         assert catalog_final.is_done(db) and catalog_final.is_curated(db)
-        assert db.query(CatalogItem).filter(CatalogItem.manufacturer == "Aerocompact").count() == 0
+        # the Aerocompact + cable packs were brought back once next to the final items
+        assert db.query(CatalogItem).filter(CatalogItem.manufacturer == "Aerocompact").count() >= 150
     finally:
         db.close()
-    # legacy seeders are refused once the curated catalog is active
-    assert client.post("/api/catalog/mounting/reseed", headers=auth).status_code == 409
+    packs = {p["key"]: p for p in client.get("/api/catalog/packs", headers=auth).json()}
+    assert packs["aerocompact"]["enabled"] and packs["cables"]["enabled"]
+    assert packs["aerocompact"]["items"] >= 150 and packs["cables"]["items"] >= 20
+    # main equipment stays GM SUN-only
+    for cat in ("panel", "inverter", "battery"):
+        assert not any((i["specs"] or {}).get("pack") for i in _items(client, auth, cat))
+    # GM SUN's own 6 mm² solar cable is not duplicated by the pack
+    pv6 = [i for i in _items(client, auth, "solar_cable") if (i["specs"] or {}).get("cross_section_mm2") == 6]
+    assert [i["name"] for i in pv6] == ["KBE"]
+    names = {i["name"] for i in _items(client, auth)}
+    assert {"Кабел СВТ 5×10 mm²", "Кабел СВТ 3×6 mm²", "Соларен кабел 10 mm² H1Z2Z2-K"} <= names
+
+
+def test_packs_remove_and_reinstall(client, auth):
+    before = len(_items(client, auth))
+    r = client.delete("/api/catalog/packs/cables", headers=auth)
+    assert r.status_code == 200, r.text
+    assert not any(i["category"] == "power_cable" for i in _items(client, auth))
+    assert "KBE" in {i["name"] for i in _items(client, auth)}  # final item untouched
+    r = client.post("/api/catalog/packs/cables", headers=auth)
+    assert r.status_code == 200 and r.json()["added"] > 0
+    assert len(_items(client, auth)) == before
+    assert client.post("/api/catalog/packs/nope", headers=auth).status_code == 404
+
+
+def test_pack_items_are_quoted_by_role(client, auth):
+    """With the cable pack the AC cable / MC4 roles are priced instead of being 'not quoted'."""
+    p = _make_project(client, auth)
+    q = client.post(f"/api/projects/{p['id']}/quotes", headers=auth, json={}).json()
+    roles = {(l.get("meta") or {}).get("role") for l in q.get("lines", [])}
+    nq = set((q.get("info") or {}).get("not_quoted_roles") or [])
+    assert "ac_cable" not in nq and "mc4_pair" not in nq
 
 
 def test_reapply_removes_foreign_items_and_keeps_quotes_valid(client, auth):
@@ -59,7 +90,11 @@ def test_reapply_removes_foreign_items_and_keeps_quotes_valid(client, auth):
     assert q2.json()["selections"].get("panel_item_id") != extra["id"]
     # idempotent
     assert client.post("/api/catalog/final/reapply", headers=auth).status_code == 200
-    assert len(_items(client, auth)) == len(F.ITEMS)
+    items = _items(client, auth)
+    assert {d["name"] for d in F.ITEMS} <= {i["name"] for i in items}
+    # enabled packs survive the restore, everything else is gone
+    assert all(i["name"] in {d["name"] for d in F.ITEMS} or (i["specs"] or {}).get("pack") for i in items)
+    assert len(client.get("/api/catalog/mounting-rules", headers=auth).json()) >= 100
 
 
 # ------------------------------------------------------------------------------------------------- dataset replace mode
@@ -271,3 +306,18 @@ def test_project_changes_update_the_draft_quote(client, auth):
     frozen = client.get(f"/api/quotes/{q['id']}", headers=auth).json()["total"]
     client.patch(f"/api/projects/{pid}", headers=auth, json={"params": {"selections": {**sel, "panel_qty": 30}}})
     assert client.get(f"/api/quotes/{q['id']}", headers=auth).json()["total"] == frozen
+
+
+def test_detailed_mounting_with_aerocompact_pack(client, auth):
+    """Lump (GM SUN per-module price) stays the default; "detailed" itemises the Aerocompact construction."""
+    p = _make_project(client, auth)
+    panel = _items(client, auth, "panel")[0]
+    base = {"panel_item_id": panel["id"], "panel_qty": 14}
+    q = client.post(f"/api/projects/{p['id']}/quotes", headers=auth, json={"selections": {**base, "mounting_mode": "lump"}}).json()
+    cons = [l for l in q["lines"] if l["section"] == "construction"]
+    assert any((l.get("meta") or {}).get("mode") == "lump" for l in cons)
+    assert not any("WCL" in l["name"] for l in cons)  # fixings are part of the per-module price
+    q = client.post(f"/api/projects/{p['id']}/quotes", headers=auth, json={"selections": {**base, "mounting_mode": "detailed"}}).json()
+    cons = [l for l in q["lines"] if l["section"] == "construction" and not l["name"].startswith("Доставка")]
+    assert len(cons) >= 5 and not any((l.get("meta") or {}).get("mode") == "lump" for l in cons)
+    assert all(l["unit_price"] > 0 for l in cons)

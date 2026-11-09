@@ -259,6 +259,10 @@ def apply(db: Session, data_dir: Path | None = None, *, force: bool = False) -> 
     backup = _backup(db, data_dir) if db.query(CatalogItem).first() is not None else None
     finals, stats = upsert_final_items(db)
     keep = {f.id for f in finals}
+    from . import catalog_packs
+
+    packs = set(catalog_packs.enabled(db))  # enabled reference packs (Aerocompact, cables) survive a restore
+    keep |= {r.id for r in db.query(CatalogItem).all() if catalog_packs.pack_of(r) in packs}
     others = [r for r in db.query(CatalogItem).all() if r.id not in keep]
     remap: dict[int, int | None] = {}
     for o in others:
@@ -300,6 +304,8 @@ def apply(db: Session, data_dir: Path | None = None, *, force: bool = False) -> 
             _put_setting(db, key, patch)
     _put_setting(db, "datafill", {"done": True, "at": datetime.now(timezone.utc).isoformat(), "stats": {"note": "final catalog"}})
     _put_setting(db, "catalog", {"curated": True, "profile": "gmsun_final"})
+    if "aerocompact" in packs:
+        catalog_packs.install(db, "aerocompact")  # re-links / re-creates the mounting rules
     result = {
         "at": datetime.now(timezone.utc).isoformat(), "kept": len(keep), "created": stats["created"], "updated": stats["updated"],
         "deleted": len(removed), "remapped": sum(1 for v in remap.values() if v), "selections_fixed": sel_fixed, "layouts_fixed": lay_fixed,

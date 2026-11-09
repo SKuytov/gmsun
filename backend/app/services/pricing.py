@@ -306,6 +306,10 @@ def build_lines(db: Session, project: Project, quote: Quote) -> tuple[list[dict[
             continue
         if item is None:
             item = engineering.find_item_for_role(all_items, r, pick)
+            if item is not None and item.category == "mounting" and info.get("mounting_mode") == "lump":
+                # construction priced per module already includes its fixings / earthing clamps
+                info.setdefault("covered_by_construction", []).append(r["name"])
+                continue
         if item is None and rk == "pv_cable":
             pvc = [c for c in all_items if c.category == "solar_cable" or (c.specs or {}).get("role") == "pv_cable"]
             if pvc:

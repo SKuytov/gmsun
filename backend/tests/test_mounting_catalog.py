@@ -114,10 +114,11 @@ def test_mounting_systems_endpoint(client, auth):
     data = r.json()
     assert len(data["systems"]) >= 14 and len(data["documents"]) >= 60
     assert data["roof_system"]["standing_seam"] == "TM"
-    # the curated production catalog has no Aerocompact items and refuses to re-seed them
+    # the Aerocompact pack is installed next to the final catalog; re-seeding is additive and idempotent
     items = client.get("/api/catalog/items", params={"category": "mounting"}, headers=auth).json()
-    assert items == []
-    assert client.post("/api/catalog/mounting/reseed", headers=auth).status_code == 409
+    assert len(items) >= 150
+    r = client.post("/api/catalog/mounting/reseed", headers=auth)
+    assert r.status_code == 200 and r.json()["added_items"] == 0
     db = SessionLocal()
     aero = db.query(CatalogItem).filter(CatalogItem.manufacturer == "Aerocompact").all()
     assert len(aero) >= 150 and all((i.specs or {}).get("datasheet_url") for i in aero)

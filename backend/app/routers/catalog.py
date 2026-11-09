@@ -326,17 +326,47 @@ def mounting_systems(_: User = Depends(get_current_user)):
 
 @router.post("/mounting/reseed", status_code=200)
 def mounting_reseed(db: Session = Depends(get_db), _: User = Depends(require_admin)):
-    """Legacy: added the built-in Aerocompact catalogue. Disabled once the GM SUN final catalog is active – the system
-    may only quote the curated items (add new ones manually or via the dataset import)."""
-    from ..services import catalog_final
+    """(Re)installs the built-in AEROCOMPACT mounting catalogue and its rules next to the final catalog. Additive:
+    existing articles and edited prices are kept."""
+    from ..services import catalog_packs
 
-    if catalog_final.is_curated(db):
-        raise HTTPException(409, "Каталогът е фиксиран към финалния набор артикули на GM SUN — вграденият каталог Aerocompact не се добавя. Добавете нови артикули ръчно или чрез импорт на набора данни.")
-    from ..seed import seed_legacy_catalog
+    res = catalog_packs.install(db, "aerocompact")
+    db.commit()
+    return {"added_items": res["added"], **res}
 
-    before = db.query(CatalogItem).count()
-    seed_legacy_catalog(db)
-    return {"added_items": db.query(CatalogItem).count() - before}
+
+@router.get("/packs")
+def packs_status(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    """Optional reference databases (Aerocompact, cables) and whether they are enabled."""
+    from ..services import catalog_packs
+
+    return catalog_packs.status(db)
+
+
+@router.post("/packs/{key}")
+def packs_install(key: str, db: Session = Depends(get_db), _: User = Depends(require_admin)):
+    from ..services import autosync, catalog_packs
+
+    if key not in catalog_packs.PACKS:
+        raise HTTPException(404, "Няма такъв пакет")
+    res = catalog_packs.install(db, key)
+    db.commit()
+    res["quotes_updated"] = autosync.recalc_all_drafts(db)
+    db.commit()
+    return res
+
+
+@router.delete("/packs/{key}")
+def packs_remove(key: str, db: Session = Depends(get_db), _: User = Depends(require_admin)):
+    from ..services import autosync, catalog_packs
+
+    if key not in catalog_packs.PACKS:
+        raise HTTPException(404, "Няма такъв пакет")
+    res = catalog_packs.remove(db, key)
+    db.commit()
+    res["quotes_updated"] = autosync.recalc_all_drafts(db)
+    db.commit()
+    return res
 
 
 @router.get("/final/status")
