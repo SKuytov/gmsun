@@ -53,7 +53,7 @@ def material_rows(db: Session, q: Quote) -> dict[str, list[dict[str, Any]]]:
     scfg = get_setting(db, "suppliers")
     groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for l in q.lines:
-        if l.hidden or l.section in ("labor",):
+        if bool(l.excluded) or l.section in ("labor",):  # hidden rows are still bought
             continue
         if any(l.key.startswith(k) or l.key == k for k in NON_MATERIAL_KEYS):
             continue

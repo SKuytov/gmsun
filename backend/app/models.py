@@ -82,7 +82,7 @@ class CatalogItem(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     category: Mapped[str] = mapped_column(String(32), index=True)
     sku: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    name: Mapped[str] = mapped_column(String(255), index=True)
+    name: Mapped[str] = mapped_column(Text, index=True)
     manufacturer: Mapped[str | None] = mapped_column(String(128), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     unit: Mapped[str] = mapped_column(String(16), default="бр.")
@@ -116,7 +116,7 @@ class LaborOption(Base):
     days: Mapped[int] = mapped_column(Integer)
     workers: Mapped[int] = mapped_column(Integer)
     price: Mapped[float] = mapped_column(Float)
-    description: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
@@ -164,7 +164,7 @@ class MountingRule(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     roof_type: Mapped[str] = mapped_column(String(32), ForeignKey("roof_types.code"), index=True)
     catalog_item_id: Mapped[int | None] = mapped_column(ForeignKey("catalog_items.id"), nullable=True)
-    name: Mapped[str] = mapped_column(String(255))
+    name: Mapped[str] = mapped_column(Text)
     basis: Mapped[str] = mapped_column(String(32))
     factor: Mapped[float] = mapped_column(Float, default=1.0)
     round_up: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -183,18 +183,18 @@ class Project(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     number: Mapped[str] = mapped_column(String(32), unique=True, index=True)
-    name: Mapped[str] = mapped_column(String(255))
+    name: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(20), default="draft")  # draft|quoted|won|lost|archived
 
     client_name: Mapped[str] = mapped_column(String(255), default="")
-    client_company: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    client_company: Mapped[str | None] = mapped_column(Text, nullable=True)
     client_eik: Mapped[str | None] = mapped_column(String(32), nullable=True)
     client_vat: Mapped[str | None] = mapped_column(String(32), nullable=True)
     client_phone: Mapped[str | None] = mapped_column(String(64), nullable=True)
     client_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    client_address: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    client_address: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    site_address: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    site_address: Mapped[str | None] = mapped_column(Text, nullable=True)
     site_lat: Mapped[float | None] = mapped_column(Float, nullable=True)
     site_lon: Mapped[float | None] = mapped_column(Float, nullable=True)
 
@@ -308,7 +308,7 @@ class QuoteLine(Base):
     key: Mapped[str] = mapped_column(String(64))  # stable key for auto-generated lines
     section: Mapped[str] = mapped_column(String(32))  # modules|inverter|construction|electrical|labor|other
     position: Mapped[int] = mapped_column(Integer, default=0)
-    name: Mapped[str] = mapped_column(String(255))
+    name: Mapped[str] = mapped_column(Text)
     unit: Mapped[str] = mapped_column(String(16), default="бр.")
     qty: Mapped[float] = mapped_column(Float, default=1.0)
     unit_price: Mapped[float] = mapped_column(Float, default=0.0)
@@ -317,7 +317,10 @@ class QuoteLine(Base):
     catalog_item_id: Mapped[int | None] = mapped_column(ForeignKey("catalog_items.id"), nullable=True)
     source: Mapped[str] = mapped_column(String(10), default="auto")  # auto | manual
     locked: Mapped[bool] = mapped_column(Boolean, default=False)  # user override, keep on recalc
-    hidden: Mapped[bool] = mapped_column(Boolean, default=False)  # excluded from quote
+    hidden: Mapped[bool] = mapped_column(Boolean, default=False)  # not shown to the client; its value is spread over the visible lines
+    excluded: Mapped[bool | None] = mapped_column(Boolean, default=False, nullable=True)  # removed from the quote (not priced, not ordered)
+    alloc: Mapped[float | None] = mapped_column(Float, default=0.0, nullable=True)  # € taken over from hidden lines (included in total)
+    client_unit_price: Mapped[float | None] = mapped_column(Float, nullable=True)  # unit price incl. alloc, as shown to the client
     meta: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
     quote: Mapped[Quote] = relationship(back_populates="lines")
@@ -375,7 +378,7 @@ class PurchaseOrderLine(Base):
     catalog_item_id: Mapped[int | None] = mapped_column(ForeignKey("catalog_items.id"), nullable=True)
     quote_line_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
     sku: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    name: Mapped[str] = mapped_column(String(255))
+    name: Mapped[str] = mapped_column(Text)
     unit: Mapped[str] = mapped_column(String(16), default="бр.")
     qty_ordered: Mapped[float] = mapped_column(Float, default=0.0)
     qty_received: Mapped[float] = mapped_column(Float, default=0.0)
@@ -401,7 +404,7 @@ class ProjectDocument(Base):
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), index=True)
     quote_id: Mapped[int | None] = mapped_column(ForeignKey("quotes.id"), nullable=True)
     kind: Mapped[str] = mapped_column(String(32), index=True)  # quote|calc|techfile|bom|rfq|order|photo|survey|contract|datasheet|protocol|other
-    title: Mapped[str] = mapped_column(String(255))
+    title: Mapped[str] = mapped_column(Text)
     filename: Mapped[str] = mapped_column(String(255))
     path: Mapped[str] = mapped_column(String(255))  # relative to DATA_DIR
     size: Mapped[int] = mapped_column(Integer, default=0)

@@ -269,7 +269,7 @@ def client_package(db: Session, q: Quote, *, merged_pdf: bool = True) -> tuple[b
     seen_files: set[Path] = set()  # Aerocompact components share one system datasheet – include it once
     for l in q.lines:
         ci = l.catalog_item
-        if l.hidden or not ci or ci.id in seen or ci.category not in ("panel", "inverter", "battery", "switchboard", "mounting"):
+        if bool(l.excluded) or not ci or ci.id in seen or ci.category not in ("panel", "inverter", "battery", "switchboard", "mounting"):
             continue
         if ci.category == "mounting" and not (ci.specs or {}).get("system"):
             continue

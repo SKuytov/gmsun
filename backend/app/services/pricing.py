@@ -26,7 +26,7 @@ SECTIONS: list[tuple[str, str, str]] = [
     ("inverter", "Част инвертор и батерии", "Inverter & batteries"),
     ("construction", "Част конструкция", "Mounting structure"),
     ("electrical", "Част електрически компоненти", "Electrical components"),
-    ("labor", "Част строително-монтажни работи", "Installation works"),
+    ("labor", "Част монтажни работи", "Installation works"),
     ("other", "Транспорт и други", "Transport & other"),
 ]
 SECTION_ORDER = {s[0]: i for i, s in enumerate(SECTIONS)}
@@ -445,13 +445,95 @@ def apply_lines(db: Session, quote: Quote, new_lines: list[dict[str, Any]]) -> N
         ln.position = i
 
 
+def is_active(ln: QuoteLine) -> bool:
+    """Line is part of the offer (priced, ordered, installed) – visible or hidden, but not removed."""
+    return not bool(getattr(ln, "excluded", False))
+
+
+def is_visible(ln: QuoteLine) -> bool:
+    """Line is shown to the client (its total includes the share of hidden lines)."""
+    return is_active(ln) and not ln.hidden
+
+
+def base_total(ln: QuoteLine) -> float:
+    return round(float(ln.qty or 0) * float(ln.unit_price or 0), 2)
+
+
+def _round_line(ln: QuoteLine, share: float) -> None:
+    """Spread ``share`` € over the unit price so that qty × client unit price = line total (2 decimals)."""
+    base = base_total(ln)
+    qty = float(ln.qty or 0)
+    if abs(share) < 0.005 or qty <= 0:
+        ln.client_unit_price, ln.total, ln.alloc = round(float(ln.unit_price or 0), 2), base, 0.0
+        return
+    cu = round(float(ln.unit_price or 0) + share / qty, 2)
+    ln.client_unit_price = cu
+    ln.total = round(qty * cu, 2)
+    ln.alloc = round(ln.total - base, 2)
+
+
+def _absorb(lines: list[QuoteLine], diff: float) -> None:
+    """Put a rounding difference (cents) on one line, preferring qty = 1 so the unit price stays exact."""
+    diff = round(diff, 2)
+    if abs(diff) < 0.005 or not lines:
+        return
+    ones = [l for l in lines if abs(float(l.qty or 0) - 1.0) < 1e-9]
+    tgt = max(ones or lines, key=lambda l: (l.total, -(l.id or 0)))
+    tgt.total = round(tgt.total + diff, 2)
+    tgt.alloc = round((tgt.alloc or 0) + diff, 2)
+    q = float(tgt.qty or 0)
+    if q > 0:
+        tgt.client_unit_price = round(tgt.total / q, 2) if ones else round(tgt.total / q, 4)
+
+
+def distribute_hidden(quote: Quote) -> float:
+    """Hidden lines stay in the price: their value is spread over the visible lines **of the same section**
+    proportionally to each visible line's value (equal split if those are all zero). A section without any
+    visible line passes its hidden value to all visible lines of the quote. Section totals and the grand total are
+    therefore exactly the same as with every line visible. Returns the distributed amount."""
+    active = [l for l in quote.lines if is_active(l)]
+    visible = [l for l in active if not l.hidden]
+    hidden = [l for l in active if l.hidden]
+    for l in active:
+        l.alloc = 0.0
+        l.client_unit_price = round(float(l.unit_price or 0), 2)
+        l.total = base_total(l)
+    for l in quote.lines:
+        if not is_active(l):
+            l.alloc, l.client_unit_price, l.total = 0.0, round(float(l.unit_price or 0), 2), base_total(l)
+    if not hidden or not visible:
+        return 0.0
+    share: dict[int, float] = {}
+    by_sec: dict[str, float] = {}
+    for l in hidden:
+        by_sec[l.section] = by_sec.get(l.section, 0.0) + base_total(l)
+
+    def spread(targets: list[QuoteLine], amount: float) -> None:
+        targets = [t for t in targets if float(t.qty or 0) > 0] or targets
+        w = [max(base_total(t), 0.0) for t in targets]
+        tw = sum(w)
+        for t, wi in zip(targets, w):
+            share[id(t)] = share.get(id(t), 0.0) + amount * (wi / tw if tw > 0 else 1.0 / len(targets))
+
+    for sec, amount in by_sec.items():
+        tg = [l for l in visible if l.section == sec]
+        spread(tg or visible, amount)
+    expected: dict[str, float] = {}
+    for l in visible:
+        _round_line(l, share.get(id(l), 0.0))
+        expected[l.section] = expected.get(l.section, 0.0) + base_total(l) + share.get(id(l), 0.0)
+    for sec, exp in expected.items():
+        sl = [l for l in visible if l.section == sec]
+        _absorb(sl, exp - sum(l.total for l in sl))
+    grand = round(sum(base_total(l) for l in active), 2)
+    _absorb(visible, grand - sum(l.total for l in visible))
+    return round(sum(base_total(l) for l in hidden), 2)
+
+
 def compute_totals(quote: Quote) -> None:
-    subtotal = 0.0
-    for ln in quote.lines:
-        ln.total = round(float(ln.qty) * float(ln.unit_price), 2)
-        if not ln.hidden:
-            subtotal += ln.total
-    quote.subtotal = round(subtotal, 2)
+    distribute_hidden(quote)
+    subtotal = round(sum(ln.total for ln in quote.lines if is_visible(ln)), 2)
+    quote.subtotal = subtotal
     quote.discount_amount = round(subtotal * float(quote.discount_pct or 0) / 100.0, 2)
     quote.net_total = round(quote.subtotal - quote.discount_amount, 2)
     quote.vat_amount = round(quote.net_total * float(quote.vat_pct or 0) / 100.0, 2)
@@ -479,7 +561,7 @@ def recalculate(db: Session, quote: Quote) -> tuple[list[str], dict[str, Any]]:
 def sections_view(quote: Quote, lang: str = "bg") -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for code, bg, en in SECTIONS:
-        lns = [l for l in quote.lines if l.section == code and not l.hidden]
+        lns = [l for l in quote.lines if l.section == code and is_visible(l)]
         if not lns:
             continue
         out.append(
@@ -494,9 +576,10 @@ def sections_view(quote: Quote, lang: str = "bg") -> list[dict[str, Any]]:
 
 
 def cost_and_margin(quote: Quote) -> tuple[float, float]:
-    cost = sum(float(l.qty) * float(l.purchase_price or 0) for l in quote.lines if not l.hidden and l.catalog_item_id)
+    # hidden lines are still bought and installed → their cost counts; removed (excluded) lines do not
+    cost = sum(float(l.qty) * float(l.purchase_price or 0) for l in quote.lines if is_active(l) and l.catalog_item_id)
     # lines without catalog item (labor, delivery) are treated as pass-through revenue (no cost tracked)
-    margin = quote.net_total - cost - sum(l.total for l in quote.lines if not l.hidden and not l.catalog_item_id and l.section in ("labor",))
+    margin = quote.net_total - cost - sum(base_total(l) for l in quote.lines if is_active(l) and not l.catalog_item_id and l.section in ("labor",))
     return round(cost, 2), round(margin, 2)
 
 

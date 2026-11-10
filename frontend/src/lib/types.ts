@@ -362,6 +362,12 @@ export interface QuoteLine {
   source: string
   locked: boolean
   hidden: boolean
+  /** removed from the quote (deleted engine row; restorable) */
+  excluded?: boolean
+  /** € taken over from hidden rows (already included in total) */
+  alloc?: number
+  /** unit price incl. the hidden-row share, as printed for the client */
+  client_unit_price?: number | null
   meta: Record<string, unknown>
 }
 

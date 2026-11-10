@@ -185,7 +185,7 @@ def quote_workbook(db: Session, q: Quote, internal: bool = False) -> bytes:
     roman = ["I", "II", "III", "IV", "V", "VI", "VII"]
     i = 0
     for code, title, _en in pricing.SECTIONS:
-        lns = [l for l in q.lines if l.section == code and not l.hidden]
+        lns = [l for l in q.lines if l.section == code and pricing.is_visible(l)]
         if not lns:
             continue
         _cell(ws, r, 1, roman[i], bold=True, align="center", fill=FILL_SECTION)
@@ -194,7 +194,7 @@ def quote_workbook(db: Session, q: Quote, internal: bool = False) -> bytes:
             _cell(ws, r, c, None, fill=FILL_SECTION)
         _cell(ws, r, 6, round(sum(l.total for l in lns), 2), MONEY, bold=True, fill=FILL_SECTION)
         if internal:
-            cost = round(sum(l.qty * (l.purchase_price or 0) for l in lns), 2)
+            cost = round(sum(l.qty * (l.purchase_price or 0) for l in q.lines if l.section == code and pricing.is_active(l)), 2)
             _cell(ws, r, 7, cost, MONEY, bold=True, fill=FILL_SECTION)
             _cell(ws, r, 8, round(sum(l.total for l in lns) - cost, 2), MONEY, bold=True, fill=FILL_SECTION)
         r += 1
@@ -203,7 +203,7 @@ def quote_workbook(db: Session, q: Quote, internal: bool = False) -> bytes:
             _cell(ws, r, 2, l.name, wrap=True)
             _cell(ws, r, 3, l.unit, align="center")
             _cell(ws, r, 4, l.qty, QTY, align="right")
-            _cell(ws, r, 5, l.unit_price, MONEY)
+            _cell(ws, r, 5, l.client_unit_price if l.client_unit_price is not None else l.unit_price, MONEY)
             _cell(ws, r, 6, l.total, MONEY)
             if internal:
                 _cell(ws, r, 7, round(l.qty * (l.purchase_price or 0), 2), MONEY)
@@ -268,7 +268,7 @@ def quote_workbook(db: Session, q: Quote, internal: bool = False) -> bytes:
         r += 1
         rows = []
         for l in q.lines:
-            if l.hidden or l.section in ("labor", "other") or (l.catalog_item_id is None and not (l.meta or {}).get("role")):
+            if not pricing.is_active(l) or l.section in ("labor", "other") or (l.catalog_item_id is None and not (l.meta or {}).get("role")):
                 continue
             ci = l.catalog_item
             meta = l.meta or {}
@@ -295,7 +295,7 @@ def rfq_groups(db: Session, q: Quote) -> dict[str, list[dict[str, Any]]]:
     scfg = get_setting(db, "suppliers")
     groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for l in q.lines:
-        if l.hidden or l.section in ("labor", "other"):
+        if not pricing.is_active(l) or l.section in ("labor", "other"):
             continue
         ci: CatalogItem | None = l.catalog_item
         if ci is None:

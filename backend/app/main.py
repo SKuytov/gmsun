@@ -17,7 +17,15 @@ from .seed import seed
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
-    ensure_columns()
+    added = ensure_columns()
+    if "quote_lines.excluded" in added:
+        # one-off migration: before hidden values were distributed, "hidden" meant "removed from the price".
+        # Keep that meaning for rows deleted by the user (hidden + locked auto rows) and for every frozen (non-draft) quote.
+        from sqlalchemy import text
+
+        with engine.begin() as conn:
+            conn.execute(text("UPDATE quote_lines SET excluded = :t WHERE hidden = :t AND ((locked = :t AND source = 'auto') OR quote_id IN (SELECT id FROM quotes WHERE status <> 'draft'))"), {"t": True})
+            conn.execute(text("UPDATE quote_lines SET hidden = :f WHERE excluded = :t"), {"t": True, "f": False})
     with SessionLocal() as db:
         seed(db)
     yield

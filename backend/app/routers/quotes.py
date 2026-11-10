@@ -77,7 +77,7 @@ def create_quote(pid: int, body: QuoteCreate, db: Session = Depends(get_db), _: 
             if ln.source == "manual" or ln.locked:
                 db.add(QuoteLine(quote_id=q.id, key=ln.key, section=ln.section, position=ln.position, name=ln.name, unit=ln.unit, qty=ln.qty,
                                  unit_price=ln.unit_price, purchase_price=ln.purchase_price, total=ln.total, catalog_item_id=ln.catalog_item_id,
-                                 source=ln.source, locked=ln.locked, hidden=ln.hidden, meta=dict(ln.meta or {})))
+                                 source=ln.source, locked=ln.locked, hidden=ln.hidden, excluded=bool(ln.excluded), meta=dict(ln.meta or {})))
         db.flush()
         db.refresh(q)
     pricing.recalculate(db, q)
@@ -175,6 +175,8 @@ def update_line(qid: int, lid: int, body: QuoteLineUpdate, db: Session = Depends
     data = body.model_dump(exclude_unset=True)
     for k, v in data.items():
         setattr(ln, k, v)
+    if data.get("excluded") is False and ln.source == "auto" and not any(k in data for k in ("qty", "unit_price", "name", "unit")):
+        ln.locked = False  # restored engine row follows the calculation again
     if ln.source == "auto" and any(k in data for k in ("qty", "unit_price", "name", "unit")) and data.get("locked") is None:
         ln.locked = True
     pricing.compute_totals(q)
@@ -190,8 +192,9 @@ def delete_line(qid: int, lid: int, db: Session = Depends(get_db), _: User = Dep
     if not ln or ln.quote_id != q.id:
         raise HTTPException(404)
     if ln.source == "auto":
-        # hide instead of delete so recalculation does not bring it back
-        ln.hidden = True
+        # mark as removed instead of deleting so recalculation does not bring it back (restorable from the quote tab)
+        ln.excluded = True
+        ln.hidden = False
         ln.locked = True
     else:
         q.lines.remove(ln)

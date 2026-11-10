@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Download, DraftingCompass, Eye, EyeOff, FileSpreadsheet, FileText, Lock, Package, Plus, RefreshCw, Trash2, Unlock } from 'lucide-react'
+import { Download, DraftingCompass, Eye, EyeOff, FileSpreadsheet, FileText, Lock, Package, Plus, RefreshCw, RotateCcw, Trash2, Unlock } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { CompletenessPanel } from '@/components/Completeness'
 import { Badge, Empty, Field, Input, Loading, Modal, NumInput, Select, Spinner, Stat, Textarea, Warn, cx, useToast } from '@/components/ui'
@@ -146,7 +146,10 @@ function QuoteEditor({ quote: q0, ctx, lang, isLatest }: { quote: Quote; ctx: St
     }
   }
 
-  const lines = q.lines.filter((l) => showHidden || !l.hidden)
+  const lines = q.lines.filter((l) => showHidden || (!l.hidden && !l.excluded))
+  const hiddenLines = q.lines.filter((l) => l.hidden && !l.excluded)
+  const hiddenValue = hiddenLines.reduce((s, l) => s + l.total, 0)
+  const excludedCount = q.lines.filter((l) => l.excluded).length
   const info = (q.selections._info || {}) as Record<string, unknown>
   const stats = info.mounting_stats as Record<string, number> | undefined
   const busy = updateLine.isPending || deleteLine.isPending || recalc.isPending || updateQuote.isPending
@@ -243,7 +246,7 @@ function QuoteEditor({ quote: q0, ctx, lang, isLatest }: { quote: Quote; ctx: St
                 {SECTIONS.map((sec) => {
                   const ls = lines.filter((l) => l.section === sec)
                   if (!ls.length) return null
-                  const sum = ls.filter((l) => !l.hidden).reduce((s, l) => s + l.total, 0)
+                  const sum = ls.filter((l) => !l.hidden && !l.excluded).reduce((s, l) => s + l.total, 0)
                   return [
                     <tr key={`h-${sec}`} className="bg-sun-soft/60">
                       <td colSpan={5} className="py-1.5 text-xs font-semibold uppercase tracking-wide text-sun-ink">
@@ -253,7 +256,7 @@ function QuoteEditor({ quote: q0, ctx, lang, isLatest }: { quote: Quote; ctx: St
                       <td />
                     </tr>,
                     ...ls.map((l, i) => (
-                      <tr key={l.id} className={cx(l.hidden && 'opacity-50')} data-testid={`row-line-${l.id}`}>
+                      <tr key={l.id} className={cx((l.hidden || l.excluded) && 'opacity-50', l.excluded && 'line-through')} data-testid={`row-line-${l.id}`}>
                         <td className="num text-ink-3">{i + 1}</td>
                         <td>
                           <input className="cell-input" defaultValue={l.name} key={`${l.id}-${l.name}`} onBlur={(e) => e.target.value !== l.name && updateLine.mutate({ id: l.id, name: e.target.value })} aria-label={t('name')} />
@@ -266,18 +269,43 @@ function QuoteEditor({ quote: q0, ctx, lang, isLatest }: { quote: Quote; ctx: St
                         </td>
                         <td>
                           <NumInput className="cell-input" value={l.unit_price} min={0} onChange={(v) => v !== l.unit_price && updateLine.mutate({ id: l.id, unit_price: v })} aria-label={t('unit_price')} />
+                          {!!l.alloc && l.client_unit_price != null && (
+                            <span className="block pr-1 text-right text-[11px] text-sun-ink" title={lang === 'bg' ? 'Единична цена в офертата за клиента (включва дял от скритите позиции)' : 'Unit price on the client quote (includes a share of the hidden rows)'} data-testid={`text-client-price-${l.id}`}>
+                              → {fmtMoney(l.client_unit_price, '')}
+                            </span>
+                          )}
                         </td>
-                        <td className="num text-right font-medium">{fmtMoney(l.total, '')}</td>
+                        <td className="num text-right font-medium">
+                          {fmtMoney(l.total, '')}
+                          {!!l.alloc && <span className="block text-[11px] font-normal text-sun-ink">+{fmtMoney(l.alloc, '')}</span>}
+                          {l.hidden && !l.excluded && <span className="block text-[11px] font-normal text-ink-3">{lang === 'bg' ? 'разпределено' : 'distributed'}</span>}
+                          {l.excluded && <span className="block text-[11px] font-normal text-bad">{lang === 'bg' ? 'премахнат' : 'removed'}</span>}
+                        </td>
                         <td className="whitespace-nowrap text-right">
                           <button type="button" className="btn-quiet btn-sm h-7 w-7 px-0" title={l.locked ? t('locked') : 'auto'} onClick={() => updateLine.mutate({ id: l.id, locked: !l.locked })} aria-label={t('locked')}>
                             {l.locked ? <Lock className="h-3.5 w-3.5 text-sun-ink" /> : <Unlock className="h-3.5 w-3.5 text-ink-3" />}
                           </button>
-                          <button type="button" className="btn-quiet btn-sm h-7 w-7 px-0" title={t('hidden')} onClick={() => updateLine.mutate({ id: l.id, hidden: !l.hidden })} aria-label={t('hidden')}>
-                            {l.hidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5 text-ink-3" />}
-                          </button>
-                          <button type="button" className="btn-quiet btn-sm h-7 w-7 px-0 text-bad" title={t('delete')} onClick={() => deleteLine.mutate(l.id)} aria-label={t('delete')}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          {l.excluded ? (
+                            <button type="button" className="btn-quiet btn-sm h-7 w-7 px-0" title={lang === 'bg' ? 'Върни позицията в офертата' : 'Restore the row'} onClick={() => updateLine.mutate({ id: l.id, excluded: false })} aria-label={lang === 'bg' ? 'Върни' : 'Restore'} data-testid={`button-restore-${l.id}`}>
+                              <RotateCcw className="h-3.5 w-3.5 text-ok" />
+                            </button>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                className="btn-quiet btn-sm h-7 w-7 px-0"
+                                title={l.hidden ? (lang === 'bg' ? 'Скрит за клиента — стойността е разпределена в видимите редове на раздела. Натиснете, за да го покажете.' : 'Hidden from the client — its value is spread over the visible rows of the section. Click to show.') : lang === 'bg' ? 'Скрий за клиента (стойността се разпределя в останалите редове, сумите не се променят)' : 'Hide from the client (its value is spread over the other rows, totals stay the same)'}
+                                onClick={() => updateLine.mutate({ id: l.id, hidden: !l.hidden })}
+                                aria-label={t('hidden')}
+                                data-testid={`button-hide-${l.id}`}
+                              >
+                                {l.hidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5 text-ink-3" />}
+                              </button>
+                              <button type="button" className="btn-quiet btn-sm h-7 w-7 px-0 text-bad" title={lang === 'bg' ? 'Премахни от офертата (не се таксува и не се поръчва)' : 'Remove from the quote (not charged, not ordered)'} onClick={() => deleteLine.mutate(l.id)} aria-label={t('delete')} data-testid={`button-delete-${l.id}`}>
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </>
+                          )}
                         </td>
                       </tr>
                     )),
@@ -291,7 +319,9 @@ function QuoteEditor({ quote: q0, ctx, lang, isLatest }: { quote: Quote; ctx: St
               <Plus className="h-4 w-4" /> {t('add_line')}
             </button>
             <label className="ml-auto flex items-center gap-1.5 text-xs text-ink-3">
-              <input type="checkbox" checked={showHidden} onChange={(e) => setShowHidden(e.target.checked)} /> {t('hidden')}
+              <input type="checkbox" checked={showHidden} onChange={(e) => setShowHidden(e.target.checked)} data-testid="checkbox-show-hidden" />
+              {lang === 'bg' ? 'Покажи скритите и премахнатите' : 'Show hidden and removed'}
+              {hiddenLines.length + excludedCount > 0 && ` (${hiddenLines.length + excludedCount})`}
             </label>
             {busy && <Spinner className="text-ink-3" />}
           </div>
@@ -305,6 +335,13 @@ function QuoteEditor({ quote: q0, ctx, lang, isLatest }: { quote: Quote; ctx: St
       <aside className="flex flex-col gap-3">
         <div className="card flex flex-col gap-2 p-4">
           <Row label={t('net')} value={fmtMoney(q.net_total)} strong />
+          {hiddenLines.length > 0 && (
+            <p className="rounded-md bg-sun-soft/60 px-2 py-1.5 text-xs text-ink-2" data-testid="text-hidden-distributed">
+              {lang === 'bg'
+                ? `${hiddenLines.length} скрити позиции за ${fmtMoney(hiddenValue)} са разпределени във видимите редове на същия раздел — сумите не се променят.`
+                : `${hiddenLines.length} hidden rows worth ${fmtMoney(hiddenValue)} are spread over the visible rows of the same section — totals stay the same.`}
+            </p>
+          )}
           {q.discount_amount > 0 && <Row label={`${t('discount')} ${q.discount_pct}%`} value={`− ${fmtMoney(q.discount_amount)}`} />}
           <Row label={`${t('vat_amount')} ${q.vat_pct}%`} value={fmtMoney(q.vat_amount)} />
           <Row label={t('gross')} value={fmtMoney(q.total)} strong big />

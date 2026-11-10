@@ -466,7 +466,7 @@ const dict = {
   section_inverter: ['Инвертор и батерии', 'Inverter & batteries'],
   section_construction: ['Конструкция', 'Mounting structure'],
   section_electrical: ['Електрически компоненти', 'Electrical components'],
-  section_labor: ['Строително-монтажни работи', 'Installation works'],
+  section_labor: ['Монтажни работи', 'Installation works'],
   section_other: ['Други', 'Other'],
 
   // catalog

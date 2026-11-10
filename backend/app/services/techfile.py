@@ -316,13 +316,13 @@ def render_techfile_html(db: Session, quote: Quote) -> str:
         )
     sections = []
     for code, title_bg, _ in SECTIONS:
-        lns = [l for l in quote.lines if l.section == code and not l.hidden]
+        lns = [l for l in quote.lines if l.section == code and not l.excluded]
         if lns:
             sections.append({"code": code, "title": title_bg, "lines": lns})
     # ordering list grouped by manufacturer
     order: dict[str, list[Any]] = {}
     for l in quote.lines:
-        if l.hidden or l.section in ("labor", "other") or (l.meta or {}).get("spare") is None and l.catalog_item_id is None and not (l.meta or {}).get("role"):
+        if l.excluded or l.section in ("labor", "other") or (l.meta or {}).get("spare") is None and l.catalog_item_id is None and not (l.meta or {}).get("role"):
             continue
         ci = db.get(CatalogItem, l.catalog_item_id) if l.catalog_item_id else None
         sup = (l.meta or {}).get("supplier") or (ci.manufacturer if ci and ci.manufacturer else None) or "Неразпределени / местна доставка"

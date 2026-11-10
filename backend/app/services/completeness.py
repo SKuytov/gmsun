@@ -58,11 +58,11 @@ def _fix_add(items: list[CatalogItem], key: str, qty: float = 1) -> dict[str, An
 
 def _has(lines: list[Any], pattern: str) -> bool:
     rx = re.compile(pattern, re.I)
-    return any(not l.hidden and rx.search(l.name or "") for l in lines)
+    return any(not l.excluded and rx.search(l.name or "") for l in lines)
 
 
 def _roles(lines: list[Any]) -> set[str]:
-    return {(l.meta or {}).get("role") for l in lines if not l.hidden and (l.meta or {}).get("role") and not (l.meta or {}).get("missing_item")}
+    return {(l.meta or {}).get("role") for l in lines if not l.excluded and (l.meta or {}).get("role") and not (l.meta or {}).get("missing_item")}
 
 
 def check(db: Session, q: Quote) -> dict[str, Any]:
@@ -76,7 +76,7 @@ def check(db: Session, q: Quote) -> dict[str, Any]:
     pricing_cfg = get_setting(db, "pricing")
     proc_cfg = get_setting(db, "procurement") or {}
     items = db.query(CatalogItem).filter(CatalogItem.active.is_(True)).all()
-    lines = [l for l in q.lines if not l.hidden]
+    lines = [l for l in q.lines if not l.excluded]
     roles = _roles(lines)
     sections = {l.section for l in lines}
     kwp = float(info.get("kwp") or 0)
@@ -283,7 +283,7 @@ def apply_fixes(db: Session, q: Quote, fixes: list[dict[str, Any]]) -> None:
     for f in fixes:
         if f.get("type") == "add_line" and f.get("name"):
             name = str(f["name"])[:250]
-            if any((l.name or "") == name and not l.hidden for l in q.lines):
+            if any((l.name or "") == name and not l.excluded for l in q.lines):
                 continue
             q.lines.append(QuoteLine(key=f"manual:{uuid.uuid4().hex[:8]}", section="electrical" if f.get("target") == "electrical" else "other",
                                      position=max((l.position or 0 for l in q.lines), default=-1) + 1, name=name, unit="бр.",

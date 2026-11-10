@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ORMModel(BaseModel):
@@ -320,6 +320,7 @@ class QuoteLineUpdate(BaseModel):
     purchase_price: float | None = None
     locked: bool | None = None
     hidden: bool | None = None
+    excluded: bool | None = None
     meta: dict[str, Any] | None = None
 
 
@@ -338,7 +339,20 @@ class QuoteLineOut(ORMModel):
     source: str
     locked: bool
     hidden: bool
+    excluded: bool = False
+    alloc: float = 0.0
+    client_unit_price: float | None = None
     meta: dict[str, Any]
+
+    @field_validator("excluded", mode="before")
+    @classmethod
+    def _nb(cls, v: Any) -> bool:
+        return bool(v)
+
+    @field_validator("alloc", mode="before")
+    @classmethod
+    def _nf(cls, v: Any) -> float:
+        return float(v or 0)
 
 
 class QuoteCreate(BaseModel):

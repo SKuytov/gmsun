@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from ..config import get_settings
 from ..models import Quote, RoofTypeConfig
-from .pricing import SECTIONS, estimate_yield
+from .pricing import SECTIONS, estimate_yield, is_active, is_visible
 from .settings import get_setting
 
 TEMPLATES = Path(__file__).resolve().parent.parent / "templates"
@@ -58,11 +58,12 @@ def render_quote_html(db: Session, quote: Quote, mode: str = "client") -> str:
     sections = []
     idx = 0
     for code, title_bg, _ in SECTIONS:
-        lns = [l for l in quote.lines if l.section == code and not l.hidden]
+        lns = [l for l in quote.lines if l.section == code and is_visible(l)]
         if not lns:
             continue
         total = sum(l.total for l in lns)
-        cost = sum(float(l.purchase_price or 0) * float(l.qty or 0) for l in lns)
+        # hidden rows of the section are still bought → their cost belongs to the section's margin
+        cost = sum(float(l.purchase_price or 0) * float(l.qty or 0) for l in quote.lines if l.section == code and is_active(l))
         rows = [_line_view(l) for l in lns]
         if code == "construction" and collapse and len(lns) > 1:
             roof_name = roof_short(roof, project)
@@ -75,7 +76,7 @@ def render_quote_html(db: Session, quote: Quote, mode: str = "client") -> str:
     margin_pct = (margin / float(quote.net_total) * 100) if quote.net_total else 0.0
     sup_days: dict[str, int] = {}
     for l in quote.lines:
-        if l.hidden:
+        if not is_active(l):
             continue
         m = l.meta or {}
         if m.get("supplier"):
@@ -150,7 +151,7 @@ def roof_short(roof, project) -> str:
 def _line_view(l) -> SimpleNamespace:
     m = l.meta or {}
     return SimpleNamespace(
-        name=l.name, unit=l.unit, qty=l.qty, unit_price=l.unit_price, total=l.total,
+        name=l.name, unit=l.unit, qty=l.qty, unit_price=l.client_unit_price if l.client_unit_price is not None else l.unit_price, total=l.total,
         cost=float(l.purchase_price or 0) * float(l.qty or 0),
         lead=m.get("lead_time_days"), supplier=m.get("supplier"), sku=m.get("supplier_sku"),
     )
