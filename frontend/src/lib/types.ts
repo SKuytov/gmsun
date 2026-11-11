@@ -530,6 +530,8 @@ export interface PricingSettings {
   show_unit_prices_client: boolean
   client_pdf_collapse_construction: boolean
   advance_basis: 'net' | 'total'
+  /** company default: add delivery-fee lines to quotes (GM SUN: off) */
+  include_delivery_fees?: boolean
   delivery_fee_equipment: number
   delivery_fee_inverter: number
   delivery_fee_construction: number

@@ -31,6 +31,7 @@ DEFAULT_SETTINGS: dict[str, dict[str, Any]] = {
         "show_unit_prices_client": False,
         "client_pdf_collapse_construction": True,
         "advance_basis": "net",
+        "include_delivery_fees": False,  # GM SUN: delivery fees are not quoted (per-quote switch can still add them)
         "delivery_fee_equipment": 200.0,
         "delivery_fee_inverter": 60.0,
         "delivery_fee_construction": 40.0,

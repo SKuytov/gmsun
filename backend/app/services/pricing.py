@@ -129,6 +129,14 @@ def _design(db: Session, project: Project, sel: dict[str, Any], pricing: dict[st
         return {"roles": [], "warnings": [f"Грешка в инженерния модул: {e}"], "strings": {}}
 
 
+def include_delivery(sel: dict[str, Any], pricing: dict[str, Any]) -> bool:
+    """Delivery fee lines: the quote's own switch wins, otherwise the company setting (off by default)."""
+    v = sel.get("delivery_fees")
+    if isinstance(v, bool):
+        return v
+    return bool(pricing.get("include_delivery_fees", False))
+
+
 def build_lines(db: Session, project: Project, quote: Quote) -> tuple[list[dict[str, Any]], list[str], dict[str, Any]]:
     sel = quote.selections or {}
     pricing = get_setting(db, "pricing")
@@ -167,7 +175,8 @@ def build_lines(db: Session, project: Project, quote: Quote) -> tuple[list[dict[
             info["panel_spare"] = spare
     elif panel_qty > 0:
         warnings.append("Не е избран модел панел.")
-    if sel.get("delivery_fees", True) and panel_qty > 0 and float(pricing.get("delivery_fee_equipment", 0)) > 0:
+    inc_delivery = include_delivery(sel, pricing)
+    if inc_delivery and panel_qty > 0 and float(pricing.get("delivery_fee_equipment", 0)) > 0:
         lines.append(_line("delivery:modules", "modules", "Доставка на оборудване", "бр.", 1, pricing["delivery_fee_equipment"]))
 
     # --------------------------------------------------------- inverter/battery
@@ -232,7 +241,7 @@ def build_lines(db: Session, project: Project, quote: Quote) -> tuple[list[dict[
     info["compat"] = sysc
     for b in sysc["blocked"]:
         warnings.insert(0, f"НЕСЪВМЕСТИМО: {b}")
-    if sel.get("delivery_fees", True) and inverter and float(pricing.get("delivery_fee_inverter", 0)) > 0:
+    if inc_delivery and inverter and float(pricing.get("delivery_fee_inverter", 0)) > 0:
         lines.append(_line("delivery:inverter", "inverter", "Доставка на оборудване", "бр.", 1, pricing["delivery_fee_inverter"]))
 
     # ------------------------------------------------------------- construction
@@ -251,7 +260,7 @@ def build_lines(db: Session, project: Project, quote: Quote) -> tuple[list[dict[
             if not ml:
                 warnings.append("Няма дефинирани правила за монтажни материали за този тип покрив.")
             lines.extend(ml)
-        if sel.get("delivery_fees", True) and float(pricing.get("delivery_fee_construction", 0)) > 0:
+        if inc_delivery and float(pricing.get("delivery_fee_construction", 0)) > 0:
             lines.append(_line("delivery:construction", "construction", "Доставка на оборудване", "бр.", 1, pricing["delivery_fee_construction"]))
     elif not roof:
         warnings.append("Непознат тип покрив.")

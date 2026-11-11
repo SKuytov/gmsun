@@ -239,6 +239,7 @@ function PricingTab() {
         </div>
       </div>
       <div className="card flex flex-col gap-2 p-4">
+        <Toggle checked={!!draft.include_delivery_fees} onChange={(v) => setDraft({ ...draft, include_delivery_fees: v })} label={bg ? 'Такси за доставка в офертите (по подразбиране)' : 'Delivery fees in quotes (default)'} />
         <Toggle checked={draft.show_unit_prices_client} onChange={(v) => setDraft({ ...draft, show_unit_prices_client: v })} label={bg ? 'Единични цени в клиентския PDF' : 'Unit prices in client PDF'} />
         <Toggle checked={draft.client_pdf_collapse_construction} onChange={(v) => setDraft({ ...draft, client_pdf_collapse_construction: v })} label={bg ? 'Конструкцията като един ред в клиентския PDF' : 'Collapse structure into one line in client PDF'} />
       </div>

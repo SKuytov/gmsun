@@ -540,7 +540,7 @@ export function LaborStep({ ctx }: { ctx: StepCtx }) {
             <NumInput value={sel.transport_price ?? 0} min={0} onChange={(v) => setSel({ transport_price: v })} />
           </Field>
         </div>
-        <Toggle checked={sel.delivery_fees !== false} onChange={(v) => setSel({ delivery_fees: v })} label={`${t('delivery_fees')} (${pricing.delivery_fee_equipment} / ${pricing.delivery_fee_inverter} / ${pricing.delivery_fee_construction} EUR)`} />
+        <Toggle checked={sel.delivery_fees ?? !!pricing.include_delivery_fees} onChange={(v) => setSel({ delivery_fees: v })} label={`${t('delivery_fees')} (${pricing.delivery_fee_equipment} / ${pricing.delivery_fee_inverter} / ${pricing.delivery_fee_construction} EUR)`} />
       </div>
 
       <div className="card flex flex-col gap-3 p-4">

@@ -92,7 +92,7 @@ SETTING_HINTS = {
     "procurement.fastest_max_days": "Макс. срок за 'най-бързо' (дни)", "procurement.tier_economy_max": "Праг economy (0–1)",
     "procurement.tier_premium_min": "Праг premium (0–1)", "procurement.max_parallel_inverters": "Макс. брой инвертори в паралел (предложения)", "procurement.min_parallel_unit_kw": "Мин. мощност на инвертор за паралелна работа, kW",
 }
-SETTING_SKIP = {"company.logo_path", "pricing.advance_options", "pricing.currency", "pricing.show_unit_prices_client", "pricing.client_pdf_collapse_construction",
+SETTING_SKIP = {"company.logo_path", "pricing.advance_options", "pricing.currency", "pricing.show_unit_prices_client", "pricing.include_delivery_fees", "pricing.client_pdf_collapse_construction",
                 "pricing.advance_basis", "pricing.quote_number_prefix", "suppliers.list", "procurement.brand_tiers", "procurement.tier_weights",
                 "procurement.candidate_panels", "procurement.candidate_inverters", "procurement.candidate_batteries"}
 

@@ -326,6 +326,9 @@ def seed(db: Session) -> None:
     from .services import catalog_packs
 
     catalog_packs.migrate(db)  # once: Aerocompact + cable databases next to the final catalog
+    from .services import delivery_off
+
+    delivery_off.migrate(db)  # once: no delivery fees in quotes (GM SUN request)
 
 
 def seed_legacy_catalog(db: Session) -> None:

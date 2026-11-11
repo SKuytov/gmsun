@@ -206,7 +206,7 @@ def check(db: Session, q: Quote) -> dict[str, Any]:
         add("labor", "ok", "Труд: включен", group="ops")
     if not any(l.key == "transport" or l.section == "other" and "транспорт" in (l.name or "").lower() for l in lines):
         add("transport", "warn", "Няма транспорт до обекта", "", {"type": "step", "step": "labor"}, "ops")
-    if not any(l.key.startswith("delivery:") for l in lines) and float(proc_cfg.get("min_free_delivery", 0) or 0) == 0:
+    if (q.selections or {}).get("delivery_fees") is True and not any(l.key.startswith("delivery:") for l in lines) and float(proc_cfg.get("min_free_delivery", 0) or 0) == 0:
         add("delivery_fees", "info", "Няма такси за доставка от доставчици", "Ако доставчикът не доставя безплатно, добавете транспорта му в Настройки → Доставчици.", None, "ops")
     if not _has(lines, SERVICE_ITEMS["waste"]["pattern"]):
         add("waste", "info", "Извозване на опаковки/отпадъци не е включено", "", _fix_add(items, "waste"), "ops")
