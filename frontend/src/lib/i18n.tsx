@@ -167,7 +167,6 @@ const dict = {
   cables_manual_hint: ['Изберете тип и дължина на всеки кабел. Проектът проверява дали сеченията стигат.', 'Choose the type and length of every cable. The design still checks the cross-sections.'],
   cables_prefill: ['Попълни от проекта', 'Fill from design'],
   cable_type: ['Тип кабел', 'Cable type'],
-  length_m: ['Дължина (m)', 'Length (m)'],
   add_cable: ['Добави кабел', 'Add cable'],
   add_row: ['Добави ред', 'Add row'],
   mc4_title: ['MC4 конектори', 'MC4 connectors'],

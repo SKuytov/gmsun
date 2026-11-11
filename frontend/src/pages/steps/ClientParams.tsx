@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ClipboardList } from 'lucide-react'
 import { Field, Input, NumInput, Segmented, Select, Stat, Textarea, Toggle } from '@/components/ui'
 import { get } from '@/lib/api'
-import { fmtNum, useT } from '@/lib/i18n'
+import { fmtNum, useT, type Key } from '@/lib/i18n'
 import type { Project, Survey } from '@/lib/types'
 import type { StepCtx } from '../Project'
 import { MountingSystemCard } from '@/components/MountingSystem'
@@ -201,7 +201,7 @@ export function SurveyCard({ ctx }: { ctx: StepCtx }) {
   const T = (props: { k: keyof Survey; label: string; type?: string; className?: string }) => <SurveyText {...props} sv={sv} set={set} />
   const keys = FILLED[kind]
   const filled = keys.filter((k) => sv[k] !== undefined && sv[k] !== '' && sv[k] !== null).length
-  const o = (pfx: string, vals: readonly string[]) => vals.map((v) => ({ value: v, label: t(`${pfx}${v}`) }))
+  const o = (pfx: string, vals: readonly string[]) => vals.map((v) => ({ value: v, label: t(`${pfx}${v}` as Key) }))
   return (
     <div className="card p-4" data-testid="survey-card" data-kind={kind}>
       <button type="button" className="flex w-full items-center gap-3 text-left" onClick={() => setOpen(!open)}>
