@@ -357,7 +357,8 @@ def generate(db: Session, project: Project, strategies: list[str] | None = None,
                     sel.update({
                         "panel_item_id": panel.id, "panel_qty": panel_qty, "inverter_item_id": inv.id, "inverter_qty": inv_qty,
                         "battery_item_id": bat.id if bat else None, "battery_qty": bq if bat else 0,
-                        "battery_accessories": [{"item_id": a.get("item_id"), "qty": a.get("qty")} for a in acc] if bat else [],
+                        "battery_accessories": [],  # BMS / rack: automatic per battery (battery_bms / battery_rack)
+                        "battery_bms": {"mode": "auto", "items": []}, "battery_rack": {"mode": "auto", "items": []},
                         "strategy": strat,
                     })
                     if not layout_fixed:

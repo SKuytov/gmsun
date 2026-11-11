@@ -205,17 +205,29 @@ def build_lines(db: Session, project: Project, quote: Quote) -> tuple[list[dict[
             if ivc and bvc and str(ivc).upper() != str(bvc).upper():
                 warnings.append(f"Батерията е {bvc}, а инверторът е {ivc} — несъвместими.")
         info["storage_kwh"] = kwh * bq
-    auto_acc = bool(battery) and str((battery.specs or {}).get("voltage_class") or "").upper() == "HV" and sel.get("battery_auto_accessories", True)
-    if auto_acc:
-        acc_items, acc_notes = compat.hv_accessories(db, inverter, battery, bq, inv_qty or 1)
-        for it, q, why in acc_items:
-            lines.append(_item_line(f"batt_auto:{it.id}", "inverter", it, q, markup, meta={"auto": why}))
-        info["battery_accessories_auto"] = [{"id": it.id, "name": it.name, "qty": q} for it, q, _w in acc_items]
-        warnings.extend(acc_notes)
-    for i, acc in enumerate(sel.get("battery_accessories") or []):
-        it = _item(db, acc.get("catalog_item_id"))
-        if it and not (auto_acc and (it.specs or {}).get("role") in ("hv_rack", "hv_bms")):
-            lines.append(_item_line(f"batt_acc:{it.id}", "inverter", it, float(acc.get("qty") or 1), markup))
+    # BMS / control box and rack / cabinet are two independent selections (auto | manual | none)
+    from . import battery_acc
+
+    ba = battery_acc.resolve(db, sel, inverter, battery, bq, inv_qty or 1)
+    for kind, prefix in (("bms", "batt_bms"), ("rack", "batt_rack")):
+        for it, q, why in ba[kind]:
+            key = f"batt_auto:{it.id}" if ba["modes"].get(kind) == "auto" else f"{prefix}:{it.id}"
+            lines.append(_item_line(key, "inverter", it, q, markup, meta={"auto": why, "battery_part": kind}))
+    for it, q, _why in ba["other"]:
+        lines.append(_item_line(f"batt_acc:{it.id}", "inverter", it, q, markup, meta={"battery_part": "other"}))
+    info["battery_accessories_auto"] = [{"id": a["item_id"], "name": a["name"], "qty": a["qty"], "kind": k} for k in ("bms", "rack") for a in ba["auto"][k]]
+    info["battery_parts"] = {
+        "modes": ba["modes"],
+        "auto": ba["auto"],
+        "bms": [{"id": it.id, "name": it.name, "qty": q} for it, q, _w in ba["bms"]],
+        "rack": [{"id": it.id, "name": it.name, "qty": q} for it, q, _w in ba["rack"]],
+    }
+    warnings.extend(ba["notes"])
+    for w in ba["warnings"]:
+        if w.startswith("НЕСЪВМЕСТИМО"):
+            warnings.insert(0, w)
+        else:
+            warnings.append(w)
     sysc = compat.system_issues(db, project, panel, panel_qty, inverter, inv_qty or 1, battery, bq)
     info["compat"] = sysc
     for b in sysc["blocked"]:

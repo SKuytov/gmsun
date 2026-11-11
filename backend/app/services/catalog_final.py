@@ -126,6 +126,19 @@ def sanitize_selections(sel: dict[str, Any] | None, valid_ids: set[int], remap: 
         if nv != out[k]:
             out[k] = nv
             changed.append(k)
+    for k in ("battery_bms", "battery_rack"):
+        cfg = out.get(k)
+        if not isinstance(cfg, dict) or not isinstance(cfg.get("items"), list):
+            continue
+        new_items = []
+        for row in cfg["items"]:
+            if isinstance(row, dict) and row.get("item_id") is not None:
+                nv = fix(row.get("item_id"))
+                if nv:
+                    new_items.append({**row, "item_id": nv})
+        if new_items != cfg["items"]:
+            out[k] = {**cfg, "items": new_items}
+            changed.append(k)
     for k in LIST_KEYS:
         lst = out.get(k)
         if not isinstance(lst, list):

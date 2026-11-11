@@ -56,6 +56,32 @@ def batteries(
     return [BatterySuggestion(item=_item_out(db, r["item"]), qty=r["qty"], total_kwh=r["total_kwh"], reasons=r["reasons"], warnings=r["warnings"], accessories=r["accessories"]) for r in res]
 
 
+@router.post("/battery-parts")
+def battery_parts(body: dict[str, Any] | None = None, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    """BMS / rack / other accessory options for the chosen battery, the automatic choice and the resolved result
+    for the given (draft) selections — drives the two independent selectors in the Equipment step."""
+    from ..services import battery_acc
+
+    sel = dict((body or {}).get("selections") or {})
+    bat = db.get(CatalogItem, int(sel["battery_item_id"])) if sel.get("battery_item_id") else None
+    inv = db.get(CatalogItem, int(sel["inverter_item_id"])) if sel.get("inverter_item_id") else None
+    qty = int(sel.get("battery_qty") or 1) if bat else 0
+    n_inv = max(1, int(sel.get("inverter_qty") or 1)) if inv else 1
+    res = battery_acc.resolve(db, sel, inv, bat, qty, n_inv)
+    cfg = battery_acc.normalize(sel)
+    return {
+        "hv": battery_acc.is_hv(bat),
+        "family": (bat.specs or {}).get("family") if bat else None,
+        "clusters": battery_acc.clusters_for(inv, bat, qty, n_inv) if bat and battery_acc.is_hv(bat) else [],
+        "config": {k: {"mode": v["mode"], "items": v["items"]} for k, v in cfg.items()},
+        "auto": res["auto"],
+        "resolved": {k: [{"item_id": it.id, "name": it.name, "qty": q} for it, q, _w in res[k]] for k in ("bms", "rack", "other")},
+        "warnings": res["warnings"],
+        "notes": res["notes"],
+        "options": battery_acc.options(db, bat),
+    }
+
+
 @router.get("/strings")
 def strings(panel_id: int, inverter_id: int, n_panels: int, n_inverters: int = 1, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     """Quick string check (single plane) using the temperature-corrected engine; ``n_inverters`` splits the array over

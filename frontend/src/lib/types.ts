@@ -399,7 +399,12 @@ export interface Selections {
   panel_limit?: number | null
   battery_item_id?: number | null
   battery_qty?: number
+  /** other battery accessories (covers, extra cables …) — BMS and rack have their own selections */
   battery_accessories?: { item_id: number; qty: number }[]
+  /** BMS / control box: automatic (engineering), manual (listed items) or none */
+  battery_bms?: BatteryPartSel
+  /** rack / cabinet: automatic, manual or none */
+  battery_rack?: BatteryPartSel
   switchboard_item_id?: number | null
   solar_cable_item_id?: number | null
   solar_cable_red_m?: number | null
@@ -421,8 +426,6 @@ export interface Selections {
   labor_mode?: LaborMode
   /** per-quote override of the labor rate (EUR per kW of installed inverter AC power) */
   labor_eur_per_kw?: number | null
-  /** automatic BMS / racks for HV battery stacks (default true) */
-  battery_accessories_auto?: boolean
   /** pick the AC/DC board by inverter phases automatically (default true) */
   auto_switchboard?: boolean
   /** false = this quote no longer follows project / catalog changes */
@@ -806,4 +809,31 @@ export interface DatasheetStatus {
   size_mb: number
   running: boolean
   progress: { running: boolean; total: number; done: number; ok: number; failed: number; started_at: string | null; finished_at: string | null; current: string | null; errors: string[] }
+}
+
+export type BatteryPartMode = 'auto' | 'manual' | 'none'
+export interface BatteryPartSel {
+  mode: BatteryPartMode
+  items: { item_id: number; qty: number }[]
+}
+export interface BatteryPartOption {
+  item_id: number
+  name: string
+  family?: string | null
+  role?: string | null
+  capacity?: number | null
+  max_series?: number | null
+  price: number
+  compatible: boolean
+}
+export interface BatteryPartsInfo {
+  hv: boolean
+  family?: string | null
+  clusters: number[]
+  config: { bms: BatteryPartSel; rack: BatteryPartSel }
+  auto: { bms: { item_id: number; name: string; qty: number; why: string }[]; rack: { item_id: number; name: string; qty: number; why: string }[] }
+  resolved: { bms: { item_id: number; name: string; qty: number }[]; rack: { item_id: number; name: string; qty: number }[]; other: { item_id: number; name: string; qty: number }[] }
+  warnings: string[]
+  notes: string[]
+  options: { bms: BatteryPartOption[]; rack: BatteryPartOption[]; other: BatteryPartOption[] }
 }

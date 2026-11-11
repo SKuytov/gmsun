@@ -8,6 +8,7 @@ import type { BatterySuggestion, CatalogItem, CompatEntry, CompatMatrix, Inverte
 import type { StepCtx } from '../Project'
 import { Proposals } from './Proposals'
 import { ModuleAdvisor } from '@/components/ModuleAdvisor'
+import { BatteryParts } from '@/components/BatteryParts'
 import type { Selections } from '@/lib/types'
 
 /** Datasheet / supplier page links + unverified-specs hint for a catalog item. */
@@ -174,10 +175,10 @@ export function EquipmentStep({ ctx }: { ctx: StepCtx }) {
     }
     const best = (batQ.data || []).find((b) => cBat(b.item.id)?.status !== 'blocked')
     if (best) {
-      setSel({ battery_item_id: best.item.id, battery_qty: best.qty, battery_accessories: best.accessories.map((a) => ({ item_id: a.item_id, qty: a.qty })) })
+      setSel({ battery_item_id: best.item.id, battery_qty: best.qty, battery_accessories: [], battery_bms: { mode: 'auto', items: [] }, battery_rack: { mode: 'auto', items: [] } })
       toast.push(lang === 'bg' ? `„${name}“ не е съвместима с инвертора — заменена с „${best.item.name}“ × ${best.qty}.` : `"${name}" is not compatible with the inverter — replaced by "${best.item.name}" × ${best.qty}.`, 'ok')
     } else {
-      setSel({ battery_item_id: null, battery_qty: 0, battery_accessories: [] })
+      setSel({ battery_item_id: null, battery_qty: 0, battery_accessories: [], battery_bms: { mode: 'auto', items: [] }, battery_rack: { mode: 'auto', items: [] } })
       toast.push(lang === 'bg' ? `„${name}“ не е съвместима с инвертора и е премахната.` : `"${name}" is not compatible with the inverter and was removed.`, 'bad')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -211,7 +212,6 @@ export function EquipmentStep({ ctx }: { ctx: StepCtx }) {
   const otherBat = batteries.filter((i) => !batSug.some((s) => s.item.id === i.id))
   const selBat = batteries.find((b) => b.id === sel.battery_item_id)
   const batKwh = Number(selBat?.specs?.kwh || 0)
-  const selSug = batSugRaw.find((b) => b.item.id === sel.battery_item_id)
 
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
@@ -385,7 +385,7 @@ export function EquipmentStep({ ctx }: { ctx: StepCtx }) {
           <ItemCard
             item={{ id: 0, name: t('none'), category: 'battery', effective_price: 0, specs: {} } as unknown as CatalogItem}
             selected={!sel.battery_item_id}
-            onSelect={() => setSel({ battery_item_id: null, battery_qty: 0, battery_accessories: [] })}
+            onSelect={() => setSel({ battery_item_id: null, battery_qty: 0, battery_accessories: [], battery_bms: { mode: 'auto', items: [] }, battery_rack: { mode: 'auto', items: [] } })}
             lines={[]}
             warnings={[]}
           />
@@ -395,7 +395,7 @@ export function EquipmentStep({ ctx }: { ctx: StepCtx }) {
               item={s.item}
               compat={cBat(s.item.id)}
               selected={sel.battery_item_id === s.item.id}
-              onSelect={() => sel.battery_item_id !== s.item.id && setSel({ battery_item_id: s.item.id, battery_qty: s.qty, battery_accessories: (s.accessories || []).map((a) => ({ item_id: a.item_id, qty: a.qty })) })}
+              onSelect={() => sel.battery_item_id !== s.item.id && setSel({ battery_item_id: s.item.id, battery_qty: s.qty, battery_accessories: [], battery_bms: { mode: 'auto', items: [] }, battery_rack: { mode: 'auto', items: [] } })}
               lines={[`${s.item.specs.kwh} kWh`, String(s.item.specs.voltage_class || ''), `${s.qty} × = ${fmtNum(s.total_kwh, 1)} kWh`, ...s.reasons].filter(Boolean)}
               warnings={s.warnings}
             />
@@ -409,7 +409,7 @@ export function EquipmentStep({ ctx }: { ctx: StepCtx }) {
                   const id = Number(e.target.value)
                   const r = cBat(id)?.range
                   const q = Math.max(r?.min || 1, Math.min(sel.battery_qty || 1, r?.max || 99))
-                  setSel({ battery_item_id: id, battery_qty: q, battery_accessories: [] })
+                  setSel({ battery_item_id: id, battery_qty: q, battery_accessories: [], battery_bms: { mode: 'auto', items: [] }, battery_rack: { mode: 'auto', items: [] } })
                 }}
                 data-testid="select-other-battery"
               >
@@ -450,21 +450,7 @@ export function EquipmentStep({ ctx }: { ctx: StepCtx }) {
             <div className="self-end pb-2 text-sm text-ink-2">
               = <span className="num font-semibold">{fmtNum(batKwh * (sel.battery_qty || 1), 1)} kWh</span>
             </div>
-            {(selSug?.accessories.length || (sel.battery_accessories || []).length) > 0 && (
-              <Field label={t('battery_accessories')} className="col-span-2">
-                <ul className="flex flex-col gap-1 text-sm">
-                  {(sel.battery_accessories || []).map((a, i) => {
-                    const it = items.find((x) => x.id === a.item_id)
-                    return (
-                      <li key={i} className="flex items-center gap-2">
-                        <span className="min-w-0 flex-1 truncate">{it?.name || a.item_id}</span>
-                        <NumInput className="input-sm w-20" value={a.qty} min={0} onChange={(v) => setSel({ battery_accessories: (sel.battery_accessories || []).map((x, j) => (j === i ? { ...x, qty: v } : x)) })} />
-                      </li>
-                    )
-                  })}
-                </ul>
-              </Field>
-            )}
+            <BatteryParts sel={sel} setSel={setSel} />
           </div>
         ) : null}
       </div>

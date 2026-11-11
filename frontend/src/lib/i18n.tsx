@@ -367,7 +367,6 @@ const dict = {
   battery: ['Батерия', 'Battery'],
   suggestions: ['Предложения от базата', 'Suggestions from the database'],
   battery_qty: ['Брой батерии', 'Battery count'],
-  battery_accessories: ['Аксесоари (BMS, рак, кабели)', 'Accessories (BMS, rack, cables)'],
   panel_count: ['Брой модули', 'Module count'],
   from_layout: ['от разположението', 'from layout'],
   manual: ['ръчно', 'manual'],
