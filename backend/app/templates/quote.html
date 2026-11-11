@@ -30,11 +30,10 @@
     <div class="kind">{{ "Вътрешна калкулация" if internal else "Оферта" }}</div>
     <div class="no">№ {{ quote.number }}{% if quote.version > 1 %} <span class="muted" style="font-size:11pt;font-weight:500">ревизия {{ quote.version }}</span>{% endif %}</div>
   </div>
-  <div class="meta">
-    <div><div class="k">Дата</div><div class="v">{{ date_str }}</div></div>
-    <div><div class="k">Валидност</div><div class="v">до {{ valid_until }}</div></div>
-    <div><div class="k">Проект</div><div class="v">{{ project.number }}</div></div>
-  </div>
+  <table class="meta">
+    <tr><td class="k">Дата</td><td class="k">Валидност</td><td class="k">Проект</td></tr>
+    <tr><td class="v">{{ date_str }}</td><td class="v">до {{ valid_until }}</td><td class="v">{{ project.number }}</td></tr>
+  </table>
 </div>
 
 <div class="cols">
@@ -62,33 +61,35 @@
 <div class="accent"></div>
 {% if texts.intro and not internal %}<p class="lead">{{ texts.intro }}</p>{% endif %}
 
-{# ------------------------------------------------------------------ facts #}
-<div class="facts">
-  <div><div class="v">{{ info.get('kwp', 0)|num }}<small>kWp</small></div><div class="k">Инсталирана мощност</div></div>
-  <div><div class="v">{{ info.get('panel_qty', 0) }}<small>бр.</small></div><div class="k">Фотоволтаични модула</div></div>
-  <div><div class="v">{% if info.get('storage_kwh') %}{{ info.get('storage_kwh')|num }}<small>kWh</small>{% else %}—{% endif %}</div><div class="k">Батерийно съхранение</div></div>
-  <div><div class="v">≈ {{ annual_yield|int|thousands }}<small>kWh/г.</small></div><div class="k">Очакван добив*</div></div>
-  <div><div class="v">{% if quote.execution_days %}{{ quote.execution_days }}<small>{{ "ден" if quote.execution_days == 1 else "дни" }}</small>{% else %}—{% endif %}</div><div class="k">Монтаж на обекта</div></div>
-</div>
-
-{# ------------------------------------------------------------------ solution #}
+{# ------------------------------------------------------------------ solution + key figures #}
 <h2>Предложено решение</h2>
-<table class="kv">
-  {% for row in solution %}
-  <tr><td>{{ row.k }}</td><td><b>{{ row.v }}</b>{% if row.sub %}<br><span class="small">{{ row.sub }}</span>{% endif %}</td></tr>
-  {% endfor %}
+<table class="sol">
+  <tr>
+    <td class="sol-main">
+      <table class="kv">
+        {% for row in solution if internal or row.k != "Електрическа част" %}
+        <tr><td>{{ row.k }}</td><td><b>{{ row.v }}</b>{% if row.sub %}<br><span class="small">{{ row.sub }}</span>{% endif %}</td></tr>
+        {% endfor %}
+      </table>
+    </td>
+    <td class="sol-facts">
+      <div class="fact"><div class="v">{{ info.get('kwp', 0)|num }}<small>kWp</small></div><div class="k">Инсталирана мощност</div></div>
+      <div class="fact"><div class="v">{{ info.get('panel_qty', 0) }}<small>бр.</small></div><div class="k">Фотоволтаични модула</div></div>
+      {% if info.get('storage_kwh') %}<div class="fact"><div class="v">{{ info.get('storage_kwh')|num }}<small>kWh</small></div><div class="k">Батерийно съхранение</div></div>{% endif %}
+    </td>
+  </tr>
 </table>
 
 {# ------------------------------------------------------------------ price #}
 <div class="pricebox">
+  <div class="side">
+    {% if quote.discount_amount %}Стойност преди отстъпка <b>{{ quote.subtotal|money }} {{ quote.currency }}</b><br>Отстъпка {{ quote.discount_pct|num }} % <b>− {{ quote.discount_amount|money }} {{ quote.currency }}</b><br>{% endif %}
+    Стойност без ДДС <b>{{ quote.net_total|money }} {{ quote.currency }}</b><br>
+    ДДС {{ quote.vat_pct|num }} % <b>{{ quote.vat_amount|money }} {{ quote.currency }}</b>
+  </div>
   <div class="big">
     <div class="k">Обща стойност с ДДС</div>
     <div class="v">{{ quote.total|money }}<small>{{ quote.currency }}</small></div>
-  </div>
-  <div class="side">
-    {% if quote.discount_amount %}Стойност преди отстъпка <b>{{ quote.subtotal|money }} {{ quote.currency }}</b> · отстъпка {{ quote.discount_pct|num }} % <b>− {{ quote.discount_amount|money }}</b><br>{% endif %}
-    Стойност без ДДС <b>{{ quote.net_total|money }} {{ quote.currency }}</b><br>
-    ДДС {{ quote.vat_pct|num }} % <b>{{ quote.vat_amount|money }} {{ quote.currency }}</b>
   </div>
 </div>
 {% if not internal %}
@@ -186,7 +187,6 @@
 </div>
 {% if texts.notes %}<div class="terms" style="margin-top:8pt"><h3>Забележки</h3><p>{{ texts.notes }}</p></div>{% endif %}
 {% if quote.notes %}<div class="terms" style="margin-top:8pt"><h3>Допълнително</h3><p>{{ quote.notes }}</p></div>{% endif %}
-<p class="note">* Ориентировъчен годишен добив при специфичен добив {{ specific_yield }} kWh/kWp и зададената ориентация на модулите. Реалният добив зависи от засенчване, метеорологични условия и профил на потребление.</p>
 
 <div class="sign">
   <div>За изпълнителя<b>{{ company.signatory }}</b>{{ company.name }}</div>

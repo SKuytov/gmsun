@@ -47,10 +47,10 @@
     <div class="kind">Техническо досие</div>
     <div class="no">Оферта № {{ quote.number }}{% if quote.version > 1 %} <span class="muted" style="font-size:11pt;font-weight:500">ревизия {{ quote.version }}</span>{% endif %}</div>
   </div>
-  <div class="meta">
-    <div><div class="k">Дата</div><div class="v">{{ date_str }}</div></div>
-    <div><div class="k">Проект</div><div class="v">{{ project.number }}</div></div>
-  </div>
+  <table class="meta">
+    <tr><td class="k">Дата</td><td class="k">Проект</td></tr>
+    <tr><td class="v">{{ date_str }}</td><td class="v">{{ project.number }}</td></tr>
+  </table>
 </div>
 
 <h1>Фотоволтаична централа {{ (((info.kwp or 0) * 1000) | round | int) | thousands }} Wp{% if info.storage_kwh %} с батерия {{ info.storage_kwh | num }} kWh{% endif %}</h1>
