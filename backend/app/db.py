@@ -16,6 +16,14 @@ if settings.database_url.startswith("sqlite"):
     connect_args = {"check_same_thread": False}
 
 engine = create_engine(settings.database_url, connect_args=connect_args, pool_pre_ping=True)
+
+if settings.database_url.startswith("sqlite"):
+    # Enforce foreign keys like PostgreSQL does in production, so a missing cascade fails in tests, not on the server.
+    @event.listens_for(engine, "connect")
+    def _sqlite_fk(dbapi_conn, _rec) -> None:  # noqa: ANN001
+        cur = dbapi_conn.cursor()
+        cur.execute("PRAGMA foreign_keys=ON")
+        cur.close()
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
 
 

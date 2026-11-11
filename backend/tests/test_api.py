@@ -247,3 +247,42 @@ def test_final_catalog_lump_roofs_and_aerocompact_rules(client, auth):
     tile = next(r for r in roofs if r["code"] == "tile")
     assert tile["lump_price_per_module"] == 124
 
+
+
+def test_delete_project_with_orders_and_documents(client, auth):
+    """A project with quotes, layouts, purchase orders and documents is deleted completely (PostgreSQL enforces FKs)."""
+    p = _make_project(client, auth)
+    pid = p["id"]
+    client.post(f"/api/projects/{pid}/layouts", headers=auth, json={"name": "Юг", "plane_w_m": 3.23, "plane_h_m": 16.9, "orientation": "landscape", "setback_m": 0.3})
+    items = client.get("/api/catalog/items", headers=auth).json()
+    inv = next(i for i in items if i["category"] == "inverter")
+    q = client.post(f"/api/projects/{pid}/quotes", headers=auth, json={"selections": {"panel_qty": 10, "inverter_item_id": inv["id"]}}).json()
+    r = client.post(f"/api/quotes/{q['id']}/orders/generate", headers=auth, json={})
+    assert r.status_code < 300, r.text
+    up = client.post(f"/api/projects/{pid}/documents", headers=auth, files={"file": ("snimka.txt", b"test", "text/plain")}, data={"kind": "photo", "title": "Снимка", "quote_id": str(q["id"])})
+    assert up.status_code == 201, up.text
+    d = client.delete(f"/api/projects/{pid}", headers=auth)
+    assert d.status_code == 204, d.text
+    assert client.get(f"/api/projects/{pid}", headers=auth).status_code == 404
+    assert client.get(f"/api/quotes/{q['id']}", headers=auth).status_code == 404
+    from app.db import SessionLocal
+    from app.models import ProjectDocument, PurchaseOrder
+    with SessionLocal() as db:
+        assert db.query(PurchaseOrder).filter(PurchaseOrder.project_id == pid).count() == 0
+        assert db.query(ProjectDocument).filter(ProjectDocument.project_id == pid).count() == 0
+
+
+def test_delete_quote_keeps_orders(client, auth):
+    p = _make_project(client, auth)
+    items = client.get("/api/catalog/items", headers=auth).json()
+    inv = next(i for i in items if i["category"] == "inverter")
+    q = client.post(f"/api/projects/{p['id']}/quotes", headers=auth, json={"selections": {"panel_qty": 10, "inverter_item_id": inv["id"]}}).json()
+    assert client.post(f"/api/quotes/{q['id']}/orders/generate", headers=auth, json={}).status_code < 300
+    d = client.delete(f"/api/quotes/{q['id']}", headers=auth)
+    assert d.status_code == 204, d.text
+    from app.db import SessionLocal
+    from app.models import PurchaseOrder
+    with SessionLocal() as db:
+        pos = db.query(PurchaseOrder).filter(PurchaseOrder.project_id == p["id"]).all()
+        assert pos and all(po.quote_id is None for po in pos)
+    assert client.delete(f"/api/projects/{p['id']}", headers=auth).status_code == 204

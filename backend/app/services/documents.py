@@ -301,3 +301,41 @@ def client_package(db: Session, q: Quote, *, merged_pdf: bool = True) -> tuple[b
     archive(db, project, "quote", f"Paket_klient_{q.number}_v{q.version}.zip", data, quote=q, title=f"Пакет за клиента {q.number} v{q.version}")
     db.commit()
     return data, f"Paket_klient_{q.number}_v{q.version}.zip"
+
+
+def purge_project(db: Session, project) -> dict[str, int]:  # noqa: ANN001
+    """Delete everything that hangs on a project before the project itself (PostgreSQL enforces the foreign keys):
+    purchase orders (+ lines), documents (+ files) and the project's folder under DATA_DIR/projects/<id>.
+    Quotes and layouts are removed by the ORM cascade of Project."""
+    import shutil
+
+    from ..models import ProjectDocument, PurchaseOrder
+
+    docs = db.query(ProjectDocument).filter(ProjectDocument.project_id == project.id).all()
+    for d in docs:
+        delete(db, d)
+    qids = [q.id for q in project.quotes]
+    pos = db.query(PurchaseOrder).filter(PurchaseOrder.project_id == project.id).all()
+    if qids:
+        pos += [po for po in db.query(PurchaseOrder).filter(PurchaseOrder.quote_id.in_(qids)).all() if po not in pos]
+        for d in db.query(ProjectDocument).filter(ProjectDocument.quote_id.in_(qids)).all():
+            d.quote_id = None
+    for po in pos:
+        db.delete(po)  # lines go with the order (cascade)
+    db.flush()
+    folder = get_settings().data_dir / "projects" / str(project.id)
+    try:
+        if folder.is_dir():
+            shutil.rmtree(folder, ignore_errors=True)
+    except OSError:
+        pass
+    return {"documents": len(docs), "orders": len(pos)}
+
+
+def detach_quote(db: Session, quote) -> None:  # noqa: ANN001
+    """Before deleting a single quote: orders and documents made from it stay with the project, only the link goes."""
+    from ..models import ProjectDocument, PurchaseOrder
+
+    db.query(PurchaseOrder).filter(PurchaseOrder.quote_id == quote.id).update({PurchaseOrder.quote_id: None}, synchronize_session=False)
+    db.query(ProjectDocument).filter(ProjectDocument.quote_id == quote.id).update({ProjectDocument.quote_id: None}, synchronize_session=False)
+    db.flush()

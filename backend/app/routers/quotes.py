@@ -129,6 +129,9 @@ def recalc(qid: int, db: Session = Depends(get_db), _: User = Depends(get_curren
 @router.delete("/quotes/{qid}", status_code=204)
 def delete_quote(qid: int, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     q = _quote(db, qid)
+    from ..services import documents as _docs
+
+    _docs.detach_quote(db, q)
     db.delete(q)
     db.commit()
     return Response(status_code=204)

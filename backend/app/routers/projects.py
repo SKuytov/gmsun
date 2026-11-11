@@ -167,6 +167,9 @@ def apply_proposal(pid: int, body: ProposalApplyIn, db: Session = Depends(get_db
 @router.delete("/{pid}", status_code=204)
 def delete_project(pid: int, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     p = _get(db, pid)
+    from ..services import documents as _docs
+
+    _docs.purge_project(db, p)
     db.delete(p)
     db.commit()
     return Response(status_code=204)
