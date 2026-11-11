@@ -125,6 +125,7 @@ class RoofTypeIn(BaseModel):
     code: str
     label_bg: str
     label_en: str
+    kind: str | None = None  # pitched | flat | ground | fence
     pricing_mode: str = "detailed"
     lump_price_per_module: float = 0.0
     rails_per_module: int = 2

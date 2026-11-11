@@ -701,7 +701,9 @@ def full_design(
         role("bonding_cable", "Заземителен проводник 6 mm² жълто-зелен (изравняване на потенциалите на конструкцията)", grd["bonding_m"], unit="м", cross_section_mm2=6)
         role("bonding_clamp", "Клема за заземяване на шина (WCL8-10 / еквивалент)", int(math.ceil(rail_lines * (1 + fast_margin))), section="construction")
         role("earth_bar", "Заземителна шина / клеморед PE в таблото", 1)
-        if sel.get("earth_rod", str(getattr(project, "roof_type", "")).startswith("ground")):
+        from .site_kind import kind_from_code
+
+        if sel.get("earth_rod", kind_from_code(getattr(project, "roof_type", "")) in ("ground", "fence")):
             role("earth_rod", "Заземителен кол 1,5 m поцинкован + клема за кол", 1 if panel_qty <= 40 else 2)
             role("earth_strip", "Поцинкована шина 30×4 mm за заземител", 10 if panel_qty <= 40 else 20, unit="м")
             grd["earth_rod"] = True

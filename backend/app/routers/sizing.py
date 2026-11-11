@@ -151,7 +151,7 @@ def project_design(pid: int, body: dict[str, Any] | None = None, db: Session = D
 
 
 @router.get("/yield")
-def yield_estimate(kwp: float, azimuth_deg: float = 180, tilt_deg: float = 20, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+def yield_estimate(kwp: float, azimuth_deg: float = 180, tilt_deg: float = 20, bifaciality: float = 0, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     pr = get_setting(db, "pricing")
     sy = float(pr.get("specific_yield_kwh_per_kwp", 1250))
-    return {"annual_kwh": estimate_yield(kwp, sy, azimuth_deg, tilt_deg), "specific_yield": sy}
+    return {"annual_kwh": estimate_yield(kwp, sy, azimuth_deg, tilt_deg, bifaciality), "specific_yield": sy}

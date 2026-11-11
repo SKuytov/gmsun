@@ -84,8 +84,15 @@ def check(db: Session, q: Quote) -> dict[str, Any]:
     ac_kw = float(info.get("ac_kw") or 0)
     conn = float(project.connected_power_kw or 0)
     roof = project.roof_type or "tile"
-    is_ground = roof.startswith("ground")
-    is_flat = roof.startswith("flat")
+    from .site_kind import ROOF_KINDS, project_kind
+
+    kind = project_kind(db, project)
+    on_roof = kind in ROOF_KINDS  # scaffold, roof condition, LPS … only matter on a building
+    needs_trench = kind in ("ground", "fence")
+    is_flat = kind == "flat"
+    from .pricing import cable_modes
+
+    modes = cable_modes(sel)
     out: list[dict[str, Any]] = []
 
     def add(code: str, level: str, title: str, detail: str = "", fix: dict[str, Any] | None = None, group: str = "bom") -> None:
@@ -118,11 +125,19 @@ def check(db: Session, q: Quote) -> dict[str, Any]:
         add("not_quoted", "info", f"{len(nq)} инженерни позиции не се офертират (няма такъв артикул в каталога)", "; ".join(str(x)[:60] for x in nq[:6]) + (" …" if len(nq) > 6 else "") + ". Ако са нужни, добавете артикул с тази роля в Каталог.", {"type": "nav", "to": "/catalog"})
     if covered_roles:
         add("switchboard_cover", "ok", "AC/DC защитите са включени в окомплектованото табло")
+    for kit in info.get("kit_included") or []:
+        add("kit", "ok", f"Не се офертира: {kit}")
+    if info.get("addons_total"):
+        add("addons", "ok", f"Допълнителни скрити разходи: {float(info['addons_total']):,.2f} {q.currency} — разпределени в цената на всички видими редове".replace(",", " "), group="ops")
     for rk, title in (("pv_cable", "Соларен кабел"), ("mc4_pair", "MC4 конектори"), ("ac_cable", "AC кабел"), ("ac_mcb", "AC прекъсвач"), ("ac_rcd", "Дефектнотокова защита"), ("pe_cable", "Заземителен проводник"), ("labels", "Предупредителни табели")):
         if rk in nq_roles:
             continue  # reported once above as "not quoted"
+        if rk == "mc4_pair" and modes["mc4"] == "kit":
+            continue
         if rk not in roles and not any((l.meta or {}).get("role") == rk for l in lines):
-            add(f"role_{rk}", "warn", f"{title}: няма ред в офертата", "Автоматичното електро оборудване може да е изключено (Материали → Автоматично ел. оборудване).", {"type": "step", "step": "materials"})
+            hint = ("Ръчен избор на кабели — добавете ред в Материали → Кабели." if modes["cables"] == "manual" and rk in ("pv_cable", "ac_cable", "pe_cable")
+                    else "Автоматичното електро оборудване може да е изключено (Материали → Автоматично ел. оборудване).")
+            add(f"role_{rk}", "warn", f"{title}: няма ред в офертата", hint, {"type": "step", "step": "materials"})
     if not any(r in roles for r in ("dc_spd", "ac_spd")):
         add("spd", "warn", "Няма катоден отводител (SPD) DC/AC", "Ако инверторът няма вграден SPD тип II, добавете го — изисква се от ЕРП и застрахователите.", {"type": "step", "step": "materials"})
     if not any(r in roles for r in ("earth_rod", "earth_clamp", "bonding_clamp", "earth_tape")) and not _has(lines, r"заземител|заземяв|WCL|earth"):
@@ -173,30 +188,61 @@ def check(db: Session, q: Quote) -> dict[str, Any]:
     else:
         if lays:
             add("visual", "ok", "Визуализация върху снимка: налична", group="site")
-    if not is_ground and (height >= 6 or access in ("scaffold", "lift", "crane")) and not _has(lines, SERVICE_ITEMS["scaffold"]["pattern"]):
+    if on_roof and (height >= 6 or access in ("scaffold", "lift", "crane")) and not _has(lines, SERVICE_ITEMS["scaffold"]["pattern"]):
         days = max(1, int(q.execution_days or info.get("execution_days") or 2))
         add("scaffold", "warn", f"Нужно скеле/подемна техника (височина {height:g} m, достъп: {access or 'неясен'})", "Наемът на скеле/вишка не е в офертата.", _fix_add(items, "scaffold", days), "site")
-    elif not is_ground and not survey.get("building_height_m"):
+    elif on_roof and not survey.get("building_height_m"):
         add("scaffold", "info", "Височина на сградата не е въведена", "Над ~6 m обикновено е нужно скеле или вишка.", {"type": "step", "step": "params"}, "site")
-    if survey.get("roof_condition") == "poor":
+    if on_roof and survey.get("roof_condition") == "poor":
         add("roof_condition", "bad", "Покривът е в лошо състояние според огледа", "Монтажът върху компрометиран покрив е риск за гаранцията. Предвидете ремонт/хидроизолация или го изключете писмено от обхвата.", _fix_add(items, "roof_repair"), "site")
-    elif survey.get("roof_condition") == "fair":
+    elif on_roof and survey.get("roof_condition") == "fair":
         add("roof_condition", "info", "Покрив в задоволително състояние", "Опишете в офертата, че ремонт на покрива не е включен.", None, "site")
     if roof in ("tile", "tile_xt", "tile_xtr", "plain_tile") and float(survey.get("roof_age_years") or 0) > 25:
         add("roof_age", "info", f"Керемиден покрив на {survey.get('roof_age_years')} г.", "Предвидете резерв от счупени керемиди (5–10 бр.).", None, "site")
-    if is_ground and not _has(lines, SERVICE_ITEMS["trench"]["pattern"]):
-        run = float(params.get("ac_run_m") or 0) + float(params.get("dc_run_m") or 0)
-        add("trench", "warn", "Наземна централа без изкопни работи за кабелите", f"Траншея за DC/AC кабели (~{run:g} m по параметрите).", _fix_add(items, "trench", max(5, round(run))), "site")
-    if survey.get("has_lightning_protection") and not _has(lines, SERVICE_ITEMS["lightning_check"]["pattern"]):
+    if needs_trench and not _has(lines, SERVICE_ITEMS["trench"]["pattern"]):
+        run = float(survey.get("trench_m") or 0) or (float(params.get("ac_run_m") or 0) + float(params.get("dc_run_m") or 0))
+        what = "Соларна ограда" if kind == "fence" else "Наземна централа"
+        src = "по огледа" if survey.get("trench_m") else "по параметрите"
+        add("trench", "warn", f"{what} без изкопни работи за кабелите", f"Траншея за DC/AC кабели (~{run:g} m {src}).", _fix_add(items, "trench", max(5, round(run))), "site")
+    if needs_trench:
+        soil = survey.get("soil_type") or ""
+        if soil == "rock":
+            add("soil", "warn", "Скалист терен според огледа", "Набиването/фундаментите и траншеята са по-скъпи — предвидете къртач/сондиране или бетонни блокове.", None, "site")
+        elif soil == "fill":
+            add("soil", "info", "Насипен терен", "Фундаментите трябва да стъпят под насипа — проверете дълбочината.", None, "site")
+        if survey.get("machine_access") == "no":
+            add("machine_access", "info", "Няма достъп за техника", "Изкопът и фундаментите се правят ръчно — увеличете труда/срока.", {"type": "step", "step": "labor"}, "site")
+        if float(survey.get("terrain_slope_pct") or 0) > 10:
+            add("slope", "info", f"Наклонен терен ({float(survey['terrain_slope_pct']):g} %)", "Стълбовете/опорите са с различна височина — проверете конструкцията.", None, "site")
+    if kind == "fence":
+        fl, fh = float(survey.get("fence_length_m") or 0), float(survey.get("fence_height_m") or 0)
+        pw = sum(float(l.plane_w_m or 0) for l in lays)
+        ph = max([float(l.plane_h_m or 0) for l in lays] or [0])
+        if not fl:
+            add("fence_len", "info", "Дължината на оградата не е въведена", "Въведете дължина и височина на оградата в огледа.", {"type": "step", "step": "params"}, "site")
+        elif pw > fl * 1.02:
+            add("fence_len", "warn", f"Разположението ({pw:g} m) е по-дълго от оградата ({fl:g} m)", "Коригирайте размера на равнината в стъпка Разположение.", {"type": "step", "step": "layout"}, "site")
+        if fh and ph > fh * 1.02:
+            add("fence_h", "info", f"Панелите ({ph:g} m) са по-високи от оградата ({fh:g} m)", "Проверете височината на стълбовете и допустимото по ЗУТ за огради.", None, "site")
+        if survey.get("wind_exposure") == "high":
+            add("fence_wind", "warn", "Силно ветровита зона", "Вертикалните панели поемат пълния вятърен натиск — нужна е статическа проверка на стълбовете/фундаментите.", None, "site")
+        if survey.get("fence_base") == "wall":
+            add("fence_wall", "info", "Монтаж към стена/фасада", "Проверете носимоспособността на стената и вида анкери (тухла/бетон/топлоизолация).", None, "site")
+        elif survey.get("fence_base") == "existing":
+            add("fence_existing", "info", "Монтаж към съществуваща ограда", "Проверете състоянието и фундаментите на оградата — тя ще носи и вятърния товар на панелите.", None, "site")
+        pnl = next((l.catalog_item for l in lines if l.section == "modules" and l.catalog_item), None)
+        if pnl is not None and not float((pnl.specs or {}).get("bifaciality") or 0):
+            add("fence_bifacial", "info", "Монофациален модул за вертикална ограда", "При ограда изток–запад бифациалните модули дават ~25–35 % повече добив.", {"type": "step", "step": "equipment"}, "site")
+    if on_roof and survey.get("has_lightning_protection") and not _has(lines, SERVICE_ITEMS["lightning_check"]["pattern"]):
         add("lps", "warn", "Сградата има мълниезащита — нужно съгласуване", "При съществуваща LPS конструкцията трябва да се свърже по правилата (разделително разстояние/еквипотенциал).", _fix_add(items, "lightning_check"), "site")
-    if survey.get("structure") == "wood" and not is_flat and not _has(lines, r"статичес|конструктив"):
+    if on_roof and survey.get("structure") == "wood" and not is_flat and not _has(lines, r"статичес|конструктив"):
         add("statics", "info", "Дървена покривна конструкция", "При тежки/бифациални модули поискайте статическа оценка.", None, "site")
     if float(survey.get("cable_route_m") or 0) > 0:
         route = float(survey["cable_route_m"])
         known = float(params.get("ac_run_m") or 0)
         if known and route > known * 1.3:
             add("cable_route", "warn", f"Кабелното трасе от огледа ({route:g} m) е по-дълго от AC дължината в параметрите ({known:g} m)", "Коригирайте AC/DC дължините в стъпка Параметри — иначе кабелите няма да стигнат.", {"type": "step", "step": "params"}, "site")
-    if not is_ground and not _has(lines, SERVICE_ITEMS["tray"]["pattern"]) and "conduit_32" not in roles and "conduit_40" not in roles:
+    if not _has(lines, SERVICE_ITEMS["tray"]["pattern"]) and not ({"conduit_32", "conduit_40", "pvc_pipe"} & roles):
         add("conduit", "info", "Няма тръба/канал за кабелите", "", _fix_add(items, "tray", 10), "site")
 
     # ------------------------------------------------------------------ labor / logistics
@@ -216,7 +262,9 @@ def check(db: Session, q: Quote) -> dict[str, Any]:
     if kwp >= 20 and spare == 0:
         add("spare_modules", "info", "Няма резервни модули", "При 40+ модула е добра практика 1–2 резервни (Настройки → Ценообразуване → резерв модули %).", None, "ops")
     battery = design.get("battery") or {}
-    if any(l.key == "battery" for l in lines) and not any(r.startswith("battery_") for r in roles):
+    if any(l.key == "battery" for l in lines) and modes["battery_cables"] == "kit":
+        add("battery_acc", "ok", "Батерийни кабели: в комплекта с батерията", group="ops")
+    elif any(l.key == "battery" for l in lines) and not any(r.startswith("battery_") for r in roles):
         add("battery_acc", "warn", "Батерия без кабели/предпазител/стойка", "Проверете ролите battery_* в Материали.", {"type": "step", "step": "materials"}, "ops")
 
     # ------------------------------------------------------------------ prices / margin / lead times

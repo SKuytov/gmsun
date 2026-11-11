@@ -51,7 +51,7 @@
     <div class="lbl">Обект</div>
     <div class="addr">
       <b>{{ project.site_address or "—" }}</b><br>
-      <span class="d">{{ roof_label }} · {{ "монофазно" if project.phase == 1 else "трифазно" }} присъединяване{% if project.connected_power_kw %} {{ project.connected_power_kw|num }} kW{% endif %}</span><br>
+      <span class="d">{{ roof_label }} · {{ "монофазно" if project.phase == 1 else "трифазно" }} присъединяване{% if project.connected_power_kw %}&nbsp;{{ project.connected_power_kw|num }}&nbsp;kW{% endif %}</span><br>
       <span class="d">{{ purpose_label }}</span>
     </div>
   </div>

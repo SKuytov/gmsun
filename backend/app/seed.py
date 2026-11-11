@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from .auth import hash_password
 from .config import get_settings
 from .models import CatalogItem, LaborOption, MountingRule, RoofTypeConfig, User
+from .seed_data.packs_v2 import FENCE_ITEMS, FENCE_ROOF_TYPE, FENCE_RULES
 from .seed_data.aerocompact import ITEMS as AERO_ITEMS, ROOF_TYPES as AERO_ROOF_TYPES, RULES as AERO_RULES
 
 
@@ -267,7 +268,7 @@ CATALOG: list[dict] = [
 ]
 
 # Roof / terrain types and the per-type component rules come from the Aerocompact catalogue module.
-ROOF_TYPES: list[dict] = list(AERO_ROOF_TYPES)
+ROOF_TYPES: list[dict] = list(AERO_ROOF_TYPES) + [FENCE_ROOF_TYPE]
 
 GROUND_RULES: list[tuple[str, str, str, float, bool]] = [
     ("ground", "Наземна конструкция — стоманена поцинкована (на модул)", "per_module", 1, True),
@@ -279,7 +280,7 @@ GROUND_RULES: list[tuple[str, str, str, float, bool]] = [
 ]
 
 # (roof_type, item name, basis, factor, round_up) — small parts additionally receive the fastener reserve from Settings.
-MOUNTING_RULES: list[tuple[str, str, str, float, bool]] = list(AERO_RULES) + GROUND_RULES
+MOUNTING_RULES: list[tuple[str, str, str, float, bool]] = list(AERO_RULES) + GROUND_RULES + list(FENCE_RULES)
 
 # Seed rules from earlier versions that were replaced by the Aerocompact-specific rule sets; they are
 # deactivated on upgrade so that quantities are not doubled (user-created rules are never touched).
@@ -315,6 +316,11 @@ def seed(db: Session) -> None:
     for rt in ROOF_TYPES:  # additive: new roof/terrain types appear after upgrade, edited ones are kept
         if rt["code"] not in existing_roofs:
             db.add(RoofTypeConfig(**{**rt, "pricing_mode": "lump"}))
+    db.flush()
+    from .services.site_kind import kind_from_code
+
+    for r in db.query(RoofTypeConfig).filter(RoofTypeConfig.kind.is_(None)).all():  # older rows: derive the site kind once
+        r.kind = kind_from_code(r.code)
     if not db.query(LaborOption).first():
         for d, w, p in LABOR:
             db.add(LaborOption(days=d, workers=w, price=p))
@@ -329,6 +335,7 @@ def seed(db: Session) -> None:
     from .services import delivery_off
 
     delivery_off.migrate(db)  # once: no delivery fees in quotes (GM SUN request)
+    catalog_packs.migrate_v2(db)  # once: Filkab cables, PVC pipes and the solar-fence system
 
 
 def seed_legacy_catalog(db: Session) -> None:
@@ -342,7 +349,7 @@ def seed_legacy_catalog(db: Session) -> None:
         db.commit()
         return
     existing_names = {c.name for c in db.query(CatalogItem.name).all()}
-    for i, it in enumerate(CATALOG + AERO_ITEMS):
+    for i, it in enumerate(CATALOG + AERO_ITEMS + FENCE_ITEMS):
         if it["name"] in existing_names:
             continue
         existing_names.add(it["name"])

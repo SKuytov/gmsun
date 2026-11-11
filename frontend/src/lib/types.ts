@@ -175,6 +175,9 @@ export interface ScenePlane {
   colour: [number, number, number]
   ballast: boolean
   elevated: boolean
+  fence?: boolean
+  post_spacing_m?: number | null
+  fence_base?: 'freestanding' | 'existing' | 'wall' | string | null
 }
 export interface Scene {
   project_id: number
@@ -182,6 +185,8 @@ export interface Scene {
   roof_type: string
   flat: boolean
   ground: boolean
+  fence?: boolean
+  kind?: string
   building: { width_m: number; depth_m: number; eave_height_m: number; ridge_height_m: number; colour: [number, number, number] }
   planes: ScenePlane[]
   modules: number
@@ -229,6 +234,7 @@ export interface RoofType {
   code: string
   label_bg: string
   label_en: string
+  kind?: 'pitched' | 'flat' | 'ground' | 'fence' | string | null
   pricing_mode: 'detailed' | 'lump' | string
   lump_price_per_module: number
   rails_per_module: number
@@ -413,6 +419,16 @@ export interface Selections {
   mc4_qty?: number | null
   power_cable_item_id?: number | null
   power_cable_m?: number | null
+  /** auto = by the engineering design · manual = every cable row chosen by hand (type + length) */
+  cables_mode?: 'auto' | 'manual'
+  cables?: { item_id: number | null; m: number | null }[]
+  /** MC4 connectors / battery cables come in the kit with the panels / batteries → not quoted */
+  mc4_mode?: 'kit' | 'auto' | 'manual'
+  battery_cables_mode?: 'kit' | 'auto'
+  /** PVC conduits – in the materials, hidden in the client quote (price spread over the electrical rows) */
+  pipes?: { item_id: number | null; m: number | null }[]
+  /** internal extra costs (e.g. pallet delivery) – hidden, spread over the whole quote */
+  custom_addons?: { name: string; qty: number | null; unit: string; unit_price: number | null }[]
   dc_box?: 'auto' | 'yes' | 'no'
   dc_box_fuses?: boolean
   backup_output?: boolean
@@ -788,6 +804,17 @@ export interface Survey {
   has_lightning_protection?: boolean
   earth_existing?: boolean
   notes?: string
+  // ground mount / solar fence
+  soil_type?: 'soil' | 'gravel' | 'rock' | 'fill' | ''
+  terrain_slope_pct?: number | null
+  machine_access?: 'yes' | 'limited' | 'no' | ''
+  site_fenced?: boolean
+  trench_m?: number | null
+  // solar fence / PV wall
+  fence_length_m?: number | null
+  fence_height_m?: number | null
+  fence_base?: 'freestanding' | 'existing' | 'wall' | ''
+  wind_exposure?: 'normal' | 'high' | ''
 }
 
 export interface Dashboard {

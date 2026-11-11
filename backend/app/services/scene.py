@@ -35,9 +35,13 @@ def build_scene(db: Session, project: Project) -> dict[str, Any]:
     params = project.params or {}
     survey = params.get("survey") or {}
     roof_type = project.roof_type
-    flat = roof_type in FLAT
-    ground = roof_type in GROUND
-    eave_h = float(survey.get("building_height_m") or 0) or (0.0 if ground else (3.2 if not flat else 3.5))
+    from .site_kind import project_kind
+
+    kind = project_kind(db, project)
+    fence = kind == "fence"
+    flat = kind == "flat" or roof_type in FLAT
+    ground = kind in ("ground", "fence") or roof_type in GROUND  # no building is drawn
+    eave_h = 0.0 if ground else (float(survey.get("building_height_m") or 0) or (3.2 if not flat else 3.5))
     if not ground and not flat and eave_h > 3.0:
         eave_h = max(2.6, eave_h - 1.5)  # survey height is to the ridge; drop to the eave
     layouts = sorted(project.layouts, key=lambda l: (round(l.azimuth_deg / 15), l.id))
@@ -67,11 +71,12 @@ def build_scene(db: Session, project: Project) -> dict[str, Any]:
                 eave_offset = half_d if abs(math.cos(math.radians(az - 180))) > 0.5 else half_w
             planes.append({
                 "layout_id": l.id, "name": l.name, "width_m": l.plane_w_m, "height_m": l.plane_h_m, "tilt": tilt, "azimuth": float(l.azimuth_deg),
-                "u_offset": u0, "eave_offset": eave_offset, "eave_height": eave_h if not ground else 0.8,
+                "u_offset": u0, "eave_offset": eave_offset, "eave_height": (0.3 if fence else 0.8) if ground else eave_h,
                 "roof_polygon": l.roof_polygon or [[0, 0], [l.plane_w_m, 0], [l.plane_w_m, l.plane_h_m], [0, l.plane_h_m]],
                 "obstacles": l.obstacles or [], "panels": [p for p in (l.panels or []) if p.get("enabled", True)],
                 "panel": _panel(db, l.panel_item_id), "texture": l.rect_path, "colour": roof_colour(roof_type),
-                "ballast": flat, "elevated": ground or flat,
+                "ballast": flat, "elevated": (ground or flat) and not fence, "fence": fence,
+                "post_spacing_m": 2.5 if fence else None, "fence_base": (survey.get("fence_base") or "freestanding") if fence else None,
                 "_az": az_rad,
             })
             u0 += l.plane_w_m + 0.3
@@ -80,7 +85,7 @@ def build_scene(db: Session, project: Project) -> dict[str, Any]:
     n_mod = sum(len(p["panels"]) for p in planes)
     kwp = sum(len(p["panels"]) * p["panel"]["wp"] for p in planes) / 1000
     return {
-        "project_id": project.id, "name": project.name, "roof_type": roof_type, "flat": flat, "ground": ground,
+        "project_id": project.id, "name": project.name, "roof_type": roof_type, "flat": flat, "ground": ground, "fence": fence, "kind": kind,
         "building": {"width_m": ref_width + 1.0, "depth_m": 2 * half_d + 1.0 if not (flat or ground) else ref_depth + 1.0, "eave_height_m": eave_h,
                       "ridge_height_m": eave_h + (max([l.plane_h_m * math.sin(math.radians(l.tilt_deg)) for l in layouts] or [0.0])), "colour": [214, 210, 200]},
         "planes": planes, "modules": n_mod, "kwp": round(kwp, 2),

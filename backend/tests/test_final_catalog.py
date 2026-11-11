@@ -47,7 +47,7 @@ def test_final_catalog_is_the_only_catalog(client, auth):
     for cat in ("panel", "inverter", "battery"):
         assert not any((i["specs"] or {}).get("pack") for i in _items(client, auth, cat))
     # GM SUN's own 6 mm² solar cable is not duplicated by the pack
-    pv6 = [i for i in _items(client, auth, "solar_cable") if (i["specs"] or {}).get("cross_section_mm2") == 6]
+    pv6 = [i for i in _items(client, auth, "solar_cable") if (i["specs"] or {}).get("cross_section_mm2") == 6 and (i["specs"] or {}).get("pack") != "filkab"]
     assert [i["name"] for i in pv6] == ["KBE"]
     names = {i["name"] for i in _items(client, auth)}
     assert {"Кабел СВТ 5×10 mm²", "Кабел СВТ 3×6 mm²", "Соларен кабел 10 mm² H1Z2Z2-K"} <= names
@@ -57,7 +57,7 @@ def test_packs_remove_and_reinstall(client, auth):
     before = len(_items(client, auth))
     r = client.delete("/api/catalog/packs/cables", headers=auth)
     assert r.status_code == 200, r.text
-    assert not any(i["category"] == "power_cable" for i in _items(client, auth))
+    assert not any(i["category"] == "power_cable" and (i["specs"] or {}).get("pack") == "cables" for i in _items(client, auth))
     assert "KBE" in {i["name"] for i in _items(client, auth)}  # final item untouched
     r = client.post("/api/catalog/packs/cables", headers=auth)
     assert r.status_code == 200 and r.json()["added"] > 0

@@ -85,8 +85,17 @@ def get_project(pid: int, db: Session = Depends(get_db), _: User = Depends(get_c
 @router.patch("/{pid}", response_model=ProjectOut)
 def update_project(pid: int, body: ProjectUpdate, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     p = _get(db, pid)
+    from ..services.site_kind import project_kind
+
+    old_kind, old_roof = project_kind(db, p), p.roof_type
     for k, v in body.model_dump(exclude_unset=True).items():
         setattr(p, k, v)
+    if p.roof_type != old_roof:
+        new_kind = project_kind(db, p)
+        if (new_kind == "fence") != (old_kind == "fence"):  # vertical fence ↔ roof/ground: reset the tilt of the planes
+            roof = db.get(RoofTypeConfig, p.roof_type)
+            for lay in p.layouts:
+                lay.tilt_deg = 90.0 if new_kind == "fence" else float(roof.default_tilt_deg if roof else 20.0)
     db.commit()
     db.refresh(p)
     autosync.sync_project(db, p)  # the working (draft) quote follows the wizard automatically
@@ -196,7 +205,11 @@ def list_layouts(pid: int, db: Session = Depends(get_db), _: User = Depends(get_
 def create_layout(pid: int, body: LayoutIn, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     p = _get(db, pid)
     roof = db.get(RoofTypeConfig, p.roof_type)
-    lay = Layout(project_id=p.id, name=body.name or f"Покрив {len(p.layouts) + 1}", tilt_deg=roof.default_tilt_deg if roof else 20.0)
+    from ..services.site_kind import kind_of
+
+    kind = kind_of(p.roof_type, roof)
+    base = {"fence": "Ограда", "ground": "Поле"}.get(kind, "Покрив")
+    lay = Layout(project_id=p.id, name=body.name or f"{base} {len(p.layouts) + 1}", tilt_deg=roof.default_tilt_deg if roof else 20.0)
     for k, v in body.model_dump(exclude_unset=True).items():
         if v is not None:
             setattr(lay, k, v)

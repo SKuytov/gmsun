@@ -128,6 +128,7 @@ class RoofTypeConfig(Base):
     code: Mapped[str] = mapped_column(String(32), primary_key=True)
     label_bg: Mapped[str] = mapped_column(String(128))
     label_en: Mapped[str] = mapped_column(String(128))
+    kind: Mapped[str | None] = mapped_column(String(16), nullable=True)  # pitched | flat | ground | fence (site_kind.py)
     pricing_mode: Mapped[str] = mapped_column(String(16), default="detailed")  # detailed | lump
     lump_price_per_module: Mapped[float] = mapped_column(Float, default=0.0)
     rails_per_module: Mapped[int] = mapped_column(Integer, default=2)

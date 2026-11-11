@@ -20,7 +20,7 @@ def test_catalog_items_expose_procurement_fields(client, auth):
     assert all(i["supplier"] for i in items)
     assert sum(i["supplier"] == "green-energy.bg" for i in items) >= len(items) - 3
     mounting = client.get("/api/catalog/items?category=mounting", headers=auth).json()
-    assert mounting and all((i["specs"] or {}).get("pack") == "aerocompact" for i in mounting)
+    assert mounting and all((i["specs"] or {}).get("pack") in ("aerocompact", "pv_fence") for i in mounting)
 
 
 def test_item_lead_time_and_tier_override(client, auth):

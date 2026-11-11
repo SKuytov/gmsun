@@ -121,7 +121,8 @@ def quantity_for_rule(rule: MountingRule, st: LayoutStats) -> float:
     return float(math.ceil(q - 1e-9)) if rule.round_up else round(q, 2)
 
 
-def mounting_lines(db: Session, roof: RoofTypeConfig, st: LayoutStats, default_markup: float, fastener_margin_pct: float = 0.0) -> list[dict[str, Any]]:
+def mounting_lines(db: Session, roof: RoofTypeConfig, st: LayoutStats, default_markup: float, fastener_margin_pct: float = 0.0,
+                   fence_base: str | None = None) -> list[dict[str, Any]]:
     """Priced mounting lines. Small parts (specs.small_part: screws, clamps, clips,
     caps, splices) get the fastener/consumable reserve on top (industry practice
     5-10 % for loss and breakage on site)."""
@@ -131,8 +132,14 @@ def mounting_lines(db: Session, roof: RoofTypeConfig, st: LayoutStats, default_m
         .order_by(MountingRule.sort_order, MountingRule.id)
         .all()
     )
+    from ..seed_data.packs_v2 import FENCE_BASE_ONLY, FENCE_BASE_PARTS
+
+    allowed = FENCE_BASE_PARTS.get(fence_base or "freestanding", FENCE_BASE_PARTS["freestanding"])
     out: list[dict[str, Any]] = []
     for r in rules:
+        part = ((r.item.specs or {}).get("fence_part") if r.item else None)
+        if part in FENCE_BASE_ONLY and part not in allowed:  # solar fence: posts / wall brackets / U-bolts by base type
+            continue
         qty = quantity_for_rule(r, st)
         if qty <= 0:
             continue

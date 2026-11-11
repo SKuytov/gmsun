@@ -5,6 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Badge, Confirm, ErrorBox, Field, Input, Loading, Modal, NumInput, Select, Textarea, Toggle, cx, useToast } from '@/components/ui'
 import { api, del, downloadFile, errMsg, get, patch, post, put } from '@/lib/api'
 import { fmtMoney, fmtNum, useT, type Key } from '@/lib/i18n'
+import { SITE_KINDS } from '@/lib/siteKind'
 import type { CatalogItem, LaborOption, MountingRule, RoofType, Tier } from '@/lib/types'
 import { useAuth } from '@/lib/auth'
 import { DocLinks, useMountingSystems } from '@/components/MountingSystem'
@@ -979,7 +980,7 @@ function RoofsTab({ lang }: { lang: string }) {
           className="btn-accent btn-sm"
           onClick={() => {
             setIsNew(true)
-            setEdit({ code: '', label_bg: '', label_en: '', pricing_mode: 'detailed', lump_price_per_module: 0, rails_per_module: 2, rail_stock_length_m: 3.55, fixation_spacing_m: 1.2, waste_pct: 8, default_tilt_deg: 20, notes: '', sort_order: 99, active: true })
+            setEdit({ code: '', label_bg: '', label_en: '', pricing_mode: 'detailed', lump_price_per_module: 0, rails_per_module: 2, rail_stock_length_m: 3.55, fixation_spacing_m: 1.2, waste_pct: 8, default_tilt_deg: 20, kind: null, notes: '', sort_order: 99, active: true })
           }}
         >
           <Plus className="h-4 w-4" /> {t('add')}
@@ -1100,6 +1101,16 @@ function RoofsTab({ lang }: { lang: string }) {
             </Field>
             <Field label={`${t('mounting_lump')} (EUR)`}>
               <NumInput value={edit.lump_price_per_module} min={0} onChange={(v) => setEdit({ ...edit, lump_price_per_module: v })} />
+            </Field>
+            <Field label={t('roof_kind')}>
+              <Select value={edit.kind || ''} onChange={(e) => setEdit({ ...edit, kind: e.target.value || null })} data-testid="select-roof-kind">
+                <option value="">{lang === 'bg' ? '— по кода —' : '— from code —'}</option>
+                {SITE_KINDS.map((k) => (
+                  <option key={k} value={k}>
+                    {t(`kind_${k}`)}
+                  </option>
+                ))}
+              </Select>
             </Field>
             <Field label={t('tilt')}>
               <NumInput value={edit.default_tilt_deg} min={0} max={90} onChange={(v) => setEdit({ ...edit, default_tilt_deg: v })} />

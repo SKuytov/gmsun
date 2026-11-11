@@ -86,18 +86,14 @@ class Ctx:
 
 # ----------------------------------------------------------------------------- target sizing
 def demand_kwp(ctx: Ctx) -> tuple[float, str]:
-    """How much PV the client *needs* (independent of the roof): explicit target → consumption → connected power."""
+    """How much PV the client *needs* (independent of the roof): explicit target → connected power."""
     p = ctx.project
     params = p.params or {}
     explicit = _f(params, "target_kwp", 0)
     if explicit > 0:
         return round(explicit, 2), "target"
-    sy = float(ctx.pricing.get("specific_yield_kwh_per_kwp", ctx.pricing.get("specific_yield", 1250)) or 1250)
-    if p.annual_consumption_kwh and p.annual_consumption_kwh > 0:
-        kwp = p.annual_consumption_kwh / sy
-        if p.connected_power_kw > 0:
-            kwp = min(kwp, p.connected_power_kw * float(ctx.pricing.get("dc_ac_ratio_max", 1.35)))
-        return round(max(kwp, 2.0), 2), "consumption"
+    # (the annual consumption field was removed from the parameters on request of GM SUN – sizing uses the explicit
+    #  target, otherwise the connected power × 1.2)
     if p.connected_power_kw > 0:
         return round(p.connected_power_kw * 1.2, 2), "connected_power"
     return 0.0, "none"

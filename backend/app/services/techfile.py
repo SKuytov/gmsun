@@ -360,7 +360,8 @@ def render_techfile_html(db: Session, quote: Quote) -> str:
         order=order,
         logo_uri=_data_uri(settings.data_dir / company["logo_path"]) if company.get("logo_path") else None,
         date_str=date.today().strftime("%d.%m.%Y г."),
-        annual_yield=estimate_yield(kwp, float(pricing.get("specific_yield_kwh_per_kwp", 1250)), az, tilt),
+        annual_yield=estimate_yield(kwp, float(pricing.get("specific_yield_kwh_per_kwp", 1250)), az, tilt,
+                                    float(((panel.specs or {}) if panel else {}).get("bifaciality") or 0)),
         specific_yield=pricing.get("specific_yield_kwh_per_kwp", 1250),
         colors=STRING_COLORS,
     )

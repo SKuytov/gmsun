@@ -7,6 +7,124 @@ import { fmtMoney, fmtNum, useT } from '@/lib/i18n'
 import type { CatalogItem, Design, Selections } from '@/lib/types'
 import type { StepCtx } from '../Project'
 import { MountingSystemCard } from '@/components/MountingSystem'
+import { siteKind } from '@/lib/siteKind'
+
+/** Cable roles the manual cable mode replaces (mirrors pricing.MANUAL_CABLE_ROLES). */
+const CABLE_ROLES = new Set(['pv_cable', 'ac_cable', 'pe_cable', 'bonding_cable', 'rs485_cable', 'ct_cable', 'parallel_cable'])
+const isCable = (i: CatalogItem) =>
+  i.active &&
+  (['solar_cable', 'power_cable'].includes(i.category) ||
+    CABLE_ROLES.has(String(i.specs?.role || '')) ||
+    !!i.specs?.cable_kind ||
+    i.specs?.role === 'battery_cable' ||
+    (i.category === 'grounding' && /кабел|проводник|cable|H07V/i.test(i.name)))
+
+type Row = { item_id: number | null; m: number | null }
+
+function RowsEditor({ rows, onChange, options, addLabel, typeLabel, testid }: { rows: Row[]; onChange: (r: Row[]) => void; options: CatalogItem[]; addLabel: string; typeLabel: string; testid: string }) {
+  const { t } = useT()
+  const total = rows.reduce((s, r) => {
+    const it = options.find((o) => o.id === r.item_id)
+    return s + (it ? Number(it.effective_price || 0) * Number(r.m || 0) : 0)
+  }, 0)
+  return (
+    <div className="flex flex-col gap-2" data-testid={testid}>
+      {rows.length > 0 && (
+        <div className="grid grid-cols-[1fr_6rem_auto] gap-2 text-xs text-ink-3">
+          <span>{typeLabel}</span>
+          <span>{t('length_m')}</span>
+          <span />
+        </div>
+      )}
+      {rows.map((r, i) => (
+        <div key={i} className="grid grid-cols-[1fr_6rem_auto] items-center gap-2">
+          <Select className="input-sm" value={r.item_id ?? ''} onChange={(e) => onChange(rows.map((x, j) => (j === i ? { ...x, item_id: e.target.value ? Number(e.target.value) : null } : x)))} data-testid={`${testid}-item-${i}`}>
+            <option value="">—</option>
+            {options.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.name} — {fmtMoney(o.effective_price)}/{o.unit}
+              </option>
+            ))}
+          </Select>
+          <NumInput className="input-sm" value={r.m} min={0} onChange={(v) => onChange(rows.map((x, j) => (j === i ? { ...x, m: v } : x)))} data-testid={`${testid}-m-${i}`} />
+          <button type="button" className="btn-quiet btn-sm text-bad" onClick={() => onChange(rows.filter((_, j) => j !== i))} aria-label={t('delete')}>
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      ))}
+      <div className="flex items-center justify-between gap-2">
+        <button type="button" className="btn-ghost btn-sm" onClick={() => onChange([...rows, { item_id: options[0]?.id ?? null, m: 10 }])} data-testid={`${testid}-add`} disabled={!options.length}>
+          <Plus className="h-4 w-4" /> {addLabel}
+        </button>
+        {total > 0 && <span className="num text-xs text-ink-3">{fmtMoney(total)}</span>}
+      </div>
+    </div>
+  )
+}
+
+/** Cables: automatic by the engineering design, or every cable chosen by hand (type + length). */
+function CablesCard({ ctx }: { ctx: StepCtx }) {
+  const { t } = useT()
+  const { sel, setSel, items, project: p } = ctx
+  const mode = sel.cables_mode === 'manual' ? 'manual' : 'auto'
+  const options = items.filter(isCable).sort((a, b) => String(a.specs?.role || a.category).localeCompare(String(b.specs?.role || b.category)) || a.name.localeCompare(b.name))
+  const rows = sel.cables || []
+  const prefill = async () => {
+    try {
+      const d = await post<Design>(`/api/sizing/projects/${p.id}/design`, { selections: { ...sel, cables_mode: 'auto' } })
+      const out: Row[] = []
+      for (const r of d.roles) {
+        if (!CABLE_ROLES.has(r.role) || !r.item_id || !(Number(r.qty) > 0)) continue
+        out.push({ item_id: r.item_id, m: Math.ceil(Number(r.qty)) })
+      }
+      setSel({ cables_mode: 'manual', cables: out })
+    } catch {
+      setSel({ cables_mode: 'manual' })
+    }
+  }
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-line/15 p-3" data-testid="cables-card">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold">{t('cables_title')}</h3>
+        <Segmented
+          size="sm"
+          value={mode}
+          onChange={(v) => (v === 'manual' && !rows.length ? prefill() : setSel({ cables_mode: v }))}
+          options={[
+            { value: 'auto', label: t('cables_mode_auto') },
+            { value: 'manual', label: t('cables_mode_manual') },
+          ]}
+          data-testid="seg-cables"
+        />
+      </div>
+      {mode === 'manual' && (
+        <>
+          <p className="text-xs text-ink-3">{t('cables_manual_hint')}</p>
+          <RowsEditor rows={rows} onChange={(r) => setSel({ cables: r })} options={options} addLabel={t('add_cable')} typeLabel={t('cable_type')} testid="cable-rows" />
+          <button type="button" className="btn-quiet btn-sm self-start" onClick={prefill} data-testid="button-cables-prefill">
+            {t('cables_prefill')}
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+
+/** PVC conduits: in the materials, hidden in the client quote. */
+function PipesCard({ ctx }: { ctx: StepCtx }) {
+  const { t } = useT()
+  const { sel, setSel, items } = ctx
+  const options = items.filter((i) => i.active && (i.specs?.role === 'pvc_pipe' || /pvc.*тръб|тръб.*pvc/i.test(i.name)))
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-line/15 p-3" data-testid="pipes-card">
+      <h3 className="text-sm font-semibold">
+        {t('pipes_title')} <span className="ml-1 rounded bg-surface-2 px-1.5 py-0.5 text-[11px] font-normal text-ink-3">{t('hidden_in_quote')}</span>
+      </h3>
+      <p className="text-xs text-ink-3">{t('pipes_hint')}</p>
+      <RowsEditor rows={sel.pipes || []} onChange={(r) => setSel({ pipes: r })} options={options} addLabel={t('add_pipe')} typeLabel={t('pipe_type')} testid="pipe-rows" />
+    </div>
+  )
+}
 
 function useDebounced<T>(v: T, ms = 500) {
   const [d, setD] = useState(v)
@@ -210,6 +328,8 @@ export function MaterialsStep({ ctx }: { ctx: StepCtx }) {
   const num = (v: unknown) => (typeof v === 'number' ? v : undefined)
   const setParam = (k: string, v: number) => ctx.update({ params: { ...params, [k]: v } })
   const autoHint = lang === 'bg' ? 'празно = авто' : 'empty = auto'
+  const cablesMode = sel.cables_mode === 'manual' ? 'manual' : 'auto'
+  const mc4Mode = sel.mc4_mode || (sel.mc4_item_id || Number(sel.mc4_qty || 0) > 0 ? 'manual' : 'kit')
 
   // Smart defaults: pre-select the first matching catalog item and estimate cable lengths once.
   // Explicit "none" is stored as null and is never overridden.
@@ -235,6 +355,9 @@ export function MaterialsStep({ ctx }: { ctx: StepCtx }) {
           testId="select-switchboard"
           noneLabel={lang === 'bg' ? '— автоматично по инвертора —' : '— automatic by inverter —'}
         />
+        <CablesCard ctx={ctx} />
+        {cablesMode === 'auto' && (
+          <>
         <ItemSelect label={t('solar_cable')} items={by('solar_cable')} value={sel.solar_cable_item_id} onChange={(v) => setSel({ solar_cable_item_id: v })} testId="select-solar-cable" noneLabel={autoLabel} />
         <div className="grid grid-cols-2 gap-3">
           <Field label={t('red_m')} hint={autoHint}>
@@ -244,18 +367,48 @@ export function MaterialsStep({ ctx }: { ctx: StepCtx }) {
             <NumInput value={sel.solar_cable_black_m ?? null} min={0} placeholder={t('auto')} onChange={(v) => setSel({ solar_cable_black_m: v > 0 ? v : null })} />
           </Field>
         </div>
-        {mc4Items.length > 0 && <div className="grid grid-cols-[1fr_7rem] gap-3">
-          <ItemSelect label={t('mc4')} items={mc4Items} value={sel.mc4_item_id} onChange={(v) => setSel({ mc4_item_id: v })} noneLabel={autoLabel} />
-          <Field label={t('qty')} hint={autoHint}>
-            <NumInput value={sel.mc4_qty ?? null} min={0} placeholder={t('auto')} onChange={(v) => setSel({ mc4_qty: v > 0 ? v : null })} />
-          </Field>
-        </div>}
         {by('power_cable').length > 0 && <div className="grid grid-cols-[1fr_7rem] gap-3">
           <ItemSelect label={t('power_cable')} items={by('power_cable')} value={sel.power_cable_item_id} onChange={(v) => setSel({ power_cable_item_id: v })} testId="select-power-cable" noneLabel={autoLabel} />
           <Field label={t('length_m')} hint={autoHint}>
             <NumInput value={sel.power_cable_m ?? null} min={0} placeholder={t('auto')} onChange={(v) => setSel({ power_cable_m: v > 0 ? v : null })} />
           </Field>
         </div>}
+
+          </>
+        )}
+        <Field label={t('mc4_title')} hint={mc4Mode === 'kit' ? t('mc4_kit_hint') : undefined}>
+          <Segmented
+            size="sm"
+            value={mc4Mode}
+            onChange={(v) => setSel(v === 'manual' ? { mc4_mode: v } : { mc4_mode: v, mc4_item_id: null, mc4_qty: null })}
+            options={[
+              { value: 'kit', label: t('mc4_kit') },
+              { value: 'auto', label: t('mc4_auto') },
+              { value: 'manual', label: t('mc4_manual') },
+            ]}
+            data-testid="seg-mc4"
+          />
+        </Field>
+        {mc4Mode === 'manual' && (
+        <div className="grid grid-cols-[1fr_7rem] gap-3">
+          <ItemSelect label={t('mc4')} items={mc4Items} value={sel.mc4_item_id} onChange={(v) => setSel({ mc4_item_id: v })} noneLabel={autoLabel} />
+          <Field label={t('qty')} hint={autoHint}>
+            <NumInput value={sel.mc4_qty ?? null} min={0} placeholder={t('auto')} onChange={(v) => setSel({ mc4_qty: v > 0 ? v : null })} />
+          </Field>
+        </div>
+        )}
+        <Field label={t('battery_cables')}>
+          <Segmented
+            size="sm"
+            value={sel.battery_cables_mode || 'kit'}
+            onChange={(v) => setSel({ battery_cables_mode: v })}
+            options={[
+              { value: 'kit', label: t('battery_cables_kit') },
+              { value: 'auto', label: t('battery_cables_auto') },
+            ]}
+          />
+        </Field>
+        <PipesCard ctx={ctx} />
 
         <h2 className="mt-2 text-base">{t('distances')}</h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -306,7 +459,7 @@ export function MaterialsStep({ ctx }: { ctx: StepCtx }) {
         <div className="flex flex-col">
           <Toggle checked={!!sel.dc_box_fuses} onChange={(v) => setSel({ dc_box_fuses: v })} label={`${t('dc_box_fuses')} (${lang === 'bg' ? 'авто при необходимост по IEC 62548' : 'auto when required by IEC 62548'})`} disabled={sel.dc_box === 'no'} />
           <Toggle checked={!!sel.backup_output} onChange={(v) => setSel({ backup_output: v })} label={t('backup_output')} />
-          <Toggle checked={sel.earth_rod ?? p.roof_type.startsWith('ground')} onChange={(v) => setSel({ earth_rod: v })} label={t('earth_rod')} />
+          <Toggle checked={sel.earth_rod ?? ['ground', 'fence'].includes(siteKind(p.roof_type, ctx.roofTypes))} onChange={(v) => setSel({ earth_rod: v })} label={t('earth_rod')} />
           <Toggle checked={sel.auto_electrical !== false} onChange={(v) => setSel({ auto_electrical: v })} label={t('auto_electrical')} />
         </div>
 
@@ -395,6 +548,84 @@ export function MaterialsStep({ ctx }: { ctx: StepCtx }) {
             <Plus className="h-4 w-4" /> {t('add')}
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+/** Internal extra costs (e.g. a battery delivered on 2 pallets × €40): included in the quote, hidden from the client and
+ * spread proportionally over every visible row (same logic as the hidden rows). */
+function AddonsCard({ ctx }: { ctx: StepCtx }) {
+  const { t, lang } = useT()
+  const { sel, setSel } = ctx
+  const rows = sel.custom_addons || []
+  const set = (r: NonNullable<Selections['custom_addons']>) => setSel({ custom_addons: r })
+  const upd = (i: number, patch: Partial<NonNullable<Selections['custom_addons']>[number]>) => set(rows.map((x, j) => (j === i ? { ...x, ...patch } : x)))
+  const total = rows.reduce((s, r) => s + Number(r.qty || 0) * Number(r.unit_price || 0), 0)
+  const presets = [
+    { name: lang === 'bg' ? 'Доставка на батерия — палет' : 'Battery delivery – pallet', qty: 2, unit: lang === 'bg' ? 'палет' : 'pallet', unit_price: 40 },
+    { name: lang === 'bg' ? 'Доставка на панели — палет' : 'Panel delivery – pallet', qty: 1, unit: lang === 'bg' ? 'палет' : 'pallet', unit_price: 40 },
+    { name: lang === 'bg' ? 'Наем на техника' : 'Equipment rental', qty: 1, unit: lang === 'bg' ? 'ден' : 'day', unit_price: 0 },
+  ]
+  return (
+    <div className="card flex flex-col gap-3 p-4 lg:col-span-2" data-testid="addons-card">
+      <h2>{t('addons_title')}</h2>
+      <p className="text-xs text-ink-3">{t('addons_hint')}</p>
+      {rows.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="tbl text-sm">
+            <thead>
+              <tr>
+                <th>{t('addon_name')}</th>
+                <th className="w-24">{t('addon_qty')}</th>
+                <th className="w-28">{t('addon_unit')}</th>
+                <th className="w-32">{t('addon_price')}</th>
+                <th className="w-28 text-right">EUR</th>
+                <th className="w-10" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={i} data-testid={`addon-row-${i}`}>
+                  <td>
+                    <Input className="input-sm" value={r.name} placeholder={t('addon_name')} onChange={(e) => upd(i, { name: e.target.value })} data-testid={`addon-name-${i}`} />
+                  </td>
+                  <td>
+                    <NumInput className="input-sm" value={r.qty} min={0} onChange={(v) => upd(i, { qty: v })} data-testid={`addon-qty-${i}`} />
+                  </td>
+                  <td>
+                    <Input className="input-sm" value={r.unit} onChange={(e) => upd(i, { unit: e.target.value })} />
+                  </td>
+                  <td>
+                    <NumInput className="input-sm" value={r.unit_price} min={0} onChange={(v) => upd(i, { unit_price: v })} data-testid={`addon-price-${i}`} />
+                  </td>
+                  <td className="num text-right">{fmtMoney(Number(r.qty || 0) * Number(r.unit_price || 0))}</td>
+                  <td>
+                    <button type="button" className="btn-quiet btn-sm text-bad" onClick={() => set(rows.filter((_, j) => j !== i))} aria-label={t('delete')}>
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" className="btn-ghost btn-sm" onClick={() => set([...rows, { name: '', qty: 1, unit: lang === 'bg' ? 'бр.' : 'pcs', unit_price: 0 }])} data-testid="button-add-addon">
+          <Plus className="h-4 w-4" /> {t('add_addon')}
+        </button>
+        <span className="text-xs text-ink-3">{t('addon_presets')}:</span>
+        {presets.map((pr) => (
+          <button key={pr.name} type="button" className="btn-quiet btn-sm" onClick={() => set([...rows, pr])}>
+            {pr.name}
+          </button>
+        ))}
+        {total > 0 && (
+          <span className="ml-auto text-sm">
+            {t('addons_total')}: <span className="num font-semibold" data-testid="text-addons-total">{fmtMoney(total)}</span>
+          </span>
+        )}
       </div>
     </div>
   )
@@ -542,6 +773,8 @@ export function LaborStep({ ctx }: { ctx: StepCtx }) {
         </div>
         <Toggle checked={sel.delivery_fees ?? !!pricing.include_delivery_fees} onChange={(v) => setSel({ delivery_fees: v })} label={`${t('delivery_fees')} (${pricing.delivery_fee_equipment} / ${pricing.delivery_fee_inverter} / ${pricing.delivery_fee_construction} EUR)`} />
       </div>
+
+      <AddonsCard ctx={ctx} />
 
       <div className="card flex flex-col gap-3 p-4">
         <h2>{lang === 'bg' ? 'Търговски условия' : 'Commercial terms'}</h2>

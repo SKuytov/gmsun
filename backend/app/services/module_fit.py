@@ -220,7 +220,11 @@ def recommend(db: Session, project: Project, *, scope: str = "auto", strategy: s
     inverter = db.get(CatalogItem, int(sel.get("inverter_item_id") or 0)) if sel.get("inverter_item_id") else None
     roof_type = project.roof_type
     residential = roof_type in RESIDENTIAL_ROOFS
-    flat_or_ground = roof_type in FLAT_ROOFS or roof_type in GROUND
+    from .site_kind import project_kind
+
+    skind = project_kind(db, project)
+    fence = skind == "fence"
+    flat_or_ground = skind in ("flat", "ground") or roof_type in FLAT_ROOFS or roof_type in GROUND
     access = survey.get("roof_access")
     height = _f(survey, "building_height_m")
     roof_cond = survey.get("roof_condition")
@@ -298,6 +302,12 @@ def recommend(db: Session, project: Project, *, scope: str = "auto", strategy: s
         if flat_or_ground and _f(sp, "bifaciality") > 0:
             reasons.append(f"Бифациален ({_f(sp, 'bifaciality'):g} %) — +5–10 % добив на повдигната конструкция.")
             penalty -= 0.08
+        if fence and _f(sp, "bifaciality") > 0:
+            reasons.append(f"Бифациален ({_f(sp, 'bifaciality'):g} %) — при вертикална ограда изток–запад двете страни работят (+25–35 % добив).")
+            penalty -= 0.15
+        elif fence:
+            reasons.append("Монофациален модул на вертикална ограда — добивът е само от едната страна.")
+            penalty += 0.05
         if flat_or_ground and not large and count_max > 40:
             reasons.append("На плосък покрив/терен големият формат обикновено дава по-ниска цена на конструкция и труд.")
             penalty += 0.05

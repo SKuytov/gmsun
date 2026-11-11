@@ -57,11 +57,11 @@ table.meta td.v { font-size: 9.5pt; font-weight: 600; padding-top: 1pt; }
 .addr b { font-weight: 600; }
 .addr .d { color: var(--ink-2); }
 
-h1.title { font-size: 14pt; font-weight: 600; letter-spacing: -0.01em; line-height: 1.25; margin: 4pt 0 8pt; }
+h1.title { font-size: 14pt; font-weight: 600; letter-spacing: -0.01em; line-height: 1.25; margin: 4pt 0 8pt; text-align: justify; hyphens: manual; }
 h2 { font-size: 10.5pt; font-weight: 600; margin: 13pt 0 5pt; padding-bottom: 3pt; border-bottom: 0.75pt solid var(--rule); page-break-after: avoid; }
 h2 .n { color: var(--muted); font-weight: 500; margin-right: 6pt; }
 h3 { font-size: 9.5pt; font-weight: 600; margin: 10pt 0 3pt; page-break-after: avoid; }
-.lead { font-size: 9.2pt; color: var(--ink-2); max-width: 165mm; }
+.lead { font-size: 9.2pt; color: var(--ink-2); text-align: justify; hyphens: auto; }
 .lead b { font-weight: 600; color: var(--ink); }
 .small { font-size: 8pt; color: var(--muted); }
 .muted { color: var(--muted); }
@@ -82,10 +82,13 @@ table.kv b { font-weight: 600; }
 .facts .k { font-size: 7pt; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-top: 1pt; }
 
 /* solution table with key-figure column (page one) */
-table.sol { width: 100%; border-collapse: collapse; margin-bottom: 2pt; }
+table.sol { width: 100%; border-collapse: collapse; margin-bottom: 2pt; table-layout: fixed; }
 table.sol > tbody > tr > td, table.sol > tr > td { vertical-align: top; padding: 0; }
-table.sol td.sol-main { padding-right: 10pt; }
-table.sol td.sol-facts { width: 38mm; border-left: 0.75pt solid var(--rule); padding-left: 9pt; }
+table.sol td.sol-main { padding-right: 10pt; overflow-wrap: break-word; }
+table.sol td.sol-facts { width: 34mm; border-left: 0.75pt solid var(--rule); padding-left: 9pt; overflow: hidden; }
+table.sol table.kv { table-layout: fixed; }
+table.sol table.kv td:first-child { width: 30%; }
+table.sol table.kv td { overflow-wrap: break-word; }
 .fact { padding: 4pt 0 6pt; border-bottom: 0.5pt solid var(--rule); }
 .fact:last-child { border-bottom: none; }
 .fact .v { font-size: 13pt; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; line-height: 1.2; }

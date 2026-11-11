@@ -61,7 +61,7 @@ CATALOG_COLUMNS: list[Column] = [
 LABOR_COLUMNS: list[Column] = [("id", "ID (не променяйте)", "ro"), ("active", "Активен (да/не)", "bool"), ("days", "Дни", "int"), ("workers", "Работници", "int"),
                                ("price", "Цена EUR (без ДДС)", "num"), ("description", "Описание", "text")]
 ROOF_COLUMNS: list[Column] = [("code", "Код (ключ, не променяйте)", "ro"), ("active", "Активен (да/не)", "bool"), ("label_bg", "Наименование BG", "text"),
-                              ("label_en", "Наименование EN", "text"), ("pricing_mode", "Ценообразуване (detailed/lump)", "text"),
+                              ("label_en", "Наименование EN", "text"), ("kind", "Вид обект (pitched/flat/ground/fence)", "text"), ("pricing_mode", "Ценообразуване (detailed/lump)", "text"),
                               ("lump_price_per_module", "Цена конструкция EUR/модул (lump)", "num"), ("rails_per_module", "Релси на модул", "int"),
                               ("rail_stock_length_m", "Дължина релса m", "num"), ("fixation_spacing_m", "Стъпка закрепване m", "num"),
                               ("waste_pct", "Фира %", "num"), ("default_tilt_deg", "Наклон по подразбиране °", "num"), ("notes", "Бележки", "text"),

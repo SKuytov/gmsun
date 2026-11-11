@@ -37,7 +37,24 @@ PACKS: dict[str, dict[str, str]] = {
         "label_en": "Cables and cable accessories",
         "description_bg": "AC кабели СВТ (3×/5× 6–120 mm²), соларен кабел 10 mm², MC4, кабелни обувки, батерийни и комуникационни кабели, гофре, скоби, връзки, салници.",
     },
+    "filkab": {
+        "label_bg": "Филкаб — кабели (каталожни цени)",
+        "label_en": "Filkab cables (catalogue prices)",
+        "description_bg": "Соларен кабел H1Z2Z2-K 4/6 mm², СВТ-с 0,6/1 kV 3×/4×/5× 2,5–50 mm², ПВ-А2 (H07V-K) 6–25 mm² жълто-зелен, усукан проводник AL/R 2×/4× 16–35 mm² — цени от b2b.filkab.com без ДДС.",
+    },
+    "pvc_pipes": {
+        "label_bg": "PVC тръби за кабели",
+        "label_en": "PVC cable conduits",
+        "description_bg": "Гофрирани PVC тръби Ø20 / Ø25 / Ø32 (320N). Влизат в материалите, но са скрити в офертата за клиента — цената им се разпределя в електрическата част.",
+    },
+    "pv_fence": {
+        "label_bg": "Соларна ограда / стена — конструкция",
+        "label_en": "Solar fence / PV wall mounting",
+        "description_bg": "Стълбове, фундаменти, шини, скоби, конзоли за стена и U-болтове за съществуваща ограда, с правилата за количества за тип „Соларна ограда“ (ориентировъчни цени).",
+    },
 }
+# packs whose items are added even if GM SUN's final catalog has an article with the same role (explicit request)
+ALLOW_DUPLICATES = {"filkab", "pvc_pipes", "pv_fence"}
 
 # roles / categories that make up the cables pack (from the built-in electrical catalogue)
 CABLE_CATEGORIES = {"power_cable", "solar_cable", "cable_management"}
@@ -94,7 +111,27 @@ def _source_items(key: str) -> list[dict[str, Any]]:
         return list(ITEMS)
     if key == "cables":
         return _cable_items()
+    from ..seed_data import packs_v2
+
+    if key == "filkab":
+        return list(packs_v2.FILKAB_ITEMS)
+    if key == "pvc_pipes":
+        return list(packs_v2.PIPE_ITEMS)
+    if key == "pv_fence":
+        return list(packs_v2.FENCE_ITEMS)
     raise KeyError(key)
+
+
+def _source_rules(key: str) -> list[tuple[str, str, str, float, bool]]:
+    if key == "aerocompact":
+        from ..seed_data.aerocompact import RULES
+
+        return list(RULES)
+    if key == "pv_fence":
+        from ..seed_data.packs_v2 import FENCE_RULES
+
+        return list(FENCE_RULES)
+    return []
 
 
 def _duplicates_final(d: dict[str, Any], finals: list[CatalogItem]) -> bool:
@@ -128,7 +165,7 @@ def install(db: Session, key: str) -> dict[str, Any]:
     added = tagged = skipped = 0
     base = max([r.sort_order or 0 for r in rows] + [0]) + 1
     for i, d in enumerate(_source_items(key)):
-        if _duplicates_final(d, finals):
+        if key not in ALLOW_DUPLICATES and _duplicates_final(d, finals):
             skipped += 1
             continue
         cur = by_name.get(d["name"])
@@ -148,9 +185,7 @@ def install(db: Session, key: str) -> dict[str, Any]:
             it.supplier = supplier_of(it)
         by_name[it.name] = it
         added += 1
-    rules = 0
-    if key == "aerocompact":
-        rules = _install_rules(db, by_name)
+    rules = _install_rules(db, by_name, _source_rules(key))
     packs = enabled(db)
     if key not in packs:
         packs.append(key)
@@ -159,9 +194,9 @@ def install(db: Session, key: str) -> dict[str, Any]:
     return {"pack": key, "added": added, "adopted": tagged, "skipped": skipped, "rules": rules}
 
 
-def _install_rules(db: Session, by_name: dict[str, CatalogItem]) -> int:
-    from ..seed_data.aerocompact import RULES
-
+def _install_rules(db: Session, by_name: dict[str, CatalogItem], RULES: list) -> int:
+    if not RULES:
+        return 0
     existing = {(r.roof_type, r.name): r for r in db.query(MountingRule).all()}
     n = 0
     for i, (roof, name, basis, factor, ru) in enumerate(RULES):
@@ -194,6 +229,13 @@ def remove(db: Session, key: str) -> dict[str, Any]:
         from ..models import RoofTypeConfig
 
         for r in db.query(RoofTypeConfig).all():
+            if r.code != "pv_fence":
+                r.pricing_mode = "lump"
+    if key == "pv_fence":
+        from ..models import RoofTypeConfig
+
+        r = db.get(RoofTypeConfig, "pv_fence")
+        if r is not None:
             r.pricing_mode = "lump"
     db.flush()
     return {"pack": key, **res}
@@ -220,4 +262,17 @@ def migrate(db: Session) -> None:
         return
     res = {k: install(db, k) for k in ("aerocompact", "cables")}
     _put(db, "migrations", {**mig, MIGRATION_KEY: {"at": datetime.now(timezone.utc).isoformat(), **res}})
+    db.commit()
+
+
+MIGRATION_KEY_V2 = "packs_v2_filkab_pipes_fence"
+
+
+def migrate_v2(db: Session) -> None:
+    """Once: Filkab cables, PVC pipes and the solar-fence construction (GM SUN request, Nov 2026)."""
+    mig = _setting(db, "migrations")
+    if mig.get(MIGRATION_KEY_V2):
+        return
+    res = {k: install(db, k) for k in ("filkab", "pvc_pipes", "pv_fence")}
+    _put(db, "migrations", {**_setting(db, "migrations"), MIGRATION_KEY_V2: {"at": datetime.now(timezone.utc).isoformat(), **res}})
     db.commit()

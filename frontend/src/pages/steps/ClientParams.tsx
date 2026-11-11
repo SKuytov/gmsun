@@ -7,6 +7,7 @@ import { fmtNum, useT } from '@/lib/i18n'
 import type { Project, Survey } from '@/lib/types'
 import type { StepCtx } from '../Project'
 import { MountingSystemCard } from '@/components/MountingSystem'
+import { isRoofKind, siteKind, type SiteKind } from '@/lib/siteKind'
 
 type TextKeys = 'name' | 'client_name' | 'client_company' | 'client_eik' | 'client_vat' | 'client_phone' | 'client_email' | 'client_address' | 'site_address' | 'notes'
 
@@ -55,9 +56,12 @@ export function ClientStep({ ctx }: { ctx: StepCtx }) {
 export function ParamsStep({ ctx }: { ctx: StepCtx }) {
   const { t, lang } = useT()
   const p = ctx.project
+  const kind = siteKind(p.roof_type, ctx.roofTypes)
+  const panelId = ctx.sel.panel_item_id || p.layouts[0]?.panel_item_id
+  const bif = Number(ctx.items.find((i) => i.id === panelId)?.specs?.bifaciality || 0)
   const yieldQ = useQuery({
-    queryKey: ['yield', ctx.kwp, p.layouts[0]?.azimuth_deg, p.layouts[0]?.tilt_deg],
-    queryFn: () => get<{ annual_kwh: number; specific_yield: number }>(`/api/sizing/yield?kwp=${ctx.kwp}&azimuth_deg=${p.layouts[0]?.azimuth_deg ?? 180}&tilt_deg=${p.layouts[0]?.tilt_deg ?? 20}`),
+    queryKey: ['yield', ctx.kwp, p.layouts[0]?.azimuth_deg, p.layouts[0]?.tilt_deg, bif],
+    queryFn: () => get<{ annual_kwh: number; specific_yield: number }>(`/api/sizing/yield?kwp=${ctx.kwp}&azimuth_deg=${p.layouts[0]?.azimuth_deg ?? 180}&tilt_deg=${p.layouts[0]?.tilt_deg ?? 20}&bifaciality=${bif}`),
     enabled: ctx.kwp > 0,
   })
   return (
@@ -113,9 +117,6 @@ export function ParamsStep({ ctx }: { ctx: StepCtx }) {
           <Field label={t('storage')}>
             <NumInput value={p.desired_storage_kwh} onChange={(v) => ctx.update({ desired_storage_kwh: v })} min={0} />
           </Field>
-          <Field label={t('annual_consumption')}>
-            <NumInput value={p.annual_consumption_kwh} onChange={(v) => ctx.update({ annual_consumption_kwh: v })} min={0} />
-          </Field>
         </div>
         <MountingSystemCard roofType={p.roof_type} className="mt-4" />
       </div>
@@ -125,9 +126,7 @@ export function ParamsStep({ ctx }: { ctx: StepCtx }) {
       <aside className="flex flex-col gap-2">
         <Stat label={t('modules')} value={ctx.panelQty} sub={`${fmtNum(ctx.kwp, 2)} kWp`} />
         <Stat label={t('expected_yield')} value={yieldQ.data ? `${fmtNum(yieldQ.data.annual_kwh, 0)} kWh` : '—'} sub={yieldQ.data ? `${yieldQ.data.specific_yield} kWh/kWp` : ''} />
-        {p.annual_consumption_kwh && yieldQ.data ? (
-          <Stat label={lang === 'bg' ? 'Покритие на консумацията' : 'Consumption coverage'} value={`${fmtNum((100 * yieldQ.data.annual_kwh) / p.annual_consumption_kwh, 0)} %`} />
-        ) : null}
+        <Stat label={t('site_kind')} value={t(`kind_${kind}`)} sub={kind === 'fence' ? t('kind_fence_hint') : ''} />
       </aside>
     </div>
   )
@@ -145,10 +144,44 @@ function SurveyText({ k, label, type = 'text', className, sv, set }: { k: keyof 
   )
 }
 
-/** Site survey: the facts that cause most "unforeseen" costs. Stored in project.params.survey, read by the quote check. */
+/** Survey fields counted in the "filled" badge, per site kind. */
+const FILLED: Record<SiteKind, (keyof Survey)[]> = {
+  pitched: ['building_height_m', 'roof_access', 'roof_condition', 'main_breaker_a', 'internet', 'grid_operator'],
+  flat: ['building_height_m', 'roof_access', 'roof_condition', 'main_breaker_a', 'internet', 'grid_operator'],
+  ground: ['soil_type', 'machine_access', 'trench_m', 'main_breaker_a', 'internet', 'grid_operator'],
+  fence: ['fence_length_m', 'fence_height_m', 'fence_base', 'trench_m', 'main_breaker_a', 'grid_operator'],
+}
+
+function Opt<K extends keyof Survey>({ k, label, opts, sv, set, testid }: { k: K; label: string; opts: { value: string; label: string }[]; sv: Survey; set: (p: Partial<Survey>) => void; testid?: string }) {
+  return (
+    <Field label={label}>
+      <Select className="input-sm" value={(sv[k] as string) || ''} onChange={(e) => set({ [k]: e.target.value } as Partial<Survey>)} data-testid={testid || `survey-${String(k)}`}>
+        <option value="">—</option>
+        {opts.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </Select>
+    </Field>
+  )
+}
+
+function Num<K extends keyof Survey>({ k, label, sv, set, testid }: { k: K; label: string; sv: Survey; set: (p: Partial<Survey>) => void; testid?: string }) {
+  return (
+    <Field label={label}>
+      <NumInput className="input-sm" value={(sv[k] as number | null | undefined) ?? null} min={0} onChange={(v) => set({ [k]: v } as Partial<Survey>)} data-testid={testid || `survey-${String(k)}`} />
+    </Field>
+  )
+}
+
+/** Site survey: the facts that cause most "unforeseen" costs. Stored in project.params.survey, read by the quote check.
+ * The fields follow the site kind of the chosen roof / terrain type (roof · ground mount · solar fence). */
 export function SurveyCard({ ctx }: { ctx: StepCtx }) {
   const { t, lang } = useT()
   const p = ctx.project
+  const kind = siteKind(p.roof_type, ctx.roofTypes)
+  const onRoof = isRoofKind(kind)
   const saved = ((p.params as Record<string, unknown>)?.survey as Survey) || {}
   // Local copy so that quick successive edits (select, select, number) never overwrite each other
   // while the previous PATCH is still in flight.
@@ -166,99 +199,71 @@ export function SurveyCard({ ctx }: { ctx: StepCtx }) {
     ctx.update({ params: { ...(p.params || {}), survey: svRef.current } })
   }
   const T = (props: { k: keyof Survey; label: string; type?: string; className?: string }) => <SurveyText {...props} sv={sv} set={set} />
-  const filled = ['building_height_m', 'roof_access', 'roof_condition', 'main_breaker_a', 'internet', 'grid_operator'].filter((k) => sv[k as keyof Survey] !== undefined && sv[k as keyof Survey] !== '' && sv[k as keyof Survey] !== null).length
+  const keys = FILLED[kind]
+  const filled = keys.filter((k) => sv[k] !== undefined && sv[k] !== '' && sv[k] !== null).length
+  const o = (pfx: string, vals: readonly string[]) => vals.map((v) => ({ value: v, label: t(`${pfx}${v}`) }))
   return (
-    <div className="card p-4" data-testid="survey-card">
+    <div className="card p-4" data-testid="survey-card" data-kind={kind}>
       <button type="button" className="flex w-full items-center gap-3 text-left" onClick={() => setOpen(!open)}>
         <ClipboardList className="h-5 w-5 text-ink-3" />
         <div className="min-w-0 flex-1">
-          <h2>{t('survey')}</h2>
-          <p className="text-xs text-ink-3">{t('survey_hint')}</p>
+          <h2>{t('survey')} <span className="ml-1 text-xs font-normal text-ink-3">· {t(`kind_${kind}`)}</span></h2>
+          <p className="text-xs text-ink-3">{t(`survey_hint_${kind}`)}</p>
         </div>
-        <span className="num text-xs text-ink-3">{filled}/6</span>
+        <span className="num text-xs text-ink-3">
+          {filled}/{keys.length}
+        </span>
       </button>
       {open && (
         <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
           <T k="surveyed_at" label={t('survey_date')} type="date" />
-          <Field label={t('building_height')}>
-            <NumInput className="input-sm" value={sv.building_height_m ?? null} min={0} onChange={(v) => set({ building_height_m: v })} data-testid="survey-height" />
-          </Field>
-          <Field label={t('floors')}>
-            <NumInput className="input-sm" value={sv.floors ?? null} min={0} onChange={(v) => set({ floors: v })} />
-          </Field>
-          <Field label={t('roof_age')}>
-            <NumInput className="input-sm" value={sv.roof_age_years ?? null} min={0} onChange={(v) => set({ roof_age_years: v })} />
-          </Field>
-          <Field label={t('roof_access')}>
-            <Select className="input-sm" value={sv.roof_access || ''} onChange={(e) => set({ roof_access: e.target.value as Survey['roof_access'] })} data-testid="survey-access">
-              <option value="">—</option>
-              {(['ladder', 'scaffold', 'lift', 'crane', 'internal'] as const).map((o) => (
-                <option key={o} value={o}>
-                  {t(`access_${o}`)}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label={t('roof_condition')}>
-            <Select className="input-sm" value={sv.roof_condition || ''} onChange={(e) => set({ roof_condition: e.target.value as Survey['roof_condition'] })}>
-              <option value="">—</option>
-              {(['good', 'fair', 'poor'] as const).map((o) => (
-                <option key={o} value={o}>
-                  {t(`cond_${o}`)}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label={t('structure')}>
-            <Select className="input-sm" value={sv.structure || ''} onChange={(e) => set({ structure: e.target.value as Survey['structure'] })}>
-              <option value="">—</option>
-              {(['concrete', 'steel', 'wood'] as const).map((o) => (
-                <option key={o} value={o}>
-                  {t(`struct_${o}`)}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label={t('shading')}>
-            <Select className="input-sm" value={sv.shading || ''} onChange={(e) => set({ shading: e.target.value as Survey['shading'] })}>
-              <option value="">—</option>
-              {(['none', 'partial', 'strong'] as const).map((o) => (
-                <option key={o} value={o}>
-                  {t(`shade_${o}`)}
-                </option>
-              ))}
-            </Select>
-          </Field>
+          {onRoof && (
+            <>
+              <Num k="building_height_m" label={t('building_height')} sv={sv} set={set} testid="survey-height" />
+              <Num k="floors" label={t('floors')} sv={sv} set={set} />
+              {kind === 'pitched' && <Num k="roof_age_years" label={t('roof_age')} sv={sv} set={set} />}
+              <Opt k="roof_access" label={t('roof_access')} opts={o('access_', ['ladder', 'scaffold', 'lift', 'crane', 'internal'])} sv={sv} set={set} testid="survey-access" />
+              <Opt k="roof_condition" label={t('roof_condition')} opts={o('cond_', ['good', 'fair', 'poor'])} sv={sv} set={set} />
+              <Opt k="structure" label={t('structure')} opts={o('struct_', ['concrete', 'steel', 'wood'])} sv={sv} set={set} />
+            </>
+          )}
+          {kind === 'fence' && (
+            <>
+              <Num k="fence_length_m" label={t('fence_length')} sv={sv} set={set} />
+              <Num k="fence_height_m" label={t('fence_height')} sv={sv} set={set} />
+              <Opt k="fence_base" label={t('fence_base')} opts={o('fbase_', ['freestanding', 'existing', 'wall'])} sv={sv} set={set} />
+              <Opt k="wind_exposure" label={t('wind_exposure')} opts={o('wind_', ['normal', 'high'])} sv={sv} set={set} />
+            </>
+          )}
+          {(kind === 'ground' || (kind === 'fence' && sv.fence_base !== 'wall' && sv.fence_base !== 'existing')) && (
+            <Opt k="soil_type" label={t('soil_type')} opts={o('soil_', ['soil', 'gravel', 'rock', 'fill'])} sv={sv} set={set} />
+          )}
+          {kind === 'ground' && (
+            <>
+              <Num k="terrain_slope_pct" label={t('terrain_slope')} sv={sv} set={set} />
+              <Opt k="machine_access" label={t('machine_access')} opts={o('macc_', ['yes', 'limited', 'no'])} sv={sv} set={set} />
+            </>
+          )}
+          {!onRoof && <Num k="trench_m" label={t('trench_m')} sv={sv} set={set} />}
+          <Opt k="shading" label={t('shading')} opts={o('shade_', ['none', 'partial', 'strong'])} sv={sv} set={set} />
           <Field label={t('grid_operator')}>
             <Select className="input-sm" value={sv.grid_operator || ''} onChange={(e) => set({ grid_operator: e.target.value })}>
               <option value="">—</option>
-              {['Електроразпределителни мрежи Запад (ЕРМ Запад)', 'Електроразпределение Север (Energo-Pro)', 'Електроразпределение Юг (EVN)', 'Златни пясъци', 'ЕСО (високо напрежение)'].map((o) => (
-                <option key={o} value={o}>
-                  {o}
+              {['Електроразпределителни мрежи Запад (ЕРМ Запад)', 'Електроразпределение Север (Energo-Pro)', 'Електроразпределение Юг (EVN)', 'Златни пясъци', 'ЕСО (високо напрежение)'].map((op) => (
+                <option key={op} value={op}>
+                  {op}
                 </option>
               ))}
             </Select>
           </Field>
           <T k="meter_no" label={t('meter_no')} />
-          <Field label={t('main_breaker')}>
-            <NumInput className="input-sm" value={sv.main_breaker_a ?? null} min={0} onChange={(v) => set({ main_breaker_a: v })} data-testid="survey-breaker" />
-          </Field>
+          <Num k="main_breaker_a" label={t('main_breaker')} sv={sv} set={set} testid="survey-breaker" />
           <T k="meter_location" label={t('meter_location')} />
-          <Field label={t('cable_route')}>
-            <NumInput className="input-sm" value={sv.cable_route_m ?? null} min={0} onChange={(v) => set({ cable_route_m: v })} />
-          </Field>
-          <Field label={t('internet')}>
-            <Select className="input-sm" value={sv.internet || ''} onChange={(e) => set({ internet: e.target.value as Survey['internet'] })} data-testid="survey-internet">
-              <option value="">—</option>
-              {(['wifi', 'lan', 'none'] as const).map((o) => (
-                <option key={o} value={o}>
-                  {t(`net_${o}`)}
-                </option>
-              ))}
-            </Select>
-          </Field>
+          <Num k="cable_route_m" label={t('cable_route')} sv={sv} set={set} />
+          <Opt k="internet" label={t('internet')} opts={o('net_', ['wifi', 'lan', 'none'])} sv={sv} set={set} testid="survey-internet" />
           <div className="flex flex-col justify-end gap-2 pb-1">
-            <Toggle checked={!!sv.has_lightning_protection} onChange={(v) => set({ has_lightning_protection: v })} label={t('lps')} />
+            {onRoof && <Toggle checked={!!sv.has_lightning_protection} onChange={(v) => set({ has_lightning_protection: v })} label={t('lps')} />}
+            {kind === 'ground' && <Toggle checked={!!sv.site_fenced} onChange={(v) => set({ site_fenced: v })} label={t('site_fenced')} />}
             <Toggle checked={!!sv.earth_existing} onChange={(v) => set({ earth_existing: v })} label={t('earth_existing')} />
           </div>
           <T k="cable_route_notes" label={t('cable_route_notes')} className="col-span-2 md:col-span-3" />

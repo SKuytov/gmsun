@@ -33,7 +33,7 @@ ROOF_COLOURS = {  # fallback roof colours by type (RGB)
     "tile": (173, 88, 62), "tile_xt": (173, 88, 62), "tile_xtr": (173, 88, 62), "plain_tile": (150, 70, 55),
     "lt_sheet": (142, 148, 156), "lt_sheet_ts": (142, 148, 156), "standing_seam": (110, 116, 124), "sandwich": (190, 194, 200),
     "fibre_cement": (128, 128, 122), "flat_concrete": (150, 148, 142), "flat_ew": (150, 148, 142), "flat_bifacial": (120, 140, 90),
-    "ground_ballast": (112, 134, 78), "ground": (112, 134, 78),
+    "ground_ballast": (112, 134, 78), "ground": (112, 134, 78), "pv_fence": (112, 134, 78),
 }
 
 

@@ -137,7 +137,40 @@ export function Scene3D({ project, onSaved }: { project: Project; onSaved?: (l: 
     const railMat = new THREE.MeshStandardMaterial({ color: 0xa8acb2, metalness: 0.7, roughness: 0.35 })
 
     for (const pl of data.planes) {
-      const { toWorld, e, s, normal } = planeBasis(pl, data.flat || data.ground)
+      // solar fence / PV wall: a vertical plane (tilt 90°) standing 0.3 m above the ground; modules sit directly on it
+      const flatBasis = (data.flat || data.ground) && !pl.fence
+      const { toWorld, e, s, normal } = planeBasis(pl, flatBasis)
+      if (pl.fence) {
+        const top = pl.eave_height + pl.height_m
+        const postMat = new THREE.MeshStandardMaterial({ color: 0x8d9299, metalness: 0.6, roughness: 0.45 })
+        if (pl.fence_base === 'wall') {
+          const wallGeo = new THREE.BoxGeometry(pl.width_m + 0.6, top + 0.4, 0.25)
+          const w = new THREE.Mesh(wallGeo, new THREE.MeshStandardMaterial({ color: 0xd9d2c3, roughness: 0.95 }))
+          const c = toWorld(pl.width_m / 2, pl.height_m / 2, -0.16)
+          w.position.set(c.x, (top + 0.4) / 2, c.z)
+          w.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(e, new THREE.Vector3(0, 1, 0), normal))
+          w.castShadow = true
+          w.receiveShadow = true
+          sc.add(w)
+        } else {
+          const step = Math.max(0.5, Number(pl.post_spacing_m || 2.5))
+          const n = Math.max(1, Math.ceil(pl.width_m / step))
+          const thick = pl.fence_base === 'existing' ? 0.05 : 0.08
+          for (let i = 0; i <= n; i++) {
+            const u = Math.min(pl.width_m, i * (pl.width_m / n))
+            const post = new THREE.Mesh(new THREE.BoxGeometry(thick, top + 0.1, thick), postMat)
+            const c = toWorld(u, pl.height_m / 2, -0.06)
+            post.position.set(c.x, (top + 0.1) / 2, c.z)
+            post.castShadow = true
+            sc.add(post)
+            if (pl.fence_base !== 'existing') {
+              const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.06, 16), new THREE.MeshStandardMaterial({ color: 0xa9a59c, roughness: 1 }))
+              foot.position.set(c.x, 0.03, c.z)
+              sc.add(foot)
+            }
+          }
+        }
+      }
       // roof surface
       const poly = pl.roof_polygon.length >= 3 ? pl.roof_polygon : [[0, 0], [pl.width_m, 0], [pl.width_m, pl.height_m], [0, pl.height_m]]
       const rectGeo = new THREE.BufferGeometry()
@@ -158,7 +191,7 @@ export function Scene3D({ project, onSaved }: { project: Project; onSaved?: (l: 
       const roof = new THREE.Mesh(rectGeo, roofMat)
       roof.receiveShadow = true
       roof.castShadow = true
-      sc.add(roof)
+      if (!pl.fence) sc.add(roof) // a fence has no surface of its own – only posts / wall and the modules
       // usable outline
       if (pl.roof_polygon.length >= 3) {
         const pts = poly.map(([x, y]) => toWorld(x, y, 0.01))
@@ -184,10 +217,10 @@ export function Scene3D({ project, onSaved }: { project: Project; onSaved?: (l: 
       }
       // modules
       const th = Math.max(0.03, pl.panel.thickness_m)
-      const lift = pl.elevated ? 0.12 : 0.1 // rails
+      const lift = pl.fence ? 0.05 : pl.elevated ? 0.12 : 0.1 // rails
       const cols = pl.panel.cells % 6 === 0 || pl.panel.cells === 0 ? 6 : 5
       const rows = Math.max(1, Math.floor((pl.panel.cells || 108) / cols))
-      const panelTilt = data.flat || data.ground ? pl.tilt * DEG : 0
+      const panelTilt = flatBasis ? pl.tilt * DEG : 0
       for (const p of pl.panels) {
         const g = new THREE.Group()
         const glassMesh = new THREE.Mesh(new THREE.BoxGeometry(p.w - 0.02, th * 0.4, p.h - 0.02), glass)

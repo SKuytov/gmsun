@@ -20,7 +20,7 @@ def test_catalog_seeded(client, auth):
     main = [i for i in items if i["category"] in ("panel", "inverter", "battery")]
     assert main and all(i["name"] in final_names for i in main)
     extra = [i for i in items if i["name"] not in final_names]
-    assert extra and all((i["specs"] or {}).get("pack") in ("aerocompact", "cables") for i in extra)
+    assert extra and all((i["specs"] or {}).get("pack") in ("aerocompact", "cables", "filkab", "pvc_pipes", "pv_fence") for i in extra)
     meta = client.get("/api/catalog/meta", headers=auth).json()
     assert "categories" in meta
 

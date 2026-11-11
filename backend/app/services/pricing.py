@@ -19,6 +19,7 @@ from ..models import CatalogItem, LaborOption, Layout, Project, Quote, QuoteLine
 from . import compat, bom, engineering
 from . import procurement
 from . import module_fit
+from . import site_kind
 from .settings import get_setting
 
 SECTIONS: list[tuple[str, str, str]] = [
@@ -252,11 +253,16 @@ def build_lines(db: Session, project: Project, quote: Quote) -> tuple[list[dict[
         stats = bom.compute_stats(layout_sum, roof, modules_override=panel_qty, strings=int((info.get("strings") or {}).get("strings") or 1))
         info["mounting_stats"] = stats.as_dict()
         info["mounting_mode"] = eff_mode
+        skind = site_kind.kind_of(roof.code, roof)
+        fence_base = str(((project.params or {}).get("survey") or {}).get("fence_base") or "freestanding")
+        info["site_kind"] = skind
         if eff_mode == "lump":
             price = float(sel.get("lump_price_per_module") or roof.lump_price_per_module or 0)
-            lines.append(_line("mount:lump", "construction", f"Модулна алуминиева конструкция за {roof.label_bg.lower()}", "бр.", panel_qty, price, meta={"mode": "lump"}))
+            lump_name = fence_lump_name(fence_base) if skind == "fence" else f"Модулна алуминиева конструкция за {roof.label_bg.lower()}"
+            lines.append(_line("mount:lump", "construction", lump_name, "бр.", panel_qty, price, meta={"mode": "lump"}))
         else:
-            ml = bom.mounting_lines(db, roof, stats, markup, float(pricing.get("fastener_margin_pct", 0) or 0))
+            ml = bom.mounting_lines(db, roof, stats, markup, float(pricing.get("fastener_margin_pct", 0) or 0),
+                                    fence_base=fence_base if skind == "fence" else None)
             if not ml:
                 warnings.append("Няма дефинирани правила за монтажни материали за този тип покрив.")
             lines.extend(ml)
@@ -295,8 +301,29 @@ def build_lines(db: Session, project: Project, quote: Quote) -> tuple[list[dict[
     pick = procurement.chooser(db, sel.get("strategy"), all_items) if sel.get("strategy") else None
     missing: list[str] = []
     counters: dict[str, int] = {}
+    modes = cable_modes(sel)
+    info["cable_modes"] = modes
+    pipes = [p for p in (sel.get("pipes") or []) if isinstance(p, dict) and _num(p.get("m")) > 0 and p.get("item_id")]
+    skip: set[str] = set()
+    if modes["cables"] == "manual":
+        skip |= MANUAL_CABLE_ROLES
+    if modes["mc4"] == "kit":
+        skip.add("mc4_pair")
+    if modes["battery_cables"] == "kit":
+        skip |= BATTERY_KIT_ROLES
+    if pipes:
+        skip |= {"conduit_32", "conduit_40"}
+    design_cables: dict[str, list[dict[str, Any]]] = {}
     for r in design.get("roles") or []:
         rk = r["role"]
+        if rk in MANUAL_CABLE_ROLES or rk == "mc4_pair" or rk in BATTERY_KIT_ROLES:
+            design_cables.setdefault(rk, []).append(r)
+        if rk in skip:
+            if rk == "mc4_pair" or rk in BATTERY_KIT_ROLES:
+                lab = "MC4 конектори — в комплекта с панелите" if rk == "mc4_pair" else f"{r['name']} — в комплекта с батерията"
+                if lab not in info.setdefault("kit_included", []):
+                    info["kit_included"].append(lab)
+            continue
         if not auto_el and rk not in ("pv_cable", "mc4_pair", "ac_cable"):
             continue
         idx = counters.get(rk, 0)
@@ -353,6 +380,15 @@ def build_lines(db: Session, project: Project, quote: Quote) -> tuple[list[dict[
             info.setdefault("not_quoted_roles", []).append(rk)
     if missing:
         info["not_quoted"] = missing
+    if modes["cables"] == "manual":
+        lines.extend(_manual_cable_lines(db, sel, markup, design_cables, warnings, info))
+    for i, pp in enumerate(pipes):
+        it = _item(db, pp.get("item_id"))
+        if it is None:
+            continue
+        ln = _item_line(f"pipe:{i}", "electrical", it, round(_num(pp.get("m")), 2), markup, meta={"role": "pvc_pipe", "client_hidden": True})
+        ln["hidden"] = True  # bought and installed, but its price is spread over the visible electrical rows
+        lines.append(ln)
     for extra in sel.get("electrical_items") or []:
         it = _item(db, extra.get("catalog_item_id") or extra.get("item_id"))
         if it:
@@ -402,7 +438,27 @@ def build_lines(db: Session, project: Project, quote: Quote) -> tuple[list[dict[
         it = _item(db, extra.get("catalog_item_id"))
         if it:
             lines.append(_item_line(f"extra:{it.id}", "other", it, float(extra.get("qty") or 1), markup))
+    addons_total = 0.0
+    for i, a in enumerate(sel.get("custom_addons") or []):
+        if not isinstance(a, dict):
+            continue
+        qty, up = _num(a.get("qty")), _num(a.get("unit_price"))
+        if qty <= 0 or up <= 0:
+            continue
+        name = (str(a.get("name") or "").strip() or "Допълнителен разход")[:500]
+        unit = (str(a.get("unit") or "бр.").strip() or "бр.")[:16]
+        ln = _line(f"addon:{i}", "other", name, unit, qty, up, purchase=up, meta={"addon": True, "spread": "all"})
+        ln["hidden"] = True  # internal cost (e.g. pallet delivery) – spread over every visible row of the quote
+        lines.append(ln)
+        addons_total += qty * up
+    if addons_total:
+        info["addons_total"] = round(addons_total, 2)
 
+    for ln in lines:  # articles marked "hidden in the client quote" in the catalog (e.g. PVC pipes)
+        if ln.get("catalog_item_id") and not ln.get("hidden"):
+            it = _item(db, ln["catalog_item_id"], include_inactive=True)
+            if it is not None and (it.specs or {}).get("client_hidden"):
+                ln["hidden"] = True
     # price sanity
     for ln in lines:
         if ln["catalog_item_id"] and ln["unit_price"] <= 0:
@@ -431,6 +487,71 @@ def build_lines(db: Session, project: Project, quote: Quote) -> tuple[list[dict[
     return lines, warnings, info
 
 
+MANUAL_CABLE_ROLES = {"pv_cable", "ac_cable", "pe_cable", "bonding_cable", "rs485_cable", "ct_cable", "parallel_cable"}
+BATTERY_KIT_ROLES = {"battery_cable", "battery_lug", "comm_cable"}
+
+
+def _num(v: Any) -> float:
+    if isinstance(v, bool):
+        return 0.0
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return 0.0
+    return f if math.isfinite(f) else 0.0
+
+
+def cable_modes(sel: dict[str, Any]) -> dict[str, str]:
+    """cables: auto | manual · mc4: kit | auto | manual · battery_cables: kit | auto.
+    MC4 connectors and battery cables come with the panels / batteries (GM SUN) → "kit" = not quoted."""
+    cm = sel.get("cables_mode") if sel.get("cables_mode") in ("auto", "manual") else "auto"
+    mc = sel.get("mc4_mode")
+    if mc not in ("kit", "auto", "manual"):
+        mc = "manual" if (sel.get("mc4_item_id") or _num(sel.get("mc4_qty")) > 0) else "kit"
+    bc = sel.get("battery_cables_mode") if sel.get("battery_cables_mode") in ("kit", "auto") else "kit"
+    return {"cables": cm, "mc4": mc, "battery_cables": bc}
+
+
+def _manual_cable_lines(db: Session, sel: dict[str, Any], markup: float, design: dict[str, list[dict[str, Any]]],
+                        warnings: list[str], info: dict[str, Any]) -> list[dict[str, Any]]:
+    """Cables chosen by hand (type + length per row). The engineering design is still checked: a missing solar / AC /
+    PE cable or a smaller cross-section than calculated gives a warning."""
+    out: list[dict[str, Any]] = []
+    have: dict[str, float] = {}
+    for i, c in enumerate(sel.get("cables") or []):
+        if not isinstance(c, dict):
+            continue
+        it = _item(db, c.get("item_id"))
+        m = round(_num(c.get("m")), 2)
+        if it is None or m <= 0:
+            continue
+        sp = it.specs or {}
+        role = sp.get("role")
+        sec = "inverter" if it.category == "battery_accessory" else "electrical"
+        out.append(_item_line(f"cable:{i}", sec, it, m, markup, meta={"role": role, "manual": True, "cross_section_mm2": sp.get("cross_section_mm2")}))
+        if role:
+            have[role] = max(have.get(role, 0.0), _num(sp.get("cross_section_mm2")))
+    for role, label in (("pv_cable", "соларен кабел"), ("ac_cable", "AC захранващ кабел"), ("pe_cable", "заземителен проводник PE")):
+        need = [r for r in design.get(role) or []]
+        if not need:
+            continue
+        need_mm2 = max(_num((r.get("spec") or {}).get("cross_section_mm2")) for r in need)
+        if role not in have:
+            warnings.append(f"Ръчен избор на кабели: няма {label} (по проекта {need_mm2:g} mm²) — добавете ред в „Материали → Кабели“.")
+        elif need_mm2 and have[role] and have[role] + 1e-9 < need_mm2:
+            warnings.append(f"Ръчен избор на кабели: {label} {have[role]:g} mm² е под изчисленото сечение {need_mm2:g} mm² — проверете пада на напрежение и токовото натоварване.")
+    info["manual_cables"] = len(out)
+    return out
+
+
+def fence_lump_name(base: str) -> str:
+    if base == "wall":
+        return "Конструкция за фотоволтаична стена — конзоли с анкери към фасадата, алуминиеви шини, скоби (вертикален монтаж)"
+    if base == "existing":
+        return "Конструкция за соларна ограда върху съществуваща ограда — U-болтове, алуминиеви шини, скоби (вертикален монтаж)"
+    return "Конструкция за соларна ограда — поцинковани стълбове с бетонни фундаменти, алуминиеви шини, скоби (вертикален монтаж)"
+
+
 def apply_lines(db: Session, quote: Quote, new_lines: list[dict[str, Any]]) -> None:
     existing = {ln.key: ln for ln in quote.lines if ln.source == "auto"}
     seen: set[str] = set()
@@ -454,6 +575,8 @@ def apply_lines(db: Session, quote: Quote, new_lines: list[dict[str, Any]]) -> N
         ln.purchase_price = nl["purchase_price"]
         ln.catalog_item_id = nl["catalog_item_id"]
         ln.meta = nl.get("meta") or {}
+        if nl.get("hidden"):
+            ln.hidden = True  # forced: pipes, internal add-on costs
         ln.total = round(ln.qty * ln.unit_price, 2)
     for key, ln in existing.items():
         if key not in seen and not ln.locked:
@@ -526,8 +649,12 @@ def distribute_hidden(quote: Quote) -> float:
         return 0.0
     share: dict[int, float] = {}
     by_sec: dict[str, float] = {}
+    whole = 0.0  # add-on costs (meta.spread = "all") go over every visible row of the quote
     for l in hidden:
-        by_sec[l.section] = by_sec.get(l.section, 0.0) + base_total(l)
+        if (getattr(l, "meta", None) or {}).get("spread") == "all":
+            whole += base_total(l)
+        else:
+            by_sec[l.section] = by_sec.get(l.section, 0.0) + base_total(l)
 
     def spread(targets: list[QuoteLine], amount: float) -> None:
         targets = [t for t in targets if float(t.qty or 0) > 0] or targets
@@ -539,6 +666,8 @@ def distribute_hidden(quote: Quote) -> float:
     for sec, amount in by_sec.items():
         tg = [l for l in visible if l.section == sec]
         spread(tg or visible, amount)
+    if abs(whole) > 1e-9:
+        spread(visible, whole)
     expected: dict[str, float] = {}
     for l in visible:
         _round_line(l, share.get(id(l), 0.0))
@@ -613,12 +742,22 @@ def next_quote_number(db: Session, project: Project, prefix: str = "") -> str:
     return f"{base}-{n:02d}PV"
 
 
-def estimate_yield(kwp: float, specific_yield: float, azimuth_deg: float = 180.0, tilt_deg: float = 20.0) -> float:
-    """Annual yield estimate: kWp × specific yield × orientation factor."""
+def estimate_yield(kwp: float, specific_yield: float, azimuth_deg: float = 180.0, tilt_deg: float = 20.0, bifaciality: float = 0.0) -> float:
+    """Annual yield estimate: kWp × specific yield × orientation factor.
+
+    Vertical modules (tilt ≥ 75°, solar fence / PV wall): front side south 0.70, east/west 0.58, north 0.30 of the
+    optimum; a bifacial module also produces from the rear side (opposite azimuth) × bifaciality × 0.8 (rear
+    irradiance / albedo) – an east–west bifacial fence reaches ~0.9 of an optimally tilted south array."""
     if kwp <= 0:
         return 0.0
-    # simple orientation factor: south 1.0, east/west ~0.85, north ~0.6; tilt optimum ~30°
     az = abs(((azimuth_deg - 180) + 180) % 360 - 180)  # 0 = south
+    if tilt_deg >= 75:
+        def vert(a: float) -> float:
+            return 0.70 - 0.12 * (a / 90.0) if a <= 90 else 0.58 - 0.28 * ((a - 90) / 90.0)
+
+        f = vert(az) + max(0.0, min(float(bifaciality or 0), 100.0)) / 100.0 * vert(180.0 - az) * 0.8
+        return round(kwp * specific_yield * f, 0)
+    # simple orientation factor: south 1.0, east/west ~0.85, north ~0.6; tilt optimum ~30°
     f_az = 1.0 - 0.15 * (az / 90.0) if az <= 90 else 0.85 - 0.25 * ((az - 90) / 90.0)
     f_tilt = 1.0 - 0.0001 * (tilt_deg - 30) ** 2
     return round(kwp * specific_yield * max(f_az, 0.5) * max(f_tilt, 0.7), 0)
