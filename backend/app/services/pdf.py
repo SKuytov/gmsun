@@ -56,7 +56,7 @@ def _inverter_ac_kw(db: Session, sel: dict) -> float:
         return 0.0
 
 
-def render_quote_html(db: Session, quote: Quote, mode: str = "client") -> str:
+def render_quote_html(db: Session, quote: Quote, mode: str = "client", fit: int = 0) -> str:
     settings = get_settings()
     company = get_setting(db, "company")
     pricing = get_setting(db, "pricing")
@@ -139,6 +139,7 @@ def render_quote_html(db: Session, quote: Quote, mode: str = "client") -> str:
     tpl = env.get_template("quote.html")
     title = quote.title or _default_title(info, project, skind)
     return tpl.render(
+        fit=int(fit),
         company=company,
         texts=texts,
         quote=quote,
@@ -291,13 +292,67 @@ def _default_title(info: dict, project, kind: str | None = None) -> str:
     return t
 
 
+FIT_LEVELS = 4          # body.fit-1 … fit-4 in _doc.css
+FIT_MAX_TAIL = 0.45     # only squeeze when the spill-over is at most this share of a page
+
+
+def _box_with_id(page, ident: str):
+    stack = [page._page_box]
+    while stack:
+        b = stack.pop()
+        el = getattr(b, "element", None)
+        if el is not None and getattr(el, "get", None) and el.get("id") == ident:
+            return b
+        stack.extend(getattr(b, "children", None) or [])
+    return None
+
+
+def _spec_span(doc) -> tuple[int, int, float] | None:
+    """(first page, last page, tail share) of the specification block (#spec-start … #spec-end).  The tail share is
+    how much of its last page the spill-over occupies (0–1)."""
+    first = last = None
+    tail = 0.0
+    for i, page in enumerate(doc.pages):
+        if first is None and _box_with_id(page, "spec-start") is not None:
+            first = i
+        b = _box_with_id(page, "spec-end")
+        if b is not None:
+            last = i
+            pb = page._page_box
+            top, h = pb.content_box_y(), float(pb.height) or 1.0
+            tail = max(0.0, (b.position_y + b.margin_height() - top) / h)
+    if first is None or last is None:
+        return None
+    return first, last, tail
+
+
+def _fit_specification(render):
+    """Render at fit-0; when the specification + totals spill onto one more page with only a short tail (e.g. a
+    section with two rows and the totals), re-render with progressively tighter typography (fit-1 … fit-4) and take
+    the first level that saves that page.  Falls back to the normal layout when nothing saves it, so it never makes
+    the document worse."""
+    base = render(0)
+    span = _spec_span(base)
+    if not span:
+        return base
+    first, last, tail = span
+    if last == first or tail > FIT_MAX_TAIL:
+        return base
+    for lvl in range(1, FIT_LEVELS + 1):
+        doc = render(lvl)
+        s = _spec_span(doc)
+        if s and (s[1] - s[0]) < (last - first):
+            return doc
+    return base
+
+
 def render_quote_pdf(db: Session, quote: Quote, mode: str = "client") -> Path:
     from weasyprint import HTML
 
     settings = get_settings()
-    html = render_quote_html(db, quote, mode)
     out = settings.pdf_dir / f"quote_{quote.number}_v{quote.version}_{mode}.pdf"
-    HTML(string=html, base_url=str(TEMPLATES)).write_pdf(str(out))
+    doc = _fit_specification(lambda fit: HTML(string=render_quote_html(db, quote, mode, fit), base_url=str(TEMPLATES)).render())
+    doc.write_pdf(str(out))
     quote.pdf_path = str(out.relative_to(settings.data_dir))
     db.commit()
     return out

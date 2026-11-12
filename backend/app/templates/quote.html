@@ -6,7 +6,7 @@
 {% include "_doc.css" %}
 </style>
 </head>
-<body>
+<body class="fit-{{ fit|default(0) }}">
 
 {# ------------------------------------------------------------------ letterhead #}
 <div class="lh">
@@ -117,7 +117,7 @@
 
 {# ================================================================== page 2: specification #}
 <div class="pb"></div>
-<h2><span class="n">Приложение 1</span>Спецификация на оборудването, материалите и дейностите</h2>
+<h2 id="spec-start"><span class="n">Приложение 1</span>Спецификация на оборудването, материалите и дейностите</h2>
 <p class="small">Всички цени са в {{ quote.currency }}{{ " без ДДС" }}. Количествата са определени по инженерен разчет за обекта и могат да бъдат уточнени при оглед.</p>
 <table class="lines{{ " dense" if internal else "" }}">
   <thead>
@@ -154,7 +154,7 @@
   </tbody>
 </table>
 
-<div class="totals-wrap">
+<div class="totals-wrap" id="spec-end">
 <table class="totals">
   {% if quote.discount_amount %}
   <tr class="sub"><td>Сума</td><td class="r">{{ quote.subtotal|money }} {{ quote.currency }}</td></tr>
