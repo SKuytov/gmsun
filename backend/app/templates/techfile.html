@@ -53,7 +53,7 @@
   </table>
 </div>
 
-<h1>Фотоволтаична централа {{ (((info.kwp or 0) * 1000) | round | int) | thousands }} Wp{% if info.storage_kwh %} с батерия {{ info.storage_kwh | num }} kWh{% endif %}</h1>
+<h1>Фотоволтаична централа {% if info.ac_kw %}{{ info.ac_kw | num }} kW{% else %}{{ (((info.kwp or 0) * 1000) | round | int) | thousands }} Wp{% endif %}{% if info.storage_kwh %} с батерия {{ info.storage_kwh | num }} kWh{% endif %}</h1>
 <p class="sub">{{ project.client_name }}{% if project.client_company %} · {{ project.client_company }}{% endif %}{% if project.site_address %} · {{ project.site_address }}{% endif %}</p>
 
 <div class="kpi">
@@ -224,10 +224,10 @@
   {% if msys.notes_bg %}<tr><td>Бележки</td><td>{{ msys.notes_bg }}</td></tr>{% endif %}
   <tr><td>Документи</td><td>{% for k, u in msys.docs.items() %}<a href="{{ u }}">{{ k }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</td></tr>
 </table>
-<p class="muted">Окончателното статично оразмеряване (стъпка на закрепване, баласт, покривни зони по EN 1991-1-4, снегова зона) се потвърждава с AEROTOOL на производителя; монтажът — по инструкцията за монтаж и контролния списък (checklist) на системата.</p>
+<p class="muted keep-prev">Окончателното статично оразмеряване (стъпка на закрепване, баласт, покривни зони по EN 1991-1-4, снегова зона) се потвърждава с AEROTOOL на производителя; монтажът — по инструкцията за монтаж и контролния списък (checklist) на системата.</p>
 {% endif %}
 
-<h2 class="pb">6. Пълна спецификация (BOM)</h2>
+<h2>6. Пълна спецификация (BOM)</h2>
 <table class="t">
   <tr><th>№</th><th>Наименование</th><th>Код / производител</th><th class="c">Мярка</th><th class="r">Кол.</th><th>Извод</th></tr>
   {% set ns = namespace(i=0) %}
@@ -251,6 +251,7 @@
 </div>
 {% endfor %}
 
+<div class="avoid">
 <h2>8. Приложими стандарти и бележки</h2>
 <ol class="rules">
   <li>IEC 62548 / БДС EN 62548 — проектиране на PV масиви: стрингове, защита от свръхток, заземяване, разединители.</li>
@@ -262,5 +263,6 @@
   <li>Количествата с „indicative“ цени в каталога са ориентировъчни — потвърдете с доставчика при поръчка.</li>
 </ol>
 <p class="muted">Документът е генериран автоматично от gmsun по данните в офертата; всички количества могат да бъдат коригирани ръчно в офертата преди печат.</p>
+</div>
 </body>
 </html>

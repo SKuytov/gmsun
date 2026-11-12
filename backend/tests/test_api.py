@@ -296,3 +296,19 @@ def test_create_project_after_delete_gets_unique_number(client, auth):
     assert c.status_code == 201, c.text
     nums = [p["number"] for p in client.get("/api/projects", headers=auth).json()]
     assert len(nums) == len(set(nums)) and c.json()["number"] > b["number"]
+
+
+def test_pdf_headline_uses_total_inverter_power(client, auth):
+    p = _make_project(client, auth)
+    items = client.get("/api/catalog/items", headers=auth).json()
+    inv = next(i for i in items if i["category"] == "inverter" and (i.get("specs") or {}).get("ac_power_kw"))
+    ac = float(inv["specs"]["ac_power_kw"])
+    q = client.post(f"/api/projects/{p['id']}/quotes", headers=auth,
+                    json={"selections": {"panel_qty": 20, "inverter_item_id": inv["id"], "inverter_qty": 2}}).json()
+    from app.db import SessionLocal
+    from app.models import Quote
+    from app.services.pdf import _num, render_quote_html
+
+    with SessionLocal() as db:
+        html = render_quote_html(db, db.get(Quote, q["id"]), "internal")
+    assert f"Фотоволтаична централа {_num(round(ac * 2, 2))} kW," in html

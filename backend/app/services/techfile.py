@@ -284,7 +284,11 @@ def render_techfile_html(db: Session, quote: Quote) -> str:
     pricing = get_setting(db, "pricing")
     project = quote.project
     sel = quote.selections or {}
-    info = sel.get("_info", {})
+    info = dict(sel.get("_info", {}))
+    if not info.get("ac_kw"):
+        from .pdf import _inverter_ac_kw
+
+        info["ac_kw"] = _inverter_ac_kw(db, sel)
     design = info.get("design") or {}
     roof = db.get(RoofTypeConfig, project.roof_type)
 

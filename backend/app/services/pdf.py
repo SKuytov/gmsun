@@ -43,13 +43,28 @@ def _data_uri(path: Path) -> str | None:
     return f"data:{mime};base64,{base64.b64encode(path.read_bytes()).decode()}"
 
 
+def _inverter_ac_kw(db: Session, sel: dict) -> float:
+    """Total inverter AC power (kW) = catalog ac_power_kw × inverter_qty; 0 when there is no inverter."""
+    from ..models import CatalogItem
+
+    try:
+        inv = db.get(CatalogItem, int(sel.get("inverter_item_id") or 0) or -1)
+        if not inv:
+            return 0.0
+        return round(float((inv.specs or {}).get("ac_power_kw") or 0) * max(1, int(sel.get("inverter_qty") or 1)), 2)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def render_quote_html(db: Session, quote: Quote, mode: str = "client") -> str:
     settings = get_settings()
     company = get_setting(db, "company")
     pricing = get_setting(db, "pricing")
     texts = get_setting(db, "texts")
     project = quote.project
-    info = (quote.selections or {}).get("_info", {})
+    info = dict((quote.selections or {}).get("_info", {}))
+    if not info.get("ac_kw"):
+        info["ac_kw"] = _inverter_ac_kw(db, quote.selections or {})
     show_unit = mode == "internal" or bool(pricing.get("show_unit_prices_client", False))
 
     roof = db.get(RoofTypeConfig, project.roof_type)
@@ -266,7 +281,10 @@ def _default_title(info: dict, project, kind: str | None = None) -> str:
     where = where_bg(kind or kind_from_code(project.roof_type))
     if where == "соларна ограда":
         where = "тип соларна ограда (вертикален монтаж)"
-    t = f"Фотоволтаична централа {_num(round(kwp, 2))} kWp, {where}"
+    # Headline power = total inverter AC power (sum over all inverters); module kWp only when there is no inverter.
+    ac = float(info.get("ac_kw") or 0)
+    power = f"{_num(round(ac, 2))} kW" if ac > 0 else f"{_num(round(kwp, 2))} kWp"
+    t = f"Фотоволтаична централа {power}, {where}"
     if storage:
         t += f", с батерийно съхранение {_num(storage)} kWh"
     t += " — доставка, монтаж и пускане в експлоатация"

@@ -112,8 +112,15 @@ thead { display: table-header-group; }
 tr { page-break-inside: avoid; }
 
 /* totals */
-.totals-wrap { display: flex; justify-content: flex-end; page-break-inside: avoid; margin-top: 8pt; }
-table.totals { width: 48%; border-collapse: collapse; font-size: 9.5pt; }
+/* Pagination rules (bulletproof against orphans): the totals never start a page alone – WeasyPrint pulls the last
+   table row(s) over with them; a section header row always stays with its first line; the signatures stay with the
+   text above them.  Must be display:block – break-before:avoid is ignored on flex containers. */
+.totals-wrap { display: block; break-before: avoid; page-break-before: avoid; break-inside: avoid; page-break-inside: avoid; margin-top: 8pt; }
+table.lines tr.section { break-after: avoid; page-break-after: avoid; }
+p, li { orphans: 3; widows: 3; }
+li { break-inside: avoid; page-break-inside: avoid; }
+ol.rules { break-inside: avoid; page-break-inside: avoid; }  /* short lists/terms move as one block (WeasyPrint still splits one taller than a page) */
+table.totals { margin-left: auto; width: 48%; border-collapse: collapse; font-size: 9.5pt; }
 table.totals td { padding: 3.5pt 6pt; }
 table.totals td.r { text-align: right; white-space: nowrap; }
 table.totals tr.grand td { font-size: 13pt; font-weight: 700; border-top: 1.25pt solid var(--rule-strong); padding-top: 6pt; }
@@ -143,7 +150,7 @@ table.totals tr.sub td { color: var(--ink-2); }
 .cap { font-size: 7.8pt; color: var(--muted); margin-top: 3pt; }
 
 /* signatures */
-.sign { display: flex; justify-content: space-between; gap: 30pt; margin-top: 22pt; page-break-inside: avoid; }
+.sign { display: flex; justify-content: space-between; gap: 30pt; margin-top: 22pt; page-break-inside: avoid; break-before: avoid; page-break-before: avoid; }
 .sign div { flex: 1; border-top: 0.75pt solid var(--rule-strong); padding-top: 5pt; font-size: 8.5pt; color: var(--ink-2); }
 .sign div b { display: block; font-weight: 600; color: var(--ink); }
 
@@ -153,6 +160,7 @@ table.totals tr.sub td { color: var(--ink-2); }
 .warnbox { border-left: 2pt solid var(--accent); padding: 4pt 8pt; margin: 3pt 0; font-size: 8.5pt; background: #fffbeb; }
 .pb { page-break-before: always; }
 .avoid { page-break-inside: avoid; }
+.keep-prev { break-before: avoid; page-break-before: avoid; }  /* closing note stays with the block above it */
 .grid { display: flex; gap: 14pt; }
 .grid > div { flex: 1 1 0; min-width: 0; }
 .dot { display: inline-block; width: 8pt; height: 8pt; margin-right: 4pt; vertical-align: middle; }
