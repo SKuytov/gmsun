@@ -286,3 +286,13 @@ def test_delete_quote_keeps_orders(client, auth):
         pos = db.query(PurchaseOrder).filter(PurchaseOrder.project_id == p["id"]).all()
         assert pos and all(po.quote_id is None for po in pos)
     assert client.delete(f"/api/projects/{p['id']}", headers=auth).status_code == 204
+
+
+def test_create_project_after_delete_gets_unique_number(client, auth):
+    a = client.post("/api/projects", headers=auth, json={"name": "A"}).json()
+    b = client.post("/api/projects", headers=auth, json={"name": "B"}).json()
+    assert client.delete(f"/api/projects/{a['id']}", headers=auth).status_code == 204
+    c = client.post("/api/projects", headers=auth, json={"name": "C"})
+    assert c.status_code == 201, c.text
+    nums = [p["number"] for p in client.get("/api/projects", headers=auth).json()]
+    assert len(nums) == len(set(nums)) and c.json()["number"] > b["number"]

@@ -738,8 +738,15 @@ def next_quote_number(db: Session, project: Project, prefix: str = "") -> str:
 
     d = date.today()
     base = f"{prefix}{d:%y%m%d}"
-    n = db.query(Quote).filter(Quote.number.like(f"{base}-%")).count() + 1
-    return f"{base}-{n:02d}PV"
+    # Highest existing sequence of the day + 1; versions share a number and deleted offers must not cause reuse.
+    import re
+
+    n = 0
+    for (num,) in db.query(Quote.number).filter(Quote.number.like(f"{base}-%")).distinct().all():
+        m = re.match(rf"^{re.escape(base)}-(\d+)", num or "")
+        if m:
+            n = max(n, int(m.group(1)))
+    return f"{base}-{n + 1:02d}PV"
 
 
 def estimate_yield(kwp: float, specific_yield: float, azimuth_deg: float = 180.0, tilt_deg: float = 20.0, bifaciality: float = 0.0) -> float:

@@ -28,8 +28,14 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 
 def _project_number(db: Session) -> str:
     y = date.today().year
-    n = db.query(func.count(Project.id)).filter(Project.number.like(f"P{y}-%")).scalar() or 0
-    return f"P{y}-{n + 1:04d}"
+    # Next number = highest existing + 1 (a count would reuse a number after a project is deleted -> unique violation).
+    prefix = f"P{y}-"
+    n = 0
+    for (num,) in db.query(Project.number).filter(Project.number.like(prefix + "%")).all():
+        tail = (num or "")[len(prefix):]
+        if tail.isdigit():
+            n = max(n, int(tail))
+    return f"{prefix}{n + 1:04d}"
 
 
 def _get(db: Session, pid: int) -> Project:
